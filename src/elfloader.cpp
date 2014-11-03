@@ -15,10 +15,48 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 
 
+ParavirtState::ParavirtState(ElfFile* file){
+	this->updateState(file);
+}
+
+ParavirtState::~ParavirtState(){}
+
+void ParavirtState::updateState(ElfFile* file){
+
+    pv_init_ops = Variable::findVariableByName("pv_init_ops")->getInstance();
+    pv_time_ops = Variable::findVariableByName("pv_time_ops")->getInstance();
+    pv_cpu_ops  = Variable::findVariableByName("pv_cpu_ops" )->getInstance();
+    pv_irq_ops  = Variable::findVariableByName("pv_irq_ops" )->getInstance();
+    pv_apic_ops = Variable::findVariableByName("pv_apic_ops")->getInstance();
+    pv_mmu_ops  = Variable::findVariableByName("pv_mmu_ops" )->getInstance();
+    pv_lock_ops = Variable::findVariableByName("pv_lock_ops")->getInstance();
+    
+    nopFuncAddress = file->
+				findAddressOfVariable("_paravirt_nop");
+    ident32NopFuncAddress = file->
+				findAddressOfVariable("_paravirt_ident_32");
+    ident64NopFuncAddress = file->
+				findAddressOfVariable("_paravirt_ident_64");
+	assert(ident64NopFuncAddress);
+
+    const Structured * pptS = 
+		dynamic_cast<const Structured*>(
+				BaseType::findBaseTypeByName("paravirt_patch_template"));
+	assert(pptS);
+
+    pv_irq_opsOffset = pptS->memberOffset("pv_irq_ops");
+    pv_cpu_opsOffset = pptS->memberOffset("pv_cpu_ops");
+	pv_mmu_opsOffset = pptS->memberOffset("pv_mmu_ops");
+    
+}
+
 ElfLoader::ElfLoader(ElfFile* elffile):
 	elffile(elffile),
 	textSegment(),
-	dataSegment(){
+	textSegmentContent(),
+	jumpTable(),
+	dataSegment(),
+	paravirtState(elffile){
 
 	this->ideal_nops = p6_nops;
 
@@ -87,34 +125,27 @@ uint64_t ElfLoader::get_call_destination(uint32_t type)
     //In memory they are directly after each other.
     //Thus type is an index into the resulting array.
 
-    Instance pv_init_ops = Variable::findVariableByName("pv_init_ops")->getInstance();
-    Instance pv_time_ops = Variable::findVariableByName("pv_time_ops")->getInstance();
-    Instance pv_cpu_ops  = Variable::findVariableByName("pv_cpu_ops" )->getInstance();
-    Instance pv_irq_ops  = Variable::findVariableByName("pv_irq_ops" )->getInstance();
-    Instance pv_apic_ops = Variable::findVariableByName("pv_apic_ops")->getInstance();
-    Instance pv_mmu_ops  = Variable::findVariableByName("pv_mmu_ops" )->getInstance();
-    Instance pv_lock_ops = Variable::findVariableByName("pv_lock_ops")->getInstance();
 
-    if(type < pv_init_ops.size()) 
-		return pv_init_ops.memberByOffset(type).getRawValue<uint64_t>();
-    type -= pv_init_ops.size();
-    if(type < pv_time_ops.size()) 
-		return pv_time_ops.memberByOffset(type).getRawValue<uint64_t>();
-    type -= pv_time_ops.size();
-    if(type < pv_cpu_ops.size())  
-		return pv_cpu_ops .memberByOffset(type).getRawValue<uint64_t>();
-    type -= pv_cpu_ops.size();
-    if(type < pv_irq_ops.size())  
-		return pv_irq_ops .memberByOffset(type).getRawValue<uint64_t>();
-    type -= pv_irq_ops.size();
-    if(type < pv_apic_ops.size()) 
-		return pv_apic_ops.memberByOffset(type).getRawValue<uint64_t>();
-    type -= pv_apic_ops.size();
-    if(type < pv_mmu_ops.size())  
-		return pv_mmu_ops .memberByOffset(type).getRawValue<uint64_t>();
-    type -= pv_mmu_ops.size();
-    if(type < pv_lock_ops.size()) 
-		return pv_lock_ops.memberByOffset(type).getRawValue<uint64_t>();
+    if(type < paravirtState.pv_init_ops.size()) 
+		return paravirtState.pv_init_ops.memberByOffset(type).getRawValue<uint64_t>(false);
+    type -= paravirtState.pv_init_ops.size();
+    if(type < paravirtState.pv_time_ops.size()) 
+		return paravirtState.pv_time_ops.memberByOffset(type).getRawValue<uint64_t>(false);
+    type -= paravirtState.pv_time_ops.size();
+    if(type < paravirtState.pv_cpu_ops.size())  
+		return paravirtState.pv_cpu_ops .memberByOffset(type).getRawValue<uint64_t>(false);
+    type -= paravirtState.pv_cpu_ops.size();
+    if(type < paravirtState.pv_irq_ops.size())  
+		return paravirtState.pv_irq_ops .memberByOffset(type).getRawValue<uint64_t>(false);
+    type -= paravirtState.pv_irq_ops.size();
+    if(type < paravirtState.pv_apic_ops.size()) 
+		return paravirtState.pv_apic_ops.memberByOffset(type).getRawValue<uint64_t>(false);
+    type -= paravirtState.pv_apic_ops.size();
+    if(type < paravirtState.pv_mmu_ops.size())  
+		return paravirtState.pv_mmu_ops .memberByOffset(type).getRawValue<uint64_t>(false);
+    type -= paravirtState.pv_mmu_ops.size();
+    if(type < paravirtState.pv_lock_ops.size()) 
+		return paravirtState.pv_lock_ops.memberByOffset(type).getRawValue<uint64_t>(false);
 
     return 0;
 }
@@ -126,33 +157,6 @@ uint8_t ElfLoader::paravirt_patch_default(uint32_t type, uint16_t clobbers, void
     //Get Memory of paravirt_patch_template + type
     uint64_t opfunc = get_call_destination(type);
 
-//    std::cout << "Call address is: " << hex
-//                   << opfunc << " "
-//                   << dec << std::endl;
-
-    uint64_t nopFuncAddress = 0;
-    uint64_t ident32NopFuncAddress = 0;
-    uint64_t ident64NopFuncAddress = 0;
-	
-    nopFuncAddress = this->elffile->
-				findAddressOfVariable("_paravirt_nop");
-    ident32NopFuncAddress = this->elffile->
-				findAddressOfVariable("_paravirt_ident_32");
-    ident64NopFuncAddress = this->elffile->
-				findAddressOfVariable("_paravirt_ident_64");
-	assert(ident64NopFuncAddress);
-
-    //Get pv_cpu_ops to check offsets in else clause
-    const Structured * pptS = 
-		dynamic_cast<const Structured*>(
-				BaseType::findBaseTypeByName("paravirt_patch_template"));
-	assert(pptS);
-
-    uint32_t pv_cpu_opsOffset = pptS->memberOffset("pv_cpu_ops");
-    Variable *pv_cpu_ops_var = Variable::findVariableByName("pv_cpu_ops");
-	assert(pv_cpu_ops_var);
-    Instance pv_cpu_ops = pv_cpu_ops_var->getInstance();
-    
     if (!opfunc)
     {
         // opfunc == NULL
@@ -163,21 +167,25 @@ uint8_t ElfLoader::paravirt_patch_default(uint32_t type, uint16_t clobbers, void
         ret = paravirt_patch_nop();
     }
     //TODO get address of Function Paravirt nop
-    else if (opfunc == nopFuncAddress){
+    else if (opfunc == paravirtState.nopFuncAddress){
         /* If the operation is a nop, then nop the callsite */
         ret = paravirt_patch_nop();
 	}
     /* identity functions just return their single argument */
-    else if (opfunc == ident32NopFuncAddress){
+    else if (opfunc == paravirtState.ident32NopFuncAddress){
         ret = paravirt_patch_insns(insnbuf, len, start__mov32, end__mov32);
 	}
-    else if (opfunc == ident64NopFuncAddress){
+    else if (opfunc == paravirtState.ident64NopFuncAddress){
         ret = paravirt_patch_insns(insnbuf, len, start__mov64, end__mov64);
 	}
-    else if (type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("iret") ||
-             type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("irq_enable_sysexit") ||
-             type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("usergs_sysret32") ||
-             type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("usergs_sysret64"))
+    else if (type == paravirtState.pv_cpu_opsOffset + 
+				paravirtState.pv_cpu_ops.memberOffset("iret") ||
+             type == paravirtState.pv_cpu_opsOffset + 
+				paravirtState.pv_cpu_ops.memberOffset("irq_enable_sysexit") ||
+             type == paravirtState.pv_cpu_opsOffset + 
+				paravirtState.pv_cpu_ops.memberOffset("usergs_sysret32") ||
+             type == paravirtState.pv_cpu_opsOffset + 
+				paravirtState.pv_cpu_ops.memberOffset("usergs_sysret64"))
     {
         /* If operation requires a jmp, then jmp */
         //std::cout << "Patching jump!" << std::endl;
@@ -208,29 +216,9 @@ uint32_t ElfLoader::paravirtNativePatch(uint32_t type, uint16_t clobbers, void *
 {
     uint32_t ret = 0;
 
-    const Structured * pptS = 
-		dynamic_cast<const Structured*>(
-				BaseType::findBaseTypeByName("paravirt_patch_template"));
-	assert(pptS);
-
-    uint32_t pv_irq_opsOffset = pptS->memberOffset("pv_irq_ops");
-    Variable *pv_irq_ops_var = Variable::findVariableByName("pv_irq_ops");
-	assert(pv_irq_ops_var);
-    Instance pv_irq_ops = pv_irq_ops_var->getInstance();
-	
-    uint32_t pv_cpu_opsOffset = pptS->memberOffset("pv_cpu_ops");
-    Variable *pv_cpu_ops_var = Variable::findVariableByName("pv_cpu_ops");
-	assert(pv_cpu_ops_var);
-    Instance pv_cpu_ops = pv_cpu_ops_var->getInstance();
-    
-	uint32_t pv_mmu_opsOffset = pptS->memberOffset("pv_mmu_ops");
-    Variable *pv_mmu_ops_var = Variable::findVariableByName("pv_mmu_ops");
-	assert(pv_mmu_ops_var);
-    Instance pv_mmu_ops = pv_mmu_ops_var->getInstance();
-    
 
 #define PATCH_SITE(ops, x)		\
-  else if(type == ops##Offset + ops.memberOffset("" #x )) \
+  else if(type == paravirtState.ops##Offset + paravirtState.ops.memberOffset("" #x )) \
   {                                                         \
       ret = paravirt_patch_insns(ibuf, len, start_##ops##_##x, end_##ops##_##x);    \
   } 
@@ -261,6 +249,8 @@ uint32_t ElfLoader::paravirtNativePatch(uint32_t type, uint16_t clobbers, void *
 }
 
 void ElfLoader::applyAltinstr(){
+	uint64_t count = 0;
+	uint64_t count_all = 0;
     uint8_t *instr;
     uint8_t *replacement;
     unsigned char insnbuf[255-1];
@@ -282,16 +272,24 @@ void ElfLoader::applyAltinstr(){
 	assert(boot_cpu_data_var);
 
 	Instance boot_cpu_data = boot_cpu_data_var->getInstance();
+    Instance x86_capability = boot_cpu_data.memberByName("x86_capability");
+
+	uint32_t cpuCaps[10] = {0};
+	for (uint8_t i = 0; i < 10; i++){
+		cpuCaps[i] = x86_capability.arrayElem(i).getRawValue<uint32_t>(false);
+	}
 
     for(struct alt_instr * a = start ; a < end ; a++)
-    {
+	{
         //if (!boot_cpu_has(a->cpuid)) continue;
+
+		count_all += 1;
 		
-        Instance x86_capability = boot_cpu_data.memberByName("x86_capability");
-        if (!((x86_capability.arrayElem(a->cpuid / 32).
-						getRawValue<uint32_t>() >> (a->cpuid % 32)) & 0x1)){ 
+        if (!((cpuCaps[a->cpuid / 32] >> (a->cpuid % 32)) & 0x1)){ 
 			continue;
         }
+
+		count += 1;
 
         instr = ((uint8_t *)&a->instr_offset) + a->instr_offset;
         replacement = ((uint8_t *)&a->repl_offset) + a->repl_offset;
@@ -323,9 +321,12 @@ void ElfLoader::applyAltinstr(){
 
         memcpy(instr, insnbuf, a->instrlen);
     }
+
+	std::cout << "Applied " << count << " / " << count_all << " Altinstructions" << std::endl;
 }
 
 void ElfLoader::applyParainstr(){
+	uint64_t count = 0;
 	SegmentInfo info = this->elffile->findSegmentWithName(".parainstructions");
 	if (!info.index) return;
     
@@ -344,6 +345,8 @@ void ElfLoader::applyParainstr(){
 
     for (struct paravirt_patch_site *p = start; p < end; p++) {
         unsigned int used;
+
+		count += 1;
 
         //BUG_ON(p->len > MAX_PATCH_LEN);
 		//parainstructions: impossible length
@@ -375,295 +378,186 @@ void ElfLoader::applyParainstr(){
         add_nops(insnbuf + used, p->len - used);      //add_nops
         memcpy(instrInElf, insnbuf, p->len);   //memcpy
     }
+	std::cout << "Applied " << count << " Paravirt instructions" << std::endl;
 }
 
 void ElfLoader::applySmpLocks(){
 	SegmentInfo info = this->elffile->findSegmentWithName(".smp_locks");
 	if (!info.index) return;
+
+    unsigned char lock = 0;
+	uint64_t count = 0;
+    
+	int32_t * smpLocksStart = (int32_t *) info.index;;
+    int32_t * smpLocksStop  = (int32_t *) (info.index + info.size);
+	
+	//Find boot_cpu_data in kernel
+	Variable *boot_cpu_data_var = Variable::findVariableByName("boot_cpu_data");
+	assert(boot_cpu_data_var);
+	
+	Instance boot_cpu_data = boot_cpu_data_var->getInstance();
+    Instance x86_capability = boot_cpu_data.memberByName("x86_capability");
+    if (!((x86_capability.arrayElem(X86_FEATURE_UP / 32).
+					getRawValue<uint32_t>(false) >> (X86_FEATURE_UP % 32)) & 0x1))
+    {
+        /* turn lock prefix into DS segment override prefix */
+        lock = 0x3e;
+    }
+    else
+    {
+        /* turn DS segment override prefix into lock prefix */
+        lock = 0xf0;
+    }
+
+
+	this->updateSegmentInfoMemAddress(info);
+
+    //bool addSmpEntries = false;
+    //if(context.smpOffsets.size() == 0) addSmpEntries = true;
+    
+    for(int32_t * poff = smpLocksStart; poff < smpLocksStop ; poff++)
+    {
+		count += 1;
+        uint8_t *ptr = (uint8_t *)poff + *poff;
+
+
+        //Adapt offset in ELF
+        int32_t offset = (info.index - this->textSegment.index) - 
+			(info.memindex - this->textSegment.memindex);
+        ptr -= offset;
+
+        *ptr = lock;
+
+        //if (addSmpEntries) context.smpOffsets.insert((quint64) ptr - (quint64) context.textSegment.index);
+    }
+	std::cout << "Applied " << count << " SMP instructions" << std::endl;
 }
 
 void ElfLoader::applyMcount(SegmentInfo &info){
-	UNUSED(info);
+    //See ftrace_init_module in kernel/trace/ftrace.c
+
+	uint64_t count = 0;
+    uint64_t * mcountStart = (uint64_t *) info.index;
+    uint64_t * mcountStop  = (uint64_t *) (info.index + info.size);
+
+    //bool addMcountEntries = false;
+    //if(context.mcountEntries.size() == 0) addMcountEntries = true;
+    for(uint64_t * i = mcountStart; i < mcountStop; i++)
+    {
+		count += 1;
+        //if (addMcountEntries) context.mcountEntries.insert((*i));
+        add_nops((void*) (this->textSegmentContent.data() + (*i) - this->textSegment.memindex), 5);
+    }
+	std::cout << "Applied " << count << " Mcount instructions" << std::endl;
 }
 
-void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint64_t jumpStop){
-	UNUSED(jumpStart);
-	UNUSED(jumpStop);
+void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
+	uint64_t count = 0;
+	//Apply the jump tables after the segments are adjacent
+    //jump_label_apply_nops() => http://lxr.free-electrons.com/source/arch/x86/kernel/module.c#L205
+    //the entry type is 0 for disable and 1 for enable
+
+    //bool addJumpEntries = false;
+    //if(context.jumpEntries.size() == 0) addJumpEntries = true;
+
+    //if(context.type == Detect::KERNEL_CODE)
+    //{
+    //    numberOfJumpEntries = (jumpStop - jumpStart) / sizeof(struct jump_entry);
+    //}
+    //else if(context.type == Detect::MODULE)
+    //{
+    //    numberOfJumpEntries = context.currentModule.member("num_jump_entries").toUInt32();
+    //}
+
+    struct jump_entry * startEntry = (struct jump_entry *) this->jumpTable.data();
+    struct jump_entry * endEntry   = (struct jump_entry *) (this->jumpTable.data() + 
+																this->jumpTable.size());
+
+	BaseType* jump_entry_bt = BaseType::findBaseTypeByName("jump_entry");
+	BaseType* static_key_bt = BaseType::findBaseTypeByName("static_key");
+    for(uint32_t i = 0 ; i < numberOfEntries ; i++)
+    {
+        Instance jumpEntry = Instance(NULL, 0);
+		if (dynamic_cast<ElfKernelLoader*>(this)){
+			uint64_t instanceAddress = 0;
+			
+			//This is not a real array in memory but has more readability
+			instanceAddress = (uint64_t) &((struct jump_entry *) jumpStart)[i];
+			
+			jumpEntry = jump_entry_bt->getInstance(instanceAddress);
+            
+			//Do not apply jump entries to .init.text
+			
+
+			uint64_t codeAddress = jumpEntry.memberByName("code").getValue<uint64_t>();
+            if (codeAddress > 
+					(uint64_t) this->textSegment.memindex + this->textSegment.size)
+            {
+                continue;
+            }
+		}
+		else if (dynamic_cast<ElfModuleLoader*>(this)){
+			//	TODO!!!!
+			//    jumpEntry = context.currentModule.member("jump_entries").arrayElem(i);
+		}
+
+        uint64_t keyAddress = jumpEntry.memberByName("key").getValue<uint64_t>();
+
+        //if(doPrint) Console::out() << hex << "Code: " << jumpEntry.member("code").toUInt64() << " target: " << jumpEntry.member("target").toUInt64() << dec << endl;
+        //if(doPrint) Console::out() << hex << "Code offset : " << jumpEntry.member("code").toUInt64() - textSegmentInMem << " target offset : " << jumpEntry.member("target").toUInt64() - textSegmentInMem << dec << endl;
+
+        Instance key = static_key_bt->getInstance(keyAddress);
+        uint64_t enabled = key.memberByName("enabled")
+							  .memberByName("counter")
+							  .getValue<int64_t>();
+
+        //if(doPrint) Console::out() << hex << "Key @ " << keyAddress << " is: " << enabled << dec << endl;
+
+		uint64_t codeEntry = jumpEntry.memberByName("code").getValue<uint64_t>();
+        for (struct jump_entry * entry = startEntry ; entry < endEntry; entry++){
+            //Check if current elf entry is current kernel entry
+            if (codeEntry ==  entry->code)
+            {
+
+				count +=1;
+                uint64_t patchOffset = entry->code - 
+								(uint64_t) this->textSegment.memindex;
+
+                char * patchAddress = (char *) (patchOffset + 
+								(uint64_t) this->textSegmentContent.data());
+
+                //if(doPrint) Console::out() << "Jump Entry @ " << hex << patchOffset << dec;
+                //if(doPrint) Console::out() << " " << ((enabled) ? "enabled" : "disabled") << endl;
+
+                int32_t destination = entry->target - (entry->code + 5);
+                //if(addJumpEntries){
+                //    context.jumpEntries.insert(entry->code, destination);
+                //    context.jumpDestinations.insert(entry->target);
+                //}
+
+
+                if(enabled)
+                {
+                    //if(doPrint) Console::out() << hex << "Patching jump " << 
+					//    "@ : " << patchOffset << dec << endl;
+                    *patchAddress = (char) 0xe9;
+                    *((int32_t*) (patchAddress + 1)) = destination;
+                }
+                else
+                {
+                    add_nops(patchAddress, 5);      //add_nops
+                }
+            }
+        }
+    }
+	std::cout << "Applied " << count << " JMP entries" << std::endl;
 }
 
 void ElfLoader::parseElfFile(){
+	std::cout << "Parsing file" << std::endl;
 	this->initText();
 	this->initData();
 }
-
-//int ElfLoader64::apply_relocate()
-//{
-//	char* fileContent = this->elffile->getFileContent;
-//
-//    Elf64_Rela *rel = (Elf64_Rela *) (fileContent + elf64Shdr[context.relsec].sh_offset);
-//    Elf32_Word sectionId = sechdrs[context.relsec].sh_info;
-//    QString sectionName = QString(fileContent + sechdrs[context.shstrindex].sh_offset + sechdrs[sectionId].sh_name);
-//
-//    //Elf64_Rela *rel = (void *)sechdrs[relsec].sh_addr;
-//
-//    Elf64_Sym *symBase = (Elf64_Sym *) (fileContent + sechdrs[context.symindex].sh_offset);
-//    Elf64_Sym *sym;
-//
-//    void *locInElf = 0;
-//    void *locInMem = 0;
-//    void *locOfRelSectionInMem = 0;
-//    void *locOfRelSectionInElf = 0;
-//    uint64_t val;
-//    uint64_t i;
-//
-//    void *sectionBaseElf = (void *) (fileContent + sechdrs[sectionId].sh_offset);
-//    void *sectionBaseMem = 0;
-//
-//    sectionBaseMem = (void *) findMemAddressOfSegment(context, sectionName);
-//
-//    bool doPrint = false;
-//
-//    //if(sectionName.compare("__kcrctab_gpl") == 0) doPrint = true;
-//
-//    if(doPrint) std::cout << "Section to Relocate: " << sectionName << dec << std::endl;
-//
-//    for (i = 0; i < sechdrs[context.relsec].sh_size / sizeof(*rel); i++) {
-//        /* This is where to make the change */
-//        //loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
-//        //        + rel[i].r_offset;
-//        locInElf = (void *) ((char*)sectionBaseElf + rel[i].r_offset);
-//        locInMem = (void *) ((char*)sectionBaseMem + rel[i].r_offset);
-//
-//        /* This is the symbol it is referring to.  Note that all
-//               undefined symbols have been resolved.  */
-//        //sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
-//        //        + ELF64_R_SYM(rel[i].r_info);
-//        //sym = (Elf64_Sym *) (fileContent + sechdrs[context.symindex].sh_offset)
-//        //        + ELF64_R_SYM(rel[i].r_info);
-//        sym = symBase + ELF64_R_SYM(rel[i].r_info);
-//
-//        Variable* v = NULL;
-//        Instance symbol;
-//
-//        QString symbolName = QString(&((fileContent + sechdrs[context.strindex].sh_offset)[sym->st_name]));
-//
-//        /////////////////////////////////////////////////////////////////////
-//        //if ((unsigned long) locInMem == 0xffffffffa0000006) doPrint = true;
-//        //if (rel[i].r_offset == 0xf1f) doPrint = true;
-//        //if (symbolName.compare("snd_pcm_set_sync") == 0) doPrint = true;
-//        //if(context.currentModule.member("name").toString().compare("\"virtio_balloon\"") == 0 && rel[i].r_offset == 0xb43) doPrint = true;
-//        //        sectionName.compare(".altinstructions") == 0 && i <= 1) doPrint = true;
-//        /////////////////////////////////////////////////////////////////////
-//
-//        if(doPrint) std::cout << std::endl;
-//        if(doPrint) std::cout << "Loc in Elf: " << hex << locInElf << dec << std::endl;
-//        if(doPrint) std::cout << "Loc in Mem: " << hex << locInMem << dec << std::endl;
-//        if(doPrint) std::cout << "Sym: " << hex << symbolName << " @ " << sym << " (Offset: 0x" << ELF64_R_SYM(rel[i].r_info) << " , Info: 0x" << sym->st_info << " )" << " Bind type: " << ELF64_ST_BIND(sym->st_info) << dec << std::endl;
-//
-//        if(doPrint) std::cout << "Name of current Section: " << QString(fileContent + sechdrs[context.shstrindex].sh_offset + sechdrs[sectionId].sh_name) << std::endl;
-//        //			std::cout << "type " << (int)ELF64_R_TYPE(rel[i].r_info) << " st_value " << sym->st_value << " r_addend " << rel[i].r_addend << " loc " << hex << (u64)loc << dec << std::endl;
-//
-//        switch(sym->st_shndx){
-//        case SHN_COMMON:
-//            if(doPrint) std::cout << "Symtype SHN_UNDEF" << std::endl;
-//            debugerr("This should not happen!");
-//            continue; //TODO REMOVE
-//            break;
-//        case SHN_ABS:
-//            if(doPrint) std::cout << "Symtype SHN_ABS" << std::endl;
-//            //printf("Nothing to do!\n");
-//            break;
-//        case SHN_UNDEF:
-//            //debugerr("Sym Type: SHN_UNDEF");
-//
-//            //Resolve Symbol and write to st_value
-//            if(doPrint) std::cout << "Symtype SHN_UNDEF" << std::endl;
-//            if(doPrint) std::cout << "System Map contains " << _sym.memSpecs().systemMap.count(symbolName) << " Versions of that symbol." << std::endl;
-//
-//
-//            if(_symTable.contains(symbolName))
-//            {
-//                sym->st_value = _symTable.value(symbolName);
-//                if(doPrint) std::cout << "Found symbol @" << hex << sym->st_value << dec << std::endl;
-//            }
-//            //Try to find variable in system map
-//            else if (_sym.memSpecs().systemMap.count(symbolName) > 0)
-//            {
-//                //std::cout << "Found Variable in system.map: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << std::endl;
-//                //sym->st_value = _sym.memSpecs().systemMap.value(symbolName).address;
-//                QList<SystemMapEntry> symbols = _sym.memSpecs().systemMap.values(symbolName);
-//                for (QList<SystemMapEntry>::iterator i = symbols.begin(); i != symbols.end(); ++i)
-//                {
-//                    SystemMapEntry currentEntry = (*i);
-//
-//                    //ELF64_ST_BIND(sym->st_info) => 0: Local, 1: Global, 2: Weak
-//                    //currentEntry.type => 'ascii' lowercase: local, uppercase: global
-//                    if (ELF64_ST_BIND(sym->st_info) == 1 && currentEntry.type >= 0x41 && currentEntry.type <= 0x5a)
-//                    {
-//                        if(doPrint) std::cout << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Global" << dec << std::endl;
-//                        sym->st_value = currentEntry.address;
-//                    }
-//                    else if (ELF64_ST_BIND(sym->st_info) == 0 && currentEntry.type >= 0x61 && currentEntry.type <= 0x7a)
-//                    {
-//                        if(doPrint) std::cout << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Local" << dec << std::endl;
-//                        sym->st_value = currentEntry.address;
-//                    }
-//                }
-//            }
-//            else
-//            {
-//                //std::cout << "Variable not found in system.map: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << std::endl;
-//                //Try to find the variable by name in insight.
-//                v = _sym.factory().findVarByName(symbolName);
-//                if (!v)
-//                {
-//                    //debugerr("Variable " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << " not found! ERROR!");
-//                    QList<BaseType*> types = _sym.factory().typesByName().values(symbolName);
-//
-//                    if(types.size() > 0)
-//                    {
-//                        BaseType* bt;
-//                        //std::cout << "Type found in insight: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << std::endl;
-//                        for(int k = 0 ; k < types.size() ; k++)
-//                        {
-//                            bt = types.at(k);
-//                            //std::cout << k << ": " << (bt && (bt->type() == rtFunction) ? "function" : "type") << " with size " <<  bt->size() << std::endl;
-//                            // Only use the type if it is a function and got a defined size
-//                            if( bt->type() == rtFunction && bt->size() > 0) { break; }
-//
-//                            if(k == types.size() - 1)
-//                            {
-//                                //std::cout << "Function not found in insight: " << symbolName << std::endl;
-//                                //TODO handle this case does this happen??
-//                            }
-//                        }
-//                        const Function* func = dynamic_cast<const Function*>(bt);
-//
-//                        if (func) {
-//                            sym->st_value = func->pcLow();
-//                            if(doPrint) std::cout << "Function found in: " << hex << sym->st_value << dec << std::endl;
-//                            //TODO check if somewhere the startaddress is zero! bug!
-////                            std::cout << Console::color(ctColHead) << "  Start Address:  "
-////                                 << Console::color(ctAddress) << QString("0x%1").arg(
-////                                                            func->pcLow(),
-////                                                            _sym.memSpecs().sizeofPointer << 1,
-////                                                            16,
-////                                                            QChar('0'))
-////                                 << Console::color(ctReset)
-////                                 << std::endl;
-//                        }
-//
-//                    } //Else no type with with the given name found.
-//                    continue;
-//                }
-//                //std::cout << "Variable found in insight: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << std::endl;
-//                symbol = v->toInstance(_vmem, BaseType::trLexical, ksAll);
-//                if(!symbol.isValid())
-//                {
-//                    debugerr("Symbol " << symbolName << " not found! ERROR!");
-//                    continue;
-//                }
-//                //std::cout << "Symbol found with address : 0x" << hex << symbol.address() << dec << std::endl;
-//                sym->st_value = symbol.address();
-//
-//                if(doPrint) std::cout << "Instance found: " << hex << sym->st_value << dec << std::endl;
-//
-//            }
-//
-//            break;
-//        default:
-//            if(doPrint) std::cout << "default: " << std::endl;
-//            //debugerr("Sym Type: default: " << sym->st_shndx);
-//
-//            //TODO this is not right yet.
-//            /* Divert to percpu allocation if a percpu var. */
-//            if (sym->st_shndx == context.percpuDataSegment)
-//            {
-//                locOfRelSectionInMem = context.currentModule.member("percpu").toPointer();
-//                //sym->st_value += (unsigned long)mod_percpu(mod);
-//                if(doPrint) std::cout << "Per CPU variable" << std::endl;
-//            }
-//            else
-//            {
-//                QString relocSection = QString(&((fileContent + sechdrs[context.shstrindex].sh_offset)[sechdrs[sym->st_shndx].sh_name]));
-//                locOfRelSectionInElf = (void *) findElfSegmentWithName(fileContent, relocSection).index;
-//                locOfRelSectionInMem = (void *) findMemAddressOfSegment(context, relocSection);
-//                if(doPrint) std::cout << "SectionName: " << hex << relocSection << dec << std::endl;
-//            }
-//
-//            //Only add the location of the section if it was not already added
-//            if(doPrint) std::cout << "old st_value: " << hex << sym->st_value << dec;
-//            if(doPrint) std::cout << " locOfRelSectionInMem: " << hex << locOfRelSectionInMem << dec;
-//            if(doPrint) std::cout << " locOfRelSectionInElf: " << hex << locOfRelSectionInElf << dec << std::endl;
-//
-//            if(sym->st_value < (long unsigned int) locOfRelSectionInMem)
-//            {
-//                sym->st_value += (long unsigned int) locOfRelSectionInMem;
-//            }
-//
-//            break;
-//        }
-//
-//        val = sym->st_value + rel[i].r_addend;
-//
-//        if(doPrint) std::cout << "raddend: " << hex << rel[i].r_addend << dec << std::endl;
-//        if(doPrint) std::cout << "sym->value: " << hex << sym->st_value << dec << std::endl;
-//        if(doPrint) std::cout << "val: " << hex << val << dec << std::endl;
-//
-//        switch (ELF64_R_TYPE(rel[i].r_info)) {
-//        case R_X86_64_NONE:
-//            break;
-//        case R_X86_64_64:
-//            *(uint64_t *)locInElf = val;
-//            break;
-//        case R_X86_64_32:
-//            *(uint32_t *)locInElf = val;
-//            if (val != *(uint32_t *)locInElf)
-//                goto overflow;
-//            break;
-//        case R_X86_64_32S:
-//            *(qint32 *)locInElf = val;
-//            if(doPrint) std::cout << " 32S final value: " << hex << (qint32) val << dec << std::endl;
-//            if ((qint64)val != *(qint32 *)locInElf)
-//                goto overflow;
-//            break;
-//        case R_X86_64_PC32:
-//
-//            //This line is from the original source the loc here is the location within the loaded module.
-//            //val -= (u64)loc;
-//            if(sectionName.compare(".altinstructions") == 0)
-//            {
-//                //This is later used to copy some memory
-//                val = val - (uint64_t)locOfRelSectionInMem + (uint64_t)locOfRelSectionInElf - (uint64_t)locInElf;
-//            }
-//            else
-//            {
-//                //This is used as relocation in memory
-//                val -= (uint64_t)locInMem;
-//            }
-//            if(doPrint) std::cout << "PC32 final value: " << hex << (uint32_t) val << dec << std::endl;
-//            *(uint32_t *)locInElf = val;
-//#if 0
-//            if ((qint64)val != *(qint32 *)loc)
-//                goto overflow;
-//#endif
-//            break;
-//        default:
-//            debugerr("Unknown rela relocation: " << ELF64_R_TYPE(rel[i].r_info));
-//            return -ENOEXEC;
-//        }
-//        doPrint = false;
-//    }
-//    return 0;
-//
-//overflow:
-//    Console::err() << "overflow in relocation type " << (int)ELF64_R_TYPE(rel[i].r_info) << " val " << hex << val << std::endl;
-//    Console::err() << "likely not compiled with -mcmodel=kernel" << std::endl;
-//    return -ENOEXEC;
-//	return 0;
-//}
-
-////////////////////////////////////////////////////
 
 ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	ElfLoader(elffile),
@@ -672,10 +566,8 @@ ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	bssSegment(),
 	rodataSegment(),
 	fentryAddress(0),
-	genericUnrolledAddress(0),
-
-	textSegmentContent(),
-	jumpTable(){}
+	genericUnrolledAddress(0)
+	{}
 
 ElfKernelLoader::~ElfKernelLoader(){}
 
@@ -750,8 +642,10 @@ void ElfKernelLoader::initText(void) {
 		this->jumpTable.insert(this->jumpTable.end(),
 					info.index, info.index + info.size);
 	}
+    uint32_t numberOfEntries = (jumpStop - jumpStart) / sizeof(struct jump_entry);
 
-	applyJumpEntries( jumpStart, jumpStop);
+
+	applyJumpEntries( jumpStart, numberOfEntries );
 }
 
 //TODO the following must also be put in its own function
@@ -1125,7 +1019,7 @@ ElfKernelLoader32::~ElfKernelLoader32(){}
 
 ElfKernelLoader64::ElfKernelLoader64(ElfFile64* elffile):
 	ElfKernelLoader(elffile){
-	//this->parseElfFile();
+	this->parseElfFile();
 }
 
 ElfKernelLoader64::~ElfKernelLoader64(){}

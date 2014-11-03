@@ -4,6 +4,7 @@
 #include "elffile.h"
 
 #include "elfmodule.h"
+#include "libdwarfparser/libdwarfparser.h"
 
 #include <vector>
 
@@ -18,6 +19,34 @@ class ElfLoader64Module;
 class ElfFile;
 class SegmentInfo;
 
+class ParavirtState{
+
+	public:
+		ParavirtState(ElfFile* file);
+		virtual ~ParavirtState();
+
+		void updateState(ElfFile* file);
+
+
+		Instance pv_init_ops;	
+	    Instance pv_time_ops;
+	    Instance pv_cpu_ops;
+	    Instance pv_irq_ops;
+	    Instance pv_apic_ops;
+	    Instance pv_mmu_ops;
+	    Instance pv_lock_ops;
+
+		uint64_t nopFuncAddress;
+	    uint64_t ident32NopFuncAddress;
+	    uint64_t ident64NopFuncAddress;
+		
+		uint32_t pv_irq_opsOffset;
+		uint32_t pv_cpu_opsOffset;
+		uint32_t pv_mmu_opsOffset;
+
+	private:
+};
+
 class ElfLoader{
 
 	public:
@@ -28,10 +57,15 @@ class ElfLoader{
 		ElfFile* elffile;
 		
 		SegmentInfo textSegment;
+	    std::vector<char> textSegmentContent;
+	    std::vector<char> jumpTable;
+		
 		SegmentInfo dataSegment;
 		
 		const unsigned char* const* ideal_nops;
 		void  add_nops(void *insns, uint8_t len);
+
+		ParavirtState paravirtState;
 
 		uint8_t paravirt_patch_nop(void);
 		uint8_t paravirt_patch_ignore(unsigned len);
@@ -52,7 +86,7 @@ class ElfLoader{
 		void applySmpLocks();
 		void applyMcount(SegmentInfo &info);
 //		void applyTracepoints(SegmentInfo tracePoint, SegmentInfo rodata, QByteArray &segmentData);
-		void applyJumpEntries(uint64_t jumpStart = 0, uint64_t jumpStop = 0);
+		void applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries);
 		
 //		static QList<uint64_t> _paravirtJump;
 //		static QList<uint64_t> _paravirtCall;
@@ -79,8 +113,6 @@ class ElfKernelLoader : public ElfLoader {
 	    uint64_t fentryAddress;
 	    uint64_t genericUnrolledAddress;
 
-	    std::vector<unsigned char> textSegmentContent;
-	    std::vector<unsigned char> jumpTable;
 
 		int apply_relocate();
 

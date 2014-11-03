@@ -1,4 +1,4 @@
-AM_CXXFLAGS = -Wall -Wextra -Werror -fpic -I $(top_builddir)/src -std=c++1y
+AM_CXXFLAGS = -Wall -Wextra -Werror -fpic -I $(top_builddir)/src -std=c++1y -I /usr/include
 
 kernint_CXXFLAGS=$(AM_CXXFLAGS) $(GLIB_CFLAGS) $(LIBS) \
 				 -I /home/kittel/projekte/code/libdwarfparser/ \
@@ -8,7 +8,8 @@ kernint_LDFLAGS=$(GLIB_LIBS) \
 				-L/home/kittel/projekte/code/libdwarfparser/libvmiwrapper/ \
 				-ldwarfparser -ldwarf -lelf \
 				-lvmiwrapper \
-				-L/home/kittel/projekte/code/libdwarf/libdwarf/
+				-L/home/kittel/projekte/code/libdwarf/libdwarf/ \
+				-lboost_system -lboost_filesystem
 
 bin_PROGRAMS=kernint
 
