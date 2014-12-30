@@ -39,6 +39,5 @@ tags
 .cproject
 .project
 .settings/
-acinclude.m4
 aminclude.am
 stamp-h1
