@@ -1,4 +1,4 @@
-AM_CXXFLAGS = -Wall -Wextra -Werror -fpic -I $(top_builddir)/src -std=c++1y -I /usr/include
+AM_CXXFLAGS = -ggdb -Wall -Wextra -Werror -fpic -I $(top_builddir)/src -std=c++1y -I /usr/include
 
 kernint_CXXFLAGS=$(AM_CXXFLAGS) $(GLIB_CFLAGS) $(LIBS) \
 				 -I $(top_builddir)/../libdwarfparser/ \

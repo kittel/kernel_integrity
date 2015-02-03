@@ -14,8 +14,12 @@
 #include <list>
 #include <algorithm>
 
+
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
+//The following should replace boost filesystem once it is available in gcc
+//#include <filesystem>
+//namespace fs = std::filesystem;
 #include <iostream>
 
 
@@ -49,7 +53,7 @@ class KernelValidator {
 KernelValidator::KernelValidator(std::string dirName):
 	dirName(dirName),kernelLoader(){
 	this->loadKernel();
-	//this->loadModules();
+	this->loadModules();
 
 }
 
@@ -70,6 +74,7 @@ void KernelValidator::loadModules(){
 	for (auto curStr : moduleNames ){
 		std::string filename = findModuleFile(curStr);
 		std::cout << filename << std::endl;
+		std::cout << "Loading Module: " << curStr << std::endl;
 		ElfFile *file = ElfFile::loadElfFile(filename);
 		UNUSED(file);
 		//
@@ -118,7 +123,9 @@ std::list<std::string> KernelValidator::getKernelModules(){
 	module.changeBaseType("module");
 	
 	while(module != modules){
-		strList.push_back(module.memberByName("name").getRawValue<std::string>());
+		std::string moduleName = module.memberByName("name").getRawValue<std::string>();
+		//std::cout << "Module " << moduleName << std::endl;
+		strList.push_back(moduleName);
 		module = this->nextModule(module);
 	}
 	return strList;
@@ -129,7 +136,7 @@ int main (int argc, char **argv)
     VMIInstance *vmi;
     /* this is the VM or file that we are looking at */
     if (argc < 2) {
-        printf("Usage: %s <kerneldir> [vmimage]\n", argv[0]);
+        printf("Usage: %s <kerneldir> [ramdump]\n", argv[0]);
         return 1;
     }
 	if(argc == 3){
@@ -137,13 +144,11 @@ int main (int argc, char **argv)
 	}else{   
 		vmi = new VMIInstance("insight", VMI_KVM | VMI_INIT_COMPLETE);
 	}
-	//KernelValidator *val = new KernelValidator(argv[1]);
-	//val->getKernelModules();
+	KernelValidator *val = new KernelValidator(argv[1]);
+	val->getKernelModules();
 	//
-	vmi->getKernelPages();
+	//vmi->getKernelPages();
     //uint64_t modules = vmi->read64FromVA(file64->findAddressOfVariable("modules"));
-
-    //std::cout << "Value at modules: " << modules << std::endl;
 
 
 	//DELETE(val);
