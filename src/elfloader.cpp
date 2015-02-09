@@ -14,6 +14,11 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
+//The following should replace boost filesystem once it is available in gcc
+//#include <filesystem>
+//namespace fs = std::filesystem;
 
 ParavirtState::ParavirtState(ElfFile* file){
 	this->updateState(file);
@@ -558,6 +563,82 @@ void ElfLoader::parseElfFile(){
 	this->initText();
 	this->initData();
 }
+
+KernelManager::KernelManager():
+	dirName(), moduleMap()
+	{
+}
+
+void KernelManager::setKernelDir(std::string dirName){
+	this->dirName = dirName;
+}
+
+void KernelManager::loadAllModules(){
+	std::list<std::string> moduleNames = this->getKernelModules();
+
+	for (auto curStr : moduleNames ){
+		std::string filename = findModuleFile(curStr);
+		std::cout << "Loading Module: " << curStr << std::endl;
+		if(filename.empty()){
+			std::cout << "Module File not found" << std::endl;
+			continue;
+		}else{
+			//std::cout << filename << std::endl;
+		}
+		ElfFile *file = ElfFile::loadElfFile(filename);
+		auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE);
+		moduleMap[curStr] = module;
+		//
+		//Load ELF File
+		//
+		//Create Loader
+	
+	}
+}
+
+Instance KernelManager::nextModule(Instance &instance){
+	Instance next = instance.memberByName("list").memberByName("next", true);
+	next.changeBaseType("module");
+	return next;
+}
+
+std::string KernelManager::findModuleFile(std::string modName){
+	for( fs::recursive_directory_iterator end, dir(this->dirName);
+			dir != end; dir++){
+		if(fs::extension(*dir) == ".ko"){
+			if((*dir).path().stem() == modName){
+				return (*dir).path().native();
+			}
+			std::replace(modName.begin(), modName.end(), '_', '-');
+			if((*dir).path().stem() == modName){
+				return (*dir).path().native();
+			}
+			std::replace(modName.begin(), modName.end(), '-', '_');
+			if((*dir).path().stem() == modName){
+				return (*dir).path().native();
+			}
+		}
+	}
+	return "";
+
+}
+
+std::list<std::string> KernelManager::getKernelModules(){
+	std::list<std::string> strList;
+	Instance modules = Variable::findVariableByName("modules")->getInstance();
+	Instance module = modules.memberByName("next", true);
+	modules.changeBaseType("module");
+	module.changeBaseType("module");
+	
+	while(module != modules){
+		std::string moduleName = module.memberByName("name").getRawValue<std::string>();
+		//std::cout << "Module " << moduleName << std::endl;
+		strList.push_back(moduleName);
+		module = this->nextModule(module);
+	}
+	return strList;
+}
+
 
 ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	ElfLoader(elffile),

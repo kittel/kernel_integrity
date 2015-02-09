@@ -30,7 +30,7 @@ ElfFile::ElfFile(FILE* fd, size_t fileSize, char* fileContent, ElfType type):
 	}catch(DwarfException &e){
 		std::cout << e.what() << std::endl;
 	}
-	std::cout << "Done loading elfFile" << std::endl;
+	//std::cout << "Done loading elfFile" << std::endl;
 }
 
 ElfFile::~ElfFile(){

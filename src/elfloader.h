@@ -98,9 +98,30 @@ class ElfLoader{
 
 };
 
-class ElfKernelLoader : public ElfLoader {
+class KernelManager{
+
+	public:
+		KernelManager();
+		
+		void setKernelDir(std::string dirName);
+
+		std::list<std::string> getKernelModules();
+		void loadAllModules();
+	private:
+		std::string dirName;
+
+		Instance nextModule(Instance &instance);
+		std::string findModuleFile(std::string modName);
+		
+		ElfModule *loadModule(std::string moduleName);
+		typedef std::map<std::string, ElfLoader*> ModuleMap;
+		ModuleMap moduleMap;
+};
+
+class ElfKernelLoader : public ElfLoader, public KernelManager {
 	public:
 		ElfKernelLoader(ElfFile* elffile);
+		ElfKernelLoader(ElfFile* elffile, std::string dirName);
 		virtual ~ElfKernelLoader();
 
 	protected:
@@ -120,7 +141,9 @@ class ElfKernelLoader : public ElfLoader {
 		
 		virtual void initText();
 		virtual void initData();
+
 	private:
+
 };
 
 class ElfModuleLoader : public ElfLoader {

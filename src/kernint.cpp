@@ -15,11 +15,6 @@
 #include <algorithm>
 
 
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
-//The following should replace boost filesystem once it is available in gcc
-//#include <filesystem>
-//namespace fs = std::filesystem;
 #include <iostream>
 
 
@@ -28,32 +23,24 @@ class KernelValidator {
 		KernelValidator(std::string dirName);
 		virtual ~KernelValidator();
 
-		std::list<std::string> getKernelModules();
-
-		Instance nextModule(Instance &instance);
-		std::string findModuleFile(std::string modName);
 
 
 
 	protected:
 
 	private:
-		std::string dirName;
-		ElfLoader* kernelLoader;
+		ElfKernelLoader* kernelLoader;
 
-		typedef std::map<std::string, ElfLoader*> modules;
-
-		void loadKernel();
-		void loadModules();
+		void loadKernel(std::string dirName);
 
 
 
 };
 
 KernelValidator::KernelValidator(std::string dirName):
-	dirName(dirName),kernelLoader(){
-	this->loadKernel();
-	this->loadModules();
+	kernelLoader(){
+	this->loadKernel(dirName);
+	this->kernelLoader->loadAllModules();
 
 }
 
@@ -61,75 +48,15 @@ KernelValidator::~KernelValidator(){
 
 }
 
-void KernelValidator::loadKernel(){
+void KernelValidator::loadKernel(std::string dirName){
 	std::string kernelName = dirName;
 	kernelName.append("/vmlinux");
     ElfFile *kernelFile = ElfFile::loadElfFile(kernelName);
-    kernelLoader = kernelFile->parseElf(ElfFile::ELFPROGRAMTYPEKERNEL);
+    kernelLoader = dynamic_cast<ElfKernelLoader *>(
+			kernelFile->parseElf(ElfFile::ELFPROGRAMTYPEKERNEL));
+	kernelLoader->setKernelDir(dirName);
 }
 
-void KernelValidator::loadModules(){
-	std::list<std::string> moduleNames = this->getKernelModules();
-
-	for (auto curStr : moduleNames ){
-		std::string filename = findModuleFile(curStr);
-		std::cout << filename << std::endl;
-		std::cout << "Loading Module: " << curStr << std::endl;
-		ElfFile *file = ElfFile::loadElfFile(filename);
-		UNUSED(file);
-		//
-		//Load ELF File
-		//
-		//Create Loader
-	
-	}
-
-
-
-}
-
-Instance KernelValidator::nextModule(Instance &instance){
-	Instance next = instance.memberByName("list").memberByName("next", true);
-	next.changeBaseType("module");
-	return next;
-}
-
-std::string KernelValidator::findModuleFile(std::string modName){
-	for( fs::recursive_directory_iterator end, dir(this->dirName);
-			dir != end; dir++){
-		if(fs::extension(*dir) == ".ko"){
-			if((*dir).path().stem() == modName){
-				return (*dir).path().native();
-			}
-			std::replace(modName.begin(), modName.end(), '_', '-');
-			if((*dir).path().stem() == modName){
-				return (*dir).path().native();
-			}
-			std::replace(modName.begin(), modName.end(), '-', '_');
-			if((*dir).path().stem() == modName){
-				return (*dir).path().native();
-			}
-		}
-	}
-	return "";
-
-}
-
-std::list<std::string> KernelValidator::getKernelModules(){
-	std::list<std::string> strList;
-	Instance modules = Variable::findVariableByName("modules")->getInstance();
-	Instance module = modules.memberByName("next", true);
-	modules.changeBaseType("module");
-	module.changeBaseType("module");
-	
-	while(module != modules){
-		std::string moduleName = module.memberByName("name").getRawValue<std::string>();
-		//std::cout << "Module " << moduleName << std::endl;
-		strList.push_back(moduleName);
-		module = this->nextModule(module);
-	}
-	return strList;
-}
 
 int main (int argc, char **argv)
 {
@@ -145,13 +72,12 @@ int main (int argc, char **argv)
 		vmi = new VMIInstance("insight", VMI_KVM | VMI_INIT_COMPLETE);
 	}
 	KernelValidator *val = new KernelValidator(argv[1]);
-	val->getKernelModules();
 	//
 	//vmi->getKernelPages();
     //uint64_t modules = vmi->read64FromVA(file64->findAddressOfVariable("modules"));
 
 
-	//DELETE(val);
+	DELETE(val);
 	DELETE(vmi);
     
 }
