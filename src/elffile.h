@@ -17,6 +17,8 @@ class ElfLoader;
 class ElfLoader32;
 class ElfLoader64;
 
+class KernelManager;
+
 class SegmentInfo{
 
 	public:
@@ -64,7 +66,8 @@ class ElfFile{
 		int getFD();
 
 		static ElfFile* loadElfFile(std::string filename) throw();
-		virtual ElfLoader* parseElf(ElfFile::ElfProgramType type) = 0;
+		virtual ElfLoader* parseElf(ElfFile::ElfProgramType type,
+		                            KernelManager* parent = 0) = 0;
 
 		virtual bool isRelocatable() = 0;
 
@@ -93,7 +96,8 @@ class ElfFile32 : public ElfFile {
 		SegmentInfo findSegmentWithName(std::string sectionName);
 		uint64_t findAddressOfVariable(std::string symbolName);
 
-		ElfLoader* parseElf(ElfFile::ElfProgramType type);
+		ElfLoader* parseElf(ElfFile::ElfProgramType type,
+		                    KernelManager* parent = 0);
 
 		bool isRelocatable();
 	protected:
@@ -108,7 +112,8 @@ class ElfFile64 : public ElfFile {
 		SegmentInfo findSegmentWithName(std::string sectionName);
 		uint64_t findAddressOfVariable(std::string symbolName);
 
-		ElfLoader* parseElf(ElfFile::ElfProgramType type);
+		ElfLoader* parseElf(ElfFile::ElfProgramType type,
+		                    KernelManager* parent = 0);
 
 		bool isRelocatable();
 

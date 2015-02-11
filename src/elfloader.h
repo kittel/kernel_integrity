@@ -107,13 +107,13 @@ class KernelManager{
 
 		std::list<std::string> getKernelModules();
 		void loadAllModules();
+		ElfLoader *loadModule(std::string moduleName);
 	private:
 		std::string dirName;
 
 		Instance nextModule(Instance &instance);
 		std::string findModuleFile(std::string modName);
 		
-		ElfModule *loadModule(std::string moduleName);
 		typedef std::map<std::string, ElfLoader*> ModuleMap;
 		ModuleMap moduleMap;
 };
@@ -148,7 +148,7 @@ class ElfKernelLoader : public ElfLoader, public KernelManager {
 
 class ElfModuleLoader : public ElfLoader {
 	public:
-		ElfModuleLoader(ElfFile* elffile);
+		ElfModuleLoader(ElfFile* elffile, KernelManager* parent = 0);
 		virtual ~ElfModuleLoader();
 
 	protected:
@@ -159,7 +159,8 @@ class ElfModuleLoader : public ElfLoader {
 
 		void loadDependencies();
 
-	private:
+	protected:
+		KernelManager* parent;
 		
 };
 
@@ -170,9 +171,9 @@ class ElfKernelLoader32 : public ElfKernelLoader{
 	protected:
 };
 
-class ElfModuleLoader32 : ElfModuleLoader{
+class ElfModuleLoader32 : public ElfModuleLoader{
 	public:
-		ElfModuleLoader32();
+		ElfModuleLoader32(ElfFile32* elffile, KernelManager* parent = 0);
 		virtual ~ElfModuleLoader32();
 	protected:
 };
@@ -183,13 +184,11 @@ class ElfKernelLoader64 : public ElfKernelLoader{
 		virtual ~ElfKernelLoader64();
 
 	protected:
-
-
 };
 
-class ElfModuleLoader64 : ElfModuleLoader{
+class ElfModuleLoader64 : public ElfModuleLoader{
 	public:
-		ElfModuleLoader64();
+		ElfModuleLoader64(ElfFile64* elffile, KernelManager* parent = 0);
 		virtual ~ElfModuleLoader64();
 
 	protected:

@@ -132,25 +132,32 @@ uint64_t ElfLoader::get_call_destination(uint32_t type)
 
 
     if(type < paravirtState.pv_init_ops.size()) 
-		return paravirtState.pv_init_ops.memberByOffset(type).getRawValue<uint64_t>(false);
+		return paravirtState.pv_init_ops.memberByOffset(type)
+		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_init_ops.size();
     if(type < paravirtState.pv_time_ops.size()) 
-		return paravirtState.pv_time_ops.memberByOffset(type).getRawValue<uint64_t>(false);
+		return paravirtState.pv_time_ops.memberByOffset(type)
+		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_time_ops.size();
     if(type < paravirtState.pv_cpu_ops.size())  
-		return paravirtState.pv_cpu_ops .memberByOffset(type).getRawValue<uint64_t>(false);
+		return paravirtState.pv_cpu_ops .memberByOffset(type)
+		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_cpu_ops.size();
     if(type < paravirtState.pv_irq_ops.size())  
-		return paravirtState.pv_irq_ops .memberByOffset(type).getRawValue<uint64_t>(false);
+		return paravirtState.pv_irq_ops .memberByOffset(type)
+		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_irq_ops.size();
     if(type < paravirtState.pv_apic_ops.size()) 
-		return paravirtState.pv_apic_ops.memberByOffset(type).getRawValue<uint64_t>(false);
+		return paravirtState.pv_apic_ops.memberByOffset(type)
+		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_apic_ops.size();
     if(type < paravirtState.pv_mmu_ops.size())  
-		return paravirtState.pv_mmu_ops .memberByOffset(type).getRawValue<uint64_t>(false);
+		return paravirtState.pv_mmu_ops .memberByOffset(type)
+		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_mmu_ops.size();
     if(type < paravirtState.pv_lock_ops.size()) 
-		return paravirtState.pv_lock_ops.memberByOffset(type).getRawValue<uint64_t>(false);
+		return paravirtState.pv_lock_ops.memberByOffset(type)
+		    .getRawValue<uint64_t>(false);
 
     return 0;
 }
@@ -573,26 +580,31 @@ void KernelManager::setKernelDir(std::string dirName){
 	this->dirName = dirName;
 }
 
+ElfLoader *KernelManager::loadModule(std::string moduleName){
+	if(moduleMap[moduleName] != NULL){
+			std::cout << "Module: " << moduleName << " already loaded" << std::endl;
+		return moduleMap[moduleName];
+	}
+	std::string filename = findModuleFile(moduleName);
+	if(filename.empty()){
+		std::cout << "Module File not found" << std::endl;
+		return NULL;
+	}else{
+		//std::cout << filename << std::endl;
+	}
+	ElfFile *file = ElfFile::loadElfFile(filename);
+	auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE, this);
+	moduleMap[moduleName] = module;
+
+	return module;
+}
+
+
 void KernelManager::loadAllModules(){
 	std::list<std::string> moduleNames = this->getKernelModules();
 
 	for (auto curStr : moduleNames ){
-		std::string filename = findModuleFile(curStr);
-		std::cout << "Loading Module: " << curStr << std::endl;
-		if(filename.empty()){
-			std::cout << "Module File not found" << std::endl;
-			continue;
-		}else{
-			//std::cout << filename << std::endl;
-		}
-		ElfFile *file = ElfFile::loadElfFile(filename);
-		auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE);
-		moduleMap[curStr] = module;
-		//
-		//Load ELF File
-		//
-		//Create Loader
-	
+		this->loadModule(curStr);
 	}
 }
 
@@ -642,6 +654,7 @@ std::list<std::string> KernelManager::getKernelModules(){
 
 ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	ElfLoader(elffile),
+	KernelManager(),
 	vvarSegment(),
 	dataNosaveSegment(),
 	bssSegment(),
@@ -853,8 +866,10 @@ void ElfKernelLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
 
 ////////////////////////////////////////////////////
 
-ElfModuleLoader::ElfModuleLoader(ElfFile* elffile):
-	ElfLoader(elffile){}
+ElfModuleLoader::ElfModuleLoader(ElfFile* elffile, KernelManager* parent):
+	ElfLoader(elffile),
+	parent(parent){
+}
 
 ElfModuleLoader::~ElfModuleLoader(){}
 
@@ -862,27 +877,34 @@ void ElfModuleLoader::loadDependencies(void) {
 	SegmentInfo miS = elffile->findSegmentWithName(".modinfo");
 
 	//parse .modinfo and load dependencies
-	char *modinfo = (char*) miS.memindex;
-	while (modinfo < (char*) (miS.memindex) + miS.size)
+	char *modinfo = (char*) miS.index;
+	char *module = NULL;
+	if(!modinfo) return;
+
+	while (modinfo < (char*) (miS.index) + miS.size)
 	{
-		if(!*modinfo) modinfo++;
-		std::string string = std::string(modinfo);
-
-		//if(string.compare(0, 7, "depends")){
-		//	std::string dependencies = split("=").at(1).split(',');
-
-		//	//std::cout << "Parsing dependencies:"<< std::endl;
-		//	for(int i = 0; i < dependencies.size(); i++)
-		//	{
-		//		if (dependencies.at(i).compare(""))
-		//		{
-		//			loadElfModule(dependencies.at(i), findModuleByName(dependencies.at(i)));
-		//		}
-		//	}
-		//	//std::cout << "Done Parsing dependencies:"<< std::endl;
-		//	break;
-		//}
-		modinfo += string.length() + 1;
+		//std::cout << "Searching for string" << std::endl;
+		//check if the string starts with depends
+		if(modinfo[0] == 0){
+			modinfo++;
+			continue;
+		}else if(strncmp(modinfo, "depends", 7) != 0){
+			modinfo += strlen(modinfo) + 1;
+			continue;
+		}else{
+			//string.compare(0, 7, "depends")
+			modinfo += 8;
+			
+			module = strtok(modinfo, ",");
+			while(module != NULL){
+				if(*module == 0) break;
+				std::cout << "Found " << module << std::endl;
+				parent->loadModule(module);
+				module = strtok(NULL, ",");
+			}
+				
+			return;
+		}
 	}
 
 }
@@ -1098,10 +1120,27 @@ ElfKernelLoader32::~ElfKernelLoader32(){}
 
 ////////////////////////////////////////////////////
 
-ElfKernelLoader64::ElfKernelLoader64(ElfFile64* elffile):
+ElfKernelLoader64::ElfKernelLoader64(ElfFile64* elffile): 
 	ElfKernelLoader(elffile){
 	this->parseElfFile();
 }
 
 ElfKernelLoader64::~ElfKernelLoader64(){}
 
+ElfModuleLoader32::ElfModuleLoader32(ElfFile32* elffile, 
+                                     KernelManager* parent):
+	ElfModuleLoader(elffile, parent){
+	//this->ParseElfFile();
+}
+
+ElfModuleLoader32::~ElfModuleLoader32(){}
+
+////////////////////////////////////////////////////
+
+ElfModuleLoader64::ElfModuleLoader64(ElfFile64* elffile, 
+                                     KernelManager* parent):
+	ElfModuleLoader(elffile, parent){
+	this->parseElfFile();
+}
+
+ElfModuleLoader64::~ElfModuleLoader64(){}

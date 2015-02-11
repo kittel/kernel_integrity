@@ -136,15 +136,18 @@ ElfFile64::ElfFile64(FILE* fd, size_t fileSize, char* fileContent):
 ElfFile64::~ElfFile64(){}
 
 SegmentInfo ElfFile64::findSegmentWithName(std::string sectionName){
-
+	
     char * tempBuf = 0;
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
 		tempBuf = this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset
 				+ elf64Shdr[i].sh_name;
 
 		if (sectionName.compare(tempBuf) == 0) {
-			return SegmentInfo(sectionName, this->fileContent + elf64Shdr[i].sh_offset,
-					elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size);
+			return SegmentInfo(sectionName, 
+			                   this->fileContent + 
+			                        elf64Shdr[i].sh_offset,
+			                        elf64Shdr[i].sh_addr, 
+			                   elf64Shdr[i].sh_size);
 			//printf("Found Strtab in Section %i: %s\n", i, tempBuf);
 		}
 	}
@@ -160,20 +163,20 @@ void ElfFile::printSymbols(){
 	char *elfEhdr = this->fileContent;
 
 	if(elfEhdr[4] == ELFCLASS32)
-    {
-        //TODO
-    }
-    else if(elfEhdr[4] == ELFCLASS64)
-    {
-        Elf64_Ehdr * elf64Ehdr;
-        Elf64_Shdr * elf64Shdr;
+	{
+		//TODO
+	}
+	else if(elfEhdr[4] == ELFCLASS64)
+	{
+		Elf64_Ehdr * elf64Ehdr;
+		Elf64_Shdr * elf64Shdr;
 
 		elf64Ehdr = (Elf64_Ehdr *) elfEhdr;
 		elf64Shdr = (Elf64_Shdr *) (elfEhdr + elf64Ehdr->e_shoff);
 
         uint32_t symSize = elf64Shdr[this->symindex].sh_size;
-        Elf64_Sym *symBase = (Elf64_Sym *) (elfEhdr +
-									elf64Shdr[this->symindex].sh_offset);
+        Elf64_Sym *symBase = 
+		     (Elf64_Sym *) (elfEhdr + elf64Shdr[this->symindex].sh_offset);
 
         const char *symbolName;
 		const char *sectionName;
@@ -233,11 +236,13 @@ void ElfFile::printSymbols(){
 char* ElfFile::getFileContent(){
 	return this->fileContent;
 }
-ElfLoader* ElfFile32::parseElf(ElfFile::ElfProgramType type){
+ElfLoader* ElfFile32::parseElf(ElfFile::ElfProgramType type, 
+                               KernelManager* parent){
+	UNUSED(parent);
 	if(type == ElfFile::ELFPROGRAMTYPEKERNEL){
 		//return new ElfKernelLoader32(this);
 	}else if(type == ElfFile::ELFPROGRAMTYPEMODULE){
-		//return new ElfModuleLoader32(this);
+		//return new ElfModuleLoader32(this, parent);
 	}
 	return NULL;
 }
@@ -249,11 +254,12 @@ bool ElfFile32::isRelocatable(){
 //	return (elf32Ehdr->e_type == ET_REL);
 }
 
-ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type){
+ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type,
+                               KernelManager* parent){
 	if(type == ElfFile::ELFPROGRAMTYPEKERNEL){
 		return new ElfKernelLoader64(this);
 	}else if(type == ElfFile::ELFPROGRAMTYPEMODULE){
-		//return new ElfModuleLoader64(this);
+		return new ElfModuleLoader64(this, parent);
 	}
 	return NULL;
 }
