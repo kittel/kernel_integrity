@@ -57,8 +57,8 @@ class ElfLoader{
 		ElfFile* elffile;
 		
 		SegmentInfo textSegment;
-	    std::vector<char> textSegmentContent;
-	    std::vector<char> jumpTable;
+	    std::vector<uint8_t> textSegmentContent;
+	    std::vector<uint8_t> jumpTable;
 		
 		SegmentInfo dataSegment;
 		
@@ -108,14 +108,16 @@ class KernelManager{
 		std::list<std::string> getKernelModules();
 		void loadAllModules();
 		ElfLoader *loadModule(std::string moduleName);
+		uint64_t findMemAddressOfSegment();
 	private:
 		std::string dirName;
+		
+		typedef std::map<std::string, ElfLoader*> ModuleMap;
+		ModuleMap moduleMap;
 
 		Instance nextModule(Instance &instance);
 		std::string findModuleFile(std::string modName);
 		
-		typedef std::map<std::string, ElfLoader*> ModuleMap;
-		ModuleMap moduleMap;
 };
 
 class ElfKernelLoader : public ElfLoader, public KernelManager {
@@ -158,6 +160,7 @@ class ElfModuleLoader : public ElfLoader {
 		virtual void initData();
 
 		void loadDependencies();
+		virtual void applyRelocationsOnSection(uint32_t relSectionID) = 0;
 
 	protected:
 		KernelManager* parent;
@@ -192,6 +195,7 @@ class ElfModuleLoader64 : public ElfModuleLoader{
 		virtual ~ElfModuleLoader64();
 
 	protected:
+		void applyRelocationsOnSection(uint32_t relSectionID);
 
 };
 

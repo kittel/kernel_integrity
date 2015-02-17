@@ -24,4 +24,8 @@ inline std::vector<std::string> split(const std::string &s, char delim) {
     return elems;
 }
 
+inline std::string toString(uint8_t * string){
+	return std::string((const char*) string);
+}
+
 #endif /* _HELPERS_H_ */

@@ -410,13 +410,10 @@ void ElfLoader::applySmpLocks(){
 	Instance boot_cpu_data = boot_cpu_data_var->getInstance();
     Instance x86_capability = boot_cpu_data.memberByName("x86_capability");
     if (!((x86_capability.arrayElem(X86_FEATURE_UP / 32).
-					getRawValue<uint32_t>(false) >> (X86_FEATURE_UP % 32)) & 0x1))
-    {
+					getRawValue<uint32_t>(false) >> (X86_FEATURE_UP % 32)) & 0x1)){
         /* turn lock prefix into DS segment override prefix */
         lock = 0x3e;
-    }
-    else
-    {
+    }else{
         /* turn DS segment override prefix into lock prefix */
         lock = 0xf0;
     }
@@ -566,7 +563,6 @@ void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
 }
 
 void ElfLoader::parseElfFile(){
-	std::cout << "Parsing file" << std::endl;
 	this->initText();
 	this->initData();
 }
@@ -582,12 +578,11 @@ void KernelManager::setKernelDir(std::string dirName){
 
 ElfLoader *KernelManager::loadModule(std::string moduleName){
 	if(moduleMap[moduleName] != NULL){
-			std::cout << "Module: " << moduleName << " already loaded" << std::endl;
 		return moduleMap[moduleName];
 	}
 	std::string filename = findModuleFile(moduleName);
 	if(filename.empty()){
-		std::cout << "Module File not found" << std::endl;
+		std::cout << moduleName << ": Module File not found" << std::endl;
 		return NULL;
 	}else{
 		//std::cout << filename << std::endl;
@@ -711,8 +706,8 @@ void ElfKernelLoader::initText(void) {
 	info = elffile->findSegmentWithName(".init.text");
 	uint64_t initTextOffset = -(uint64_t) info.address + (uint64_t) info.index;
 
-	info.index = (char *) elffile->findAddressOfVariable("__start_mcount_loc") + initTextOffset;
-	info.size = (char *) elffile->findAddressOfVariable("__stop_mcount_loc") + initTextOffset - info.index;
+	info.index = (uint8_t *) elffile->findAddressOfVariable("__start_mcount_loc") + initTextOffset;
+	info.size = (uint8_t *) elffile->findAddressOfVariable("__stop_mcount_loc") + initTextOffset - info.index;
 	applyMcount(info);
 
 	//TODO! also enable this some time later
@@ -728,8 +723,8 @@ void ElfKernelLoader::initText(void) {
 	uint64_t jumpStart = elffile->findAddressOfVariable("__start___jump_table");
 	uint64_t jumpStop = elffile->findAddressOfVariable("__stop___jump_table");
 
-	info.index = (char *) jumpStart + dataOffset;
-	info.size = (char *) jumpStop + dataOffset - info.index;
+	info.index = (uint8_t *) jumpStart + dataOffset;
+	info.size = (uint8_t *) jumpStop + dataOffset - info.index;
 
 	//Save the jump_labels section for later reference.
 	if (info.index != 0){
@@ -861,7 +856,7 @@ void ElfKernelLoader::initData(void){
 // end of parseElfFile()
 
 void ElfKernelLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
-	info.memindex = (char*) info.address;
+	info.memindex = (uint8_t *) info.address;
 }
 
 ////////////////////////////////////////////////////
@@ -898,7 +893,6 @@ void ElfModuleLoader::loadDependencies(void) {
 			module = strtok(modinfo, ",");
 			while(module != NULL){
 				if(*module == 0) break;
-				std::cout << "Found " << module << std::endl;
 				parent->loadModule(module);
 				module = strtok(NULL, ",");
 			}
@@ -909,65 +903,322 @@ void ElfModuleLoader::loadDependencies(void) {
 
 }
 
+void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
+	ElfFile64 *elf= dynamic_cast<ElfFile64 *>(this->elffile);
+	assert(elf);
+
+	SegmentInfo relSectionInfo = 
+		        this->elffile->findSegmentByID(relSectionID);
+	
+    Elf32_Word sectionID = elf->elf64Shdr[relSectionID].sh_info;
+	std::string sectionName = this->elffile->segmentName(sectionID);
+
+	SegmentInfo sectionInfo = 
+		        this->elffile->findSegmentByID(sectionID);
+	this->updateSegmentInfoMemAddress(sectionInfo);
+	Elf64_Rela *rel = (Elf64_Rela *) relSectionInfo.index;
+
+    Elf64_Sym *symBase = (Elf64_Sym *) this->elffile->
+	                     segmentAddress(this->elffile->symindex);
+
+
+#ifdef DEBUG
+    bool doPrint = false;
+    if(sectionName.compare("__kcrctab_gpl") == 0) doPrint = true;
+    if(doPrint) Console::out() << "Section to Relocate: " << sectionName << dec << endl;
+#endif
+	
+    for (uint32_t i = 0; i < relSectionInfo.size / sizeof(*rel); i++) {
+		void *locInElf = 0;
+		void *locInMem = 0;
+		void *locOfRelSectionInMem = 0;
+		void *locOfRelSectionInElf = 0;
+		uint64_t val = 0;
+
+        /* This is where to make the change */
+        locInElf = (void *) ((char*) sectionInfo.index    + rel[i].r_offset);
+        locInMem = (void *) ((char*) sectionInfo.memindex + rel[i].r_offset);
+
+		//TODO REMOVE
+		UNUSED(locInElf);
+		UNUSED(locInMem);
+		UNUSED(locOfRelSectionInMem);
+		UNUSED(locOfRelSectionInElf);
+		UNUSED(val);
+
+		Elf64_Sym *sym = 0; 
+        sym = symBase + ELF64_R_SYM(rel[i].r_info);
+
+        Variable* v = NULL;
+		UNUSED(v);
+        Instance symbol;
+
+		std::string symbolName = this->elffile->symbolName(sym->st_name);
+
+#ifdef DEBUG
+        /////////////////////////////////////////////////////////////////////
+        //if ((unsigned long) locInMem == 0xffffffffa0000006) doPrint = true;
+        //if (rel[i].r_offset == 0xf1f) doPrint = true;
+        //if (symbolName.compare("snd_pcm_set_sync") == 0) doPrint = true;
+        //if(context.currentModule.member("name").toString().compare("\"virtio_balloon\"") == 0 && rel[i].r_offset == 0xb43) doPrint = true;
+        //        sectionName.compare(".altinstructions") == 0 && i <= 1) doPrint = true;
+        /////////////////////////////////////////////////////////////////////
+
+        if(doPrint) Console::out() << endl;
+        if(doPrint) Console::out() << "Loc in Elf: " << hex << locInElf << dec << endl;
+        if(doPrint) Console::out() << "Loc in Mem: " << hex << locInMem << dec << endl;
+        if(doPrint) Console::out() << "Sym: " << hex << symbolName << " @ " << sym << " (Offset: 0x" << ELF64_R_SYM(rel[i].r_info) << " , Info: 0x" << sym->st_info << " )" << " Bind type: " << ELF64_ST_BIND(sym->st_info) << dec << endl;
+
+        if(doPrint) Console::out() << "Name of current Section: " << QString(fileContent + sechdrs[context.shstrindex].sh_offset + sechdrs[sectionId].sh_name) << endl;
+        //			Console::out() << "type " << (int)ELF64_R_TYPE(rel[i].r_info) << " st_value " << sym->st_value << " r_addend " << rel[i].r_addend << " loc " << hex << (u64)loc << dec << endl;
+#endif
+
+        switch(sym->st_shndx){
+        case SHN_COMMON:
+#ifdef DEBUG
+            if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
+            debugerr("This should not happen!");
+#endif
+			assert(false);
+            continue; //TODO REMOVE
+            break;
+        case SHN_ABS:
+#ifdef DEBUG
+            if(doPrint) Console::out() << "Symtype SHN_ABS" << endl;
+#endif
+            break;
+        case SHN_UNDEF:
+#ifdef DEBUG
+            if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
+
+            //Resolve Symbol and write to st_value
+            if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
+            if(doPrint) Console::out() << "System Map contains " << _sym.memSpecs().systemMap.count(symbolName) << " Versions of that symbol." << endl;
+#endif
+
+#if 0
+            if(_symTable.contains(symbolName))
+            {
+                sym->st_value = _symTable.value(symbolName);
+#ifdef DEBUG
+                if(doPrint) Console::out() << "Found symbol @" << hex << sym->st_value << dec << endl;
+#endif
+            }
+            //Try to find variable in system map
+            else if (_sym.memSpecs().systemMap.count(symbolName) > 0)
+            {
+                //Console::out() << "Found Variable in system.map: " << symbolName) << endl;
+                //sym->st_value = _sym.memSpecs().systemMap.value(symbolName).address;
+                QList<SystemMapEntry> symbols = _sym.memSpecs().systemMap.values(symbolName);
+                for (QList<SystemMapEntry>::iterator i = symbols.begin(); i != symbols.end(); ++i)
+                {
+                    SystemMapEntry currentEntry = (*i);
+
+                    //ELF64_ST_BIND(sym->st_info) => 0: Local, 1: Global, 2: Weak
+                    //currentEntry.type => 'ascii' lowercase: local, uppercase: global
+                    if (ELF64_ST_BIND(sym->st_info) == 1 && currentEntry.type >= 0x41 && currentEntry.type <= 0x5a)
+                    {
+                        if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Global" << dec << endl;
+                        sym->st_value = currentEntry.address;
+                    }
+                    else if (ELF64_ST_BIND(sym->st_info) == 0 && currentEntry.type >= 0x61 && currentEntry.type <= 0x7a)
+                    {
+                        if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Local" << dec << endl;
+                        sym->st_value = currentEntry.address;
+                    }
+                }
+            }
+            else
+            {
+                //Console::out() << "Variable not found in system.map: " << symbolName << endl;
+                //Try to find the variable by name in insight.
+                v = _sym.factory().findVarByName(symbolName);
+                if (!v)
+                {
+                    //debugerr("Variable " << symbolName << " not found! ERROR!");
+                    QList<BaseType*> types = _sym.factory().typesByName().values(symbolName);
+
+                    if(types.size() > 0)
+                    {
+                        BaseType* bt;
+                        //Console::out() << "Type found in insight: " << symbolName << endl;
+                        for(int k = 0 ; k < types.size() ; k++)
+                        {
+                            bt = types.at(k);
+                            //Console::out() << k << ": " << (bt && (bt->type() == rtFunction) ? "function" : "type") << " with size " <<  bt->size() << endl;
+                            // Only use the type if it is a function and got a defined size
+                            if( bt->type() == rtFunction && bt->size() > 0) { break; }
+
+                            if(k == types.size() - 1)
+                            {
+                                //Console::out() << "Function not found in insight: " << symbolName << endl;
+                                //TODO handle this case does this happen??
+                            }
+                        }
+                        const Function* func = dynamic_cast<const Function*>(bt);
+
+                        if (func) {
+                            sym->st_value = func->pcLow();
+                            if(doPrint) Console::out() << "Function found in: " << hex << sym->st_value << dec << endl;
+                            //TODO check if somewhere the startaddress is zero! bug!
+//                            Console::out() << Console::color(ctColHead) << "  Start Address:  "
+//                                 << Console::color(ctAddress) << QString("0x%1").arg(
+//                                                            func->pcLow(),
+//                                                            _sym.memSpecs().sizeofPointer << 1,
+//                                                            16,
+//                                                            QChar('0'))
+//                                 << Console::color(ctReset)
+//                                 << endl;
+                        }
+
+                    } //Else no type with with the given name found.
+                    continue;
+                }
+                //Console::out() << "Variable found in insight: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << endl;
+                symbol = v->toInstance(_vmem, BaseType::trLexical, ksAll);
+                if(!symbol.isValid())
+                {
+                    debugerr("Symbol " << symbolName << " not found! ERROR!");
+                    continue;
+                }
+                //Console::out() << "Symbol found with address : 0x" << hex << symbol.address() << dec << endl;
+                sym->st_value = symbol.address();
+
+                if(doPrint) Console::out() << "Instance found: " << hex << sym->st_value << dec << endl;
+
+            }
+#endif
+
+            break;
+        default:
+#ifdef DEBUG
+            if(doPrint) Console::out() << "default: " << endl;
+            //debugerr("Sym Type: default: " << sym->st_shndx);
+#endif
+
+#if 0
+            //TODO this is not right yet.
+            /* Divert to percpu allocation if a percpu var. */
+            if (sym->st_shndx == context.percpuDataSegment)
+            {
+                locOfRelSectionInMem = context.currentModule.member("percpu").toPointer();
+                //sym->st_value += (unsigned long)mod_percpu(mod);
+                if(doPrint) Console::out() << "Per CPU variable" << endl;
+            }
+            else
+            {
+				std::string relocSection = this->elffile->segmentName(sym->st_shndx]);
+                locOfRelSectionInElf = (void *) findElfSegmentWithName(fileContent, relocSection).index;
+                locOfRelSectionInMem = (void *) findMemAddressOfSegment(context, relocSection);
+                if(doPrint) Console::out() << "SectionName: " << hex << relocSection << dec << endl;
+            }
+
+            //Only add the location of the section if it was not already added
+            if(doPrint) Console::out() << "old st_value: " << hex << sym->st_value << dec;
+            if(doPrint) Console::out() << " locOfRelSectionInMem: " << hex << locOfRelSectionInMem << dec;
+            if(doPrint) Console::out() << " locOfRelSectionInElf: " << hex << locOfRelSectionInElf << dec << endl;
+
+            if(sym->st_value < (long unsigned int) locOfRelSectionInMem)
+            {
+                sym->st_value += (long unsigned int) locOfRelSectionInMem;
+            }
+#endif
+            break;
+        }
+#if 0
+
+        val = sym->st_value + rel[i].r_addend;
+
+#if DEBUG
+		if(doPrint) Console::out() << "raddend: " << hex << rel[i].r_addend << dec << endl;
+        if(doPrint) Console::out() << "sym->value: " << hex << sym->st_value << dec << endl;
+        if(doPrint) Console::out() << "val: " << hex << val << dec << endl;
+#endif
+
+        switch (ELF64_R_TYPE(rel[i].r_info)) {
+        case R_X86_64_NONE:
+            break;
+        case R_X86_64_64:
+            *(quint64 *)locInElf = val;
+            break;
+        case R_X86_64_32:
+            *(quint32 *)locInElf = val;
+            if (val != *(quint32 *)locInElf)
+			    return -ENOEXEC;
+                //goto overflow;
+            break;
+        case R_X86_64_32S:
+            *(qint32 *)locInElf = val;
+            if(doPrint) Console::out() << " 32S final value: " << hex << (qint32) val << dec << endl;
+            if ((qint64)val != *(qint32 *)locInElf)
+			    return -ENOEXEC;
+                //goto overflow;
+            break;
+        case R_X86_64_PC32:
+
+            //This line is from the original source the loc here is the location within the loaded module.
+            //val -= (u64)loc;
+            if(sectionName.compare(".altinstructions") == 0)
+            {
+                //This is later used to copy some memory
+                val = val - (quint64)locOfRelSectionInMem + (quint64)locOfRelSectionInElf - (quint64)locInElf;
+            }
+            else
+            {
+                //This is used as relocation in memory
+                val -= (quint64)locInMem;
+            }
+#ifdef DEBUG
+            if(doPrint) Console::out() << "PC32 final value: " << hex << (quint32) val << dec << endl;
+#endif
+            *(quint32 *)locInElf = val;
+//#if 0
+            if ((qint64)val != *(qint32 *)loc)
+			    return -ENOEXEC;
+                //goto overflow;
+//#endif
+            break;
+        default:
+#ifdef DEBUG
+            debugerr("Unknown rela relocation: " << ELF64_R_TYPE(rel[i].r_info));
+#endif
+            return -ENOEXEC;
+        }
+#ifdef DEBUG
+        doPrint = false;
+#endif
+#endif
+    }
+    return;
+
+//#if 0
+//overflow:
+//    Console::err() << "overflow in relocation type " << (int)ELF64_R_TYPE(rel[i].r_info) << " val " << hex << val << endl;
+//    Console::err() << "likely not compiled with -mcmodel=kernel" << endl;
+//    return -ENOEXEC;
+//#endif
+
+}
+
 void ElfModuleLoader::initText(void) {
         
-	if (!this->elffile->isRelocatable()){
-		assert(false);
-		std::cout << "Not a relocatable module" << std::endl;
-	}
-
-	this->textSegment = elffile->findSegmentWithName(".text");
-	this->dataSegment = elffile->findSegmentWithName(".data");
-
-	SegmentInfo percpuDataSegment = elffile->findSegmentWithName(".data..percpu");
-
+	this->applyRelocationsOnSection(this->elffile->getRelocationSection());
 	this->loadDependencies();
-//
-//        ///* loop through every section */
-//        for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
-//        {
-//
-//            /* if Elf64_Shdr.sh_addr isn't 0 the section will appear in memory*/
-//            tempBuf = fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name;
-//            unsigned int infosec = elf64Shdr[i].sh_info;
-//
-//            /* Not a valid relocation section? */
-//            if (infosec >= elf64Ehdr->e_shnum)
-//                continue;
-//
-//            /* Don't bother with non-allocated sections */
-//            if (!(elf64Shdr[infosec].sh_flags & SHF_ALLOC))
-//                continue;
-//
-//            if (elf64Shdr[i].sh_type == SHT_REL){
-//                std::cout << "Section '" << tempBuf << "': apply_relocate" << std::endl;
-//                //TODO this is only in the i386 case!
-//                //apply_relocate(fileContent, elf64Shdr, symindex, strindex, i);
-//            }
-//            else if (elf64Shdr[i].sh_type == SHT_RELA){
-//
-//                context.relsec = i;
-//                apply_relocate_add(elf64Shdr, context);
-//                //std::cout << "Section '" << tempBuf << "': apply_relocate_add" << std::endl;
-//            }
-//            //printf("Section '%s' with type: %i starts at 0x%08X and ends at 0x%08X\n", tempBuf, elf64Shdr[i].sh_type, elf64Shdr[i].sh_offset, elf64Shdr[i].sh_offset + elf64Shdr[i].sh_size);
-//
-//        }
-//
-//
-////64bit part end
-//
-//    //module_finalize  => http://lxr.free-electrons.com/source/arch/x86/kernel/module.c#L167
-//
-//    SegmentInfo info = findElfSegmentWithName(fileContent, ".altinstructions");
-//    if (info.index) applyAltinstr(info, context);
-//
-//    info = findElfSegmentWithName(fileContent, ".parainstructions");
-//    if (info.index) applyParainstr(info, context);
-//
-//    info = findElfSegmentWithName(fileContent, ".smp_locks");
-//    if (info.index) applySmpLocks(info, context);
-//
+
+	this->textSegment = this->elffile->findSegmentWithName(".text");
+	this->dataSegment = this->elffile->findSegmentWithName(".data");
+
+	SegmentInfo percpuDataSegment = 
+		        this->elffile->findSegmentWithName(".data..percpu");
+
+
+	applyAltinstr();
+	applyParainstr();
+	applySmpLocks();
+
+
+	//create a copy of the contents
+
 //    //Content of text section in memory:
 //    //same as the sections in the elf binary
 //

@@ -12,15 +12,15 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 
 SegmentInfo::SegmentInfo(): segName(), index(0), memindex(0), address(0), size(0){}
-SegmentInfo::SegmentInfo(char *i, unsigned int s):
+SegmentInfo::SegmentInfo(uint8_t *i, unsigned int s):
 				segName(), index(i), memindex(0), address(0), size(s){}
-SegmentInfo::SegmentInfo(std::string segName, char *i, 
+SegmentInfo::SegmentInfo(std::string segName, uint8_t *i, 
 					uint64_t a, uint32_t s):
 				segName(segName), index(i), memindex(0),
 			   	address(a), size(s){}
 SegmentInfo::~SegmentInfo(){}
 
-ElfFile::ElfFile(FILE* fd, size_t fileSize, char* fileContent, ElfType type):
+ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type):
 	shstrindex(0), symindex(0), strindex(0),
 	fd(fd), fileSize(fileSize), fileContent(fileContent), type(type),
 	filename(""), symbolNameMap(){
@@ -46,7 +46,7 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 
 	FILE* fd;
 	size_t fileSize;
-	char* fileContent;
+	uint8_t* fileContent;
 
 	fd = fopen(filename.c_str(), "rb");
     if (fd != NULL) {
@@ -56,7 +56,7 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
             fileSize = ftell(fd);
 
             //MMAP the file to memory
-            fileContent = (char*) mmap(0, fileSize,
+            fileContent = (uint8_t*) mmap(0, fileSize,
 					PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(fd), 0);
             if (fileContent == MAP_FAILED) {
                 throw ElfException("MMAP failed!!!\n");
@@ -86,7 +86,7 @@ ElfFile::ElfType ElfFile::getType(){ return this->type; }
 
 int ElfFile::getFD(){ return fileno(this->fd); }
 
-ElfFile32::ElfFile32(FILE* fd, size_t fileSize, char* fileContent):
+ElfFile32::ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent):
 	ElfFile(fd, fileSize, fileContent, ELFTYPE32){
 
     throw NotImplementedException();
@@ -99,15 +99,40 @@ SegmentInfo ElfFile32::findSegmentWithName(std::string sectionName){
 	throw NotImplementedException();
 }
 
+SegmentInfo ElfFile32::findSegmentByID(uint32_t sectionID){
+	UNUSED(sectionID);
+	throw NotImplementedException();
+}
+
+
+std::string ElfFile32::segmentName(int sectionID){
+	UNUSED(sectionID);
+	throw NotImplementedException();
+}
+
+uint8_t *ElfFile32::segmentAddress(int sectionID){
+	UNUSED(sectionID);
+	throw NotImplementedException();
+}
+
+uint32_t ElfFile32::getRelocationSection(){
+	throw NotImplementedException();
+}
+		
+std::string ElfFile32::symbolName(uint32_t index){
+	UNUSED(index);
+	throw NotImplementedException();
+}
+
 uint64_t ElfFile32::findAddressOfVariable(std::string symbolName){
 	UNUSED(symbolName);
 	throw NotImplementedException();
 }
 
-ElfFile64::ElfFile64(FILE* fd, size_t fileSize, char* fileContent):
+ElfFile64::ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent):
 		ElfFile(fd, fileSize, fileContent, ELFTYPE64){
 
-    char *elfEhdr = this->fileContent;
+    uint8_t *elfEhdr = this->fileContent;
     this->elf64Ehdr = (Elf64_Ehdr *) elfEhdr;
     this->elf64Shdr = (Elf64_Shdr *) (elfEhdr + elf64Ehdr->e_shoff);
 
@@ -126,9 +151,9 @@ ElfFile64::ElfFile64(FILE* fd, size_t fileSize, char* fileContent):
 			+ elf64Shdr[this->symindex].sh_offset);
 
 	for (Elf64_Sym * sym = symBase;
-			sym < (Elf64_Sym *) (((char*) symBase) + symSize); sym++) {
-		char *currentSymbolName = &((this->fileContent
-				+ elf64Shdr[this->strindex].sh_offset)[sym->st_name]);
+			sym < (Elf64_Sym *) (((uint8_t*) symBase) + symSize); sym++) {
+		std::string currentSymbolName = toString(&((this->fileContent
+				+ elf64Shdr[this->strindex].sh_offset)[sym->st_name]));
 		symbolNameMap[currentSymbolName] = sym->st_value;
 	}
 }
@@ -139,7 +164,7 @@ SegmentInfo ElfFile64::findSegmentWithName(std::string sectionName){
 	
     char * tempBuf = 0;
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
-		tempBuf = this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset
+		tempBuf = (char*) this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset
 				+ elf64Shdr[i].sh_name;
 
 		if (sectionName.compare(tempBuf) == 0) {
@@ -154,13 +179,45 @@ SegmentInfo ElfFile64::findSegmentWithName(std::string sectionName){
 	return SegmentInfo();
 }
 
+SegmentInfo ElfFile64::findSegmentByID(uint32_t sectionID){
+	if(sectionID < elf64Ehdr->e_shnum){
+
+		std::string sectionName = toString(this->fileContent + 
+		                      elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + 
+		                      elf64Shdr[sectionID].sh_name);
+		return SegmentInfo(sectionName, 
+		                   this->fileContent + 
+		                        elf64Shdr[sectionID].sh_offset,
+		                        elf64Shdr[sectionID].sh_addr, 
+		                   elf64Shdr[sectionID].sh_size);
+	}
+	return SegmentInfo();
+}
+
+std::string ElfFile64::segmentName(int sectionID){
+	return toString(this->fileContent + 
+	                   elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + 
+	                   elf64Shdr[sectionID].sh_name);
+}
+
+uint8_t *ElfFile64::segmentAddress(int sectionID){
+	return this->fileContent + this->elf64Shdr[sectionID].sh_offset;
+
+}
+
+std::string ElfFile64::symbolName(uint32_t index){
+	return toString(&((this->fileContent + 
+								elf64Shdr[this->strindex].sh_offset)[index]));
+
+}
+
 uint64_t ElfFile64::findAddressOfVariable(std::string symbolName){
 	return symbolNameMap[symbolName];
 }
 
 
 void ElfFile::printSymbols(){
-	char *elfEhdr = this->fileContent;
+	uint8_t *elfEhdr = this->fileContent;
 
 	if(elfEhdr[4] == ELFCLASS32)
 	{
@@ -178,19 +235,16 @@ void ElfFile::printSymbols(){
         Elf64_Sym *symBase = 
 		     (Elf64_Sym *) (elfEhdr + elf64Shdr[this->symindex].sh_offset);
 
-        const char *symbolName;
-		const char *sectionName;
+		std::string symbolName;
+		std::string sectionName;
 
 		for(Elf64_Sym * sym = symBase;
 				sym < (Elf64_Sym *) (((char*) symBase) + symSize) ;
 				sym++)
         {
-            symbolName = &((elfEhdr +
-						elf64Shdr[this->strindex].sh_offset)[sym->st_name]);
+            symbolName = this->symbolName(sym->st_name);
 			if(sym->st_shndx < SHN_LORESERVE){
-				sectionName =  elfEhdr +
-						elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
-						elf64Shdr[sym->st_shndx].sh_name;
+				sectionName =  this->segmentName(sym->st_shndx);
 			}else{
 				switch(sym->st_shndx){
 					case SHN_UNDEF:
@@ -225,15 +279,15 @@ void ElfFile::printSymbols(){
 
 			if(ELF64_ST_TYPE(sym->st_info) == STT_FUNC ||
 					ELF64_ST_TYPE(sym->st_info) == STT_OBJECT){
-				printf("Symbol: %016lx %s : %s (%lu)\n",
-						sym->st_value, sectionName, symbolName,
-						sym->st_size);
+				std::cout << "Symbol: " << std::hex << sym->st_value << std::dec
+				          << " " << sectionName << " : " << symbolName
+						  << " ( " << sym->st_size << " ) " << std::endl;
 			}
         }
     }
 }
 
-char* ElfFile::getFileContent(){
+uint8_t* ElfFile::getFileContent(){
 	return this->fileContent;
 }
 ElfLoader* ElfFile32::parseElf(ElfFile::ElfProgramType type, 
@@ -267,3 +321,35 @@ ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type,
 bool ElfFile64::isRelocatable(){
 	return (elf64Ehdr->e_type == ET_REL);
 }
+
+uint32_t ElfFile64::getRelocationSection(){
+	
+	if (!this->isRelocatable()){
+		return 0;
+	}
+
+	///* loop through every section */
+	for(unsigned int i = 0; i < this->elf64Ehdr->e_shnum; i++)
+	{
+		/* if Elf64_Shdr.sh_addr isn't 0 the section will appear in memory*/
+		unsigned int infosec = this->elf64Shdr[i].sh_info;
+
+		/* Not a valid relocation section? */
+		if (infosec >= this->elf64Ehdr->e_shnum)
+			continue;
+
+		/* Don't bother with non-allocated sections */
+		if (!(this->elf64Shdr[infosec].sh_flags & SHF_ALLOC))
+			continue;
+
+		//if (this->elf64Shdr[i].sh_type == SHT_REL){
+		//	//TODO this is only in the i386 case!
+		//	//apply_relocate(fileContent, elf64Shdr, symindex, strindex, i);
+		//}
+		if (elf64Shdr[i].sh_type == SHT_RELA){
+			return i;
+		}
+	}
+	return 0;
+}
+
