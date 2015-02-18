@@ -3,10 +3,10 @@
 
 #include "exceptions.h"
 #include "kernel_headers.h"
+#include <cassert>
 
 
 #include <cstring>
-#include <cassert>
 
 #include <iostream>
 #include <typeinfo>
@@ -20,13 +20,13 @@ namespace fs = boost::filesystem;
 //#include <filesystem>
 //namespace fs = std::filesystem;
 
-ParavirtState::ParavirtState(ElfFile* file){
-	this->updateState(file);
+ParavirtState::ParavirtState(){
+	this->updateState();
 }
 
 ParavirtState::~ParavirtState(){}
 
-void ParavirtState::updateState(ElfFile* file){
+void ParavirtState::updateState(){
 
     pv_init_ops = Variable::findVariableByName("pv_init_ops")->getInstance();
     pv_time_ops = Variable::findVariableByName("pv_time_ops")->getInstance();
@@ -35,13 +35,24 @@ void ParavirtState::updateState(ElfFile* file){
     pv_apic_ops = Variable::findVariableByName("pv_apic_ops")->getInstance();
     pv_mmu_ops  = Variable::findVariableByName("pv_mmu_ops" )->getInstance();
     pv_lock_ops = Variable::findVariableByName("pv_lock_ops")->getInstance();
+
     
-    nopFuncAddress = file->
-				findAddressOfVariable("_paravirt_nop");
-    ident32NopFuncAddress = file->
-				findAddressOfVariable("_paravirt_ident_32");
-    ident64NopFuncAddress = file->
-				findAddressOfVariable("_paravirt_ident_64");
+    Function* func = 0;
+
+	func = Function::findFunctionByName("_paravirt_nop");
+	assert(func);
+	nopFuncAddress = func->getAddress();
+	
+	func = Function::findFunctionByName("_paravirt_ident_32");
+	assert(func);
+    ident32NopFuncAddress = func->getAddress();
+	
+	func = Function::findFunctionByName("_paravirt_ident_64");
+	assert(func);
+    ident64NopFuncAddress = func->getAddress();
+
+	assert(nopFuncAddress);
+	assert(ident32NopFuncAddress);
 	assert(ident64NopFuncAddress);
 
     const Structured * pptS = 
@@ -57,15 +68,16 @@ void ParavirtState::updateState(ElfFile* file){
 
 ElfLoader::ElfLoader(ElfFile* elffile):
 	elffile(elffile),
+	kernelModule(),
 	textSegment(),
 	textSegmentContent(),
 	jumpTable(),
 	dataSegment(),
-	paravirtState(elffile){
+	paravirtState(){
 
 	this->ideal_nops = p6_nops;
-
 }
+
 ElfLoader::~ElfLoader(){}
 
 void  ElfLoader::add_nops(void *insns, uint8_t len)
@@ -568,7 +580,7 @@ void ElfLoader::parseElfFile(){
 }
 
 KernelManager::KernelManager():
-	dirName(), moduleMap()
+	dirName(), moduleMap(), moduleInstanceMap()
 	{
 }
 
@@ -588,7 +600,7 @@ ElfLoader *KernelManager::loadModule(std::string moduleName){
 		//std::cout << filename << std::endl;
 	}
 	ElfFile *file = ElfFile::loadElfFile(filename);
-	auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE, this);
+	auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE, moduleName, this);
 	moduleMap[moduleName] = module;
 
 	return module;
@@ -605,7 +617,7 @@ void KernelManager::loadAllModules(){
 
 Instance KernelManager::nextModule(Instance &instance){
 	Instance next = instance.memberByName("list").memberByName("next", true);
-	next.changeBaseType("module");
+	next = next.changeBaseType("module");
 	return next;
 }
 
@@ -631,19 +643,33 @@ std::string KernelManager::findModuleFile(std::string modName){
 }
 
 std::list<std::string> KernelManager::getKernelModules(){
+	if(this->moduleInstanceMap.size() == 0){
+		this->loadKernelModules();
+	}
 	std::list<std::string> strList;
+	for(auto mod: this->moduleInstanceMap){
+	    strList.push_back(mod.first);
+	}
+	return strList;
+}
+
+Instance KernelManager::getKernelModuleInstance(std::string modName){
+	return this->moduleInstanceMap[modName];
+}
+
+void KernelManager::loadKernelModules(){
+	moduleInstanceMap.clear();
 	Instance modules = Variable::findVariableByName("modules")->getInstance();
 	Instance module = modules.memberByName("next", true);
-	modules.changeBaseType("module");
-	module.changeBaseType("module");
+	modules = modules.changeBaseType("module");
+	module = module.changeBaseType("module");
 	
 	while(module != modules){
 		std::string moduleName = module.memberByName("name").getRawValue<std::string>();
 		//std::cout << "Module " << moduleName << std::endl;
-		strList.push_back(moduleName);
+		moduleInstanceMap[moduleName] = module;
 		module = this->nextModule(module);
 	}
-	return strList;
 }
 
 
@@ -861,8 +887,11 @@ void ElfKernelLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
 
 ////////////////////////////////////////////////////
 
-ElfModuleLoader::ElfModuleLoader(ElfFile* elffile, KernelManager* parent):
+ElfModuleLoader::ElfModuleLoader(ElfFile* elffile, 
+	    std::string name,
+		KernelManager* parent):
 	ElfLoader(elffile),
+	modName(name),
 	parent(parent){
 }
 
@@ -922,7 +951,7 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 	                     segmentAddress(this->elffile->symindex);
 
 
-#ifdef DEBUG
+#ifdef PRINTDEBUG
     bool doPrint = false;
     if(sectionName.compare("__kcrctab_gpl") == 0) doPrint = true;
     if(doPrint) Console::out() << "Section to Relocate: " << sectionName << dec << endl;
@@ -955,7 +984,7 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
 		std::string symbolName = this->elffile->symbolName(sym->st_name);
 
-#ifdef DEBUG
+#ifdef PRINTDEBUG
         /////////////////////////////////////////////////////////////////////
         //if ((unsigned long) locInMem == 0xffffffffa0000006) doPrint = true;
         //if (rel[i].r_offset == 0xf1f) doPrint = true;
@@ -975,7 +1004,7 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
         switch(sym->st_shndx){
         case SHN_COMMON:
-#ifdef DEBUG
+#ifdef PRINTDEBUG
             if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
             debugerr("This should not happen!");
 #endif
@@ -983,12 +1012,12 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
             continue; //TODO REMOVE
             break;
         case SHN_ABS:
-#ifdef DEBUG
+#ifdef PRINTDEBUG
             if(doPrint) Console::out() << "Symtype SHN_ABS" << endl;
 #endif
             break;
         case SHN_UNDEF:
-#ifdef DEBUG
+#ifdef PRINTDEBUG
             if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
 
             //Resolve Symbol and write to st_value
@@ -1000,7 +1029,7 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
             if(_symTable.contains(symbolName))
             {
                 sym->st_value = _symTable.value(symbolName);
-#ifdef DEBUG
+#ifdef PRINTDEBUG
                 if(doPrint) Console::out() << "Found symbol @" << hex << sym->st_value << dec << endl;
 #endif
             }
@@ -1091,7 +1120,7 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
             break;
         default:
-#ifdef DEBUG
+#ifdef PRINTDEBUG
             if(doPrint) Console::out() << "default: " << endl;
             //debugerr("Sym Type: default: " << sym->st_shndx);
 #endif
@@ -1168,7 +1197,7 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
                 //This is used as relocation in memory
                 val -= (quint64)locInMem;
             }
-#ifdef DEBUG
+#ifdef PRINTDEBUG
             if(doPrint) Console::out() << "PC32 final value: " << hex << (quint32) val << dec << endl;
 #endif
             *(quint32 *)locInElf = val;
@@ -1179,12 +1208,12 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 //#endif
             break;
         default:
-#ifdef DEBUG
+#ifdef PRINTDEBUG
             debugerr("Unknown rela relocation: " << ELF64_R_TYPE(rel[i].r_info));
 #endif
             return -ENOEXEC;
         }
-#ifdef DEBUG
+#ifdef PRINTDEBUG
         doPrint = false;
 #endif
 #endif
@@ -1216,37 +1245,34 @@ void ElfModuleLoader::initText(void) {
 	applyParainstr();
 	applySmpLocks();
 
+    //Content of text section in memory:
+    //same as the sections in the elf binary
 
-	//create a copy of the contents
+    this->textSegmentContent.clear();
+	this->textSegmentContent.insert(this->textSegmentContent.end(),
+			this->textSegment.index,
+			this->textSegment.index + this->textSegment.size);
 
-//    //Content of text section in memory:
-//    //same as the sections in the elf binary
-//
-//    context.textSegmentContent.clear();
-//    context.textSegmentContent.append(context.textSegment.index, context.textSegment.size);
-//
-//    if(fileContent[4] == ELFCLASS32)
-//    {
-//        //TODO
-//    }
-//    else if(fileContent[4] == ELFCLASS64)
-//    {
-//        Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
-//        Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
-//        for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
-//        {
-//            QString sectionName = QString(fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name);
-//
-//            if(elf64Shdr[i].sh_flags == (SHF_ALLOC | SHF_EXECINSTR) &&
-//                    sectionName.compare(".text") != 0 &&
-//                    sectionName.compare(".init.text") != 0)
-//            {
-//                context.textSegmentContent.append(fileContent + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_size);
-//            }
-//        }
-//    }
-//
-//
+	uint8_t *fileContent = this->elffile->getFileContent();
+    Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
+    Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
+    for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
+    {
+		std::string sectionName = this->elffile->segmentName(i);
+        if (sectionName.compare(".text") == 0 ||
+            sectionName.compare(".init.text") == 0){
+			continue;
+		}
+
+        if(elf64Shdr[i].sh_flags == (SHF_ALLOC | SHF_EXECINSTR)){
+			this->textSegmentContent.insert(this->textSegmentContent.end(),
+			      fileContent + elf64Shdr[i].sh_offset, 
+			      fileContent + elf64Shdr[i].sh_offset + elf64Shdr[i].sh_size);
+        }
+    }
+
+	//TODO resume here
+
 //    //Save the jump_labels section for later reference.
 //
 //    info = findElfSegmentWithName(fileContent, "__jump_table");
@@ -1353,11 +1379,43 @@ void ElfModuleLoader::initText(void) {
 
 void ElfModuleLoader::initData(void) {}
 
-void ElfModuleLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
-	info.memindex = info.index;
+uint8_t *ElfModuleLoader::findMemAddressOfSegment(std::string segName){
+	Instance module;
+	Instance currentModule = this->parent->
+	                               getKernelModuleInstance(this->modName);
+	
+	//If the searching for the .bss section
+    //This section is right after the modules struct
+	if(segName.compare(".bss") == 0){
+        return (uint8_t *) currentModule.getAddress() + currentModule.size();
+	}
+	
+	if(segName.compare("__ksymtab_gpl") == 0){
+        return (uint8_t *) currentModule.memberByName("gpl_syms").
+		                                 getValue<uint64_t>();
+	}
+	
+	//Find the address of the current section in the memory image
+    //Get Number of sections in kernel image
+    Instance attrs = currentModule.memberByName("sect_attrs", true);
+    uint32_t attr_cnt = attrs.memberByName("nsections").getValue<uint64_t>();
+
+    //Now compare all section names until we find the correct section.
+    for (uint j = 0; j < attr_cnt; ++j) {
+        Instance attr = attrs.memberByName("attrs").arrayElem(j);
+		std::string sectionName = attr.memberByName("name", true).
+		                               getValue<std::string>();
+		if(sectionName.compare(segName) == 0){
+            return (uint8_t *) attr.memberByName("address").getValue<uint64_t>();
+        }
+    }
+	//Segment not found
 	assert(false);
-	UNUSED(info);
-    //altinstrSegmentInMem = findMemAddressOfSegment(context, ".altinstr_replacement");
+    return 0;
+}
+
+void ElfModuleLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
+	info.memindex = this->findMemAddressOfSegment(info.segName);
 }
 
 ////////////////////////////////////////////////////
@@ -1379,8 +1437,9 @@ ElfKernelLoader64::ElfKernelLoader64(ElfFile64* elffile):
 ElfKernelLoader64::~ElfKernelLoader64(){}
 
 ElfModuleLoader32::ElfModuleLoader32(ElfFile32* elffile, 
+		                             std::string name,
                                      KernelManager* parent):
-	ElfModuleLoader(elffile, parent){
+	ElfModuleLoader(elffile, name, parent){
 	//this->ParseElfFile();
 }
 
@@ -1389,8 +1448,9 @@ ElfModuleLoader32::~ElfModuleLoader32(){}
 ////////////////////////////////////////////////////
 
 ElfModuleLoader64::ElfModuleLoader64(ElfFile64* elffile, 
+		                             std::string name,
                                      KernelManager* parent):
-	ElfModuleLoader(elffile, parent){
+	ElfModuleLoader(elffile, name, parent){
 	this->parseElfFile();
 }
 

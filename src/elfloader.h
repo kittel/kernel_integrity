@@ -22,10 +22,10 @@ class SegmentInfo;
 class ParavirtState{
 
 	public:
-		ParavirtState(ElfFile* file);
+		ParavirtState();
 		virtual ~ParavirtState();
 
-		void updateState(ElfFile* file);
+		void updateState();
 
 
 		Instance pv_init_ops;	
@@ -55,6 +55,7 @@ class ElfLoader{
 
 	protected:
 		ElfFile* elffile;
+		Instance* kernelModule;
 		
 		SegmentInfo textSegment;
 	    std::vector<uint8_t> textSegmentContent;
@@ -105,15 +106,20 @@ class KernelManager{
 		
 		void setKernelDir(std::string dirName);
 
+		void loadKernelModules();
 		std::list<std::string> getKernelModules();
+		Instance getKernelModuleInstance(std::string modName);
+
 		void loadAllModules();
 		ElfLoader *loadModule(std::string moduleName);
-		uint64_t findMemAddressOfSegment();
 	private:
 		std::string dirName;
 		
 		typedef std::map<std::string, ElfLoader*> ModuleMap;
 		ModuleMap moduleMap;
+		
+		typedef std::map<std::string, Instance> ModuleInstanceMap;
+		ModuleInstanceMap moduleInstanceMap;
 
 		Instance nextModule(Instance &instance);
 		std::string findModuleFile(std::string modName);
@@ -150,19 +156,23 @@ class ElfKernelLoader : public ElfLoader, public KernelManager {
 
 class ElfModuleLoader : public ElfLoader {
 	public:
-		ElfModuleLoader(ElfFile* elffile, KernelManager* parent = 0);
+		ElfModuleLoader(ElfFile* elffile, 
+		        std::string name = "", 
+		        KernelManager* parent = 0);
 		virtual ~ElfModuleLoader();
 
 	protected:
 		void updateSegmentInfoMemAddress(SegmentInfo &info);
+		uint8_t * findMemAddressOfSegment(std::string segName);
 		
 		virtual void initText();
 		virtual void initData();
 
 		void loadDependencies();
 		virtual void applyRelocationsOnSection(uint32_t relSectionID) = 0;
-
+		
 	protected:
+		std::string modName;
 		KernelManager* parent;
 		
 };
@@ -176,7 +186,9 @@ class ElfKernelLoader32 : public ElfKernelLoader{
 
 class ElfModuleLoader32 : public ElfModuleLoader{
 	public:
-		ElfModuleLoader32(ElfFile32* elffile, KernelManager* parent = 0);
+		ElfModuleLoader32(ElfFile32* elffile, 
+		        std::string name = "", 
+		        KernelManager* parent = 0);
 		virtual ~ElfModuleLoader32();
 	protected:
 };
@@ -191,12 +203,13 @@ class ElfKernelLoader64 : public ElfKernelLoader{
 
 class ElfModuleLoader64 : public ElfModuleLoader{
 	public:
-		ElfModuleLoader64(ElfFile64* elffile, KernelManager* parent = 0);
+		ElfModuleLoader64(ElfFile64* elffile, 
+		        std::string name = "", 
+		        KernelManager* parent = 0);
 		virtual ~ElfModuleLoader64();
 
 	protected:
 		void applyRelocationsOnSection(uint32_t relSectionID);
-
 };
 
 

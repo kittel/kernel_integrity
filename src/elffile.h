@@ -75,6 +75,7 @@ class ElfFile{
 
 		static ElfFile* loadElfFile(std::string filename) throw();
 		virtual ElfLoader* parseElf(ElfFile::ElfProgramType type,
+		                            std::string name = "",
 		                            KernelManager* parent = 0) = 0;
 
 		virtual bool isRelocatable() = 0;
@@ -113,6 +114,7 @@ class ElfFile32 : public ElfFile {
 		uint64_t findAddressOfVariable(std::string symbolName);
 
 		ElfLoader* parseElf(ElfFile::ElfProgramType type,
+		                    std::string name = "",
 		                    KernelManager* parent = 0);
 
 		bool isRelocatable();
@@ -136,6 +138,7 @@ class ElfFile64 : public ElfFile {
 		uint64_t findAddressOfVariable(std::string symbolName);
 
 		ElfLoader* parseElf(ElfFile::ElfProgramType type,
+		                    std::string name = "",
 		                    KernelManager* parent = 0);
 
 		bool isRelocatable();

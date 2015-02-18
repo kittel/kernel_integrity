@@ -291,7 +291,9 @@ uint8_t* ElfFile::getFileContent(){
 	return this->fileContent;
 }
 ElfLoader* ElfFile32::parseElf(ElfFile::ElfProgramType type, 
+		                       std::string name,
                                KernelManager* parent){
+	UNUSED(name);
 	UNUSED(parent);
 	if(type == ElfFile::ELFPROGRAMTYPEKERNEL){
 		//return new ElfKernelLoader32(this);
@@ -309,11 +311,12 @@ bool ElfFile32::isRelocatable(){
 }
 
 ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type,
+		                       std::string name,
                                KernelManager* parent){
 	if(type == ElfFile::ELFPROGRAMTYPEKERNEL){
 		return new ElfKernelLoader64(this);
 	}else if(type == ElfFile::ELFPROGRAMTYPEMODULE){
-		return new ElfModuleLoader64(this, parent);
+		return new ElfModuleLoader64(this, name, parent);
 	}
 	return NULL;
 }
