@@ -11,12 +11,12 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-SegmentInfo::SegmentInfo(): segName(), index(0), memindex(0), address(0), size(0){}
+SegmentInfo::SegmentInfo(): segName(), segID(0), index(0), memindex(0), address(0), size(0){}
 SegmentInfo::SegmentInfo(uint8_t *i, unsigned int s):
-				segName(), index(i), memindex(0), address(0), size(s){}
-SegmentInfo::SegmentInfo(std::string segName, uint8_t *i, 
+				segName(), segID(), index(i), memindex(0), address(0), size(s){}
+SegmentInfo::SegmentInfo(std::string segName, uint32_t segID, uint8_t *i, 
 					uint64_t a, uint32_t s):
-				segName(segName), index(i), memindex(0),
+				segName(segName), segID(segID), index(i), memindex(0),
 			   	address(a), size(s){}
 SegmentInfo::~SegmentInfo(){}
 
@@ -115,7 +115,8 @@ uint8_t *ElfFile32::segmentAddress(int sectionID){
 	throw NotImplementedException();
 }
 
-uint32_t ElfFile32::getRelocationSection(){
+void ElfFile32::applyRelocations(ElfModuleLoader *loader){
+	UNUSED(loader);
 	throw NotImplementedException();
 }
 		
@@ -162,13 +163,13 @@ ElfFile64::~ElfFile64(){}
 
 SegmentInfo ElfFile64::findSegmentWithName(std::string sectionName){
 	
-    char * tempBuf = 0;
+	char * tempBuf = 0;
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
 		tempBuf = (char*) this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset
 				+ elf64Shdr[i].sh_name;
 
 		if (sectionName.compare(tempBuf) == 0) {
-			return SegmentInfo(sectionName, 
+			return SegmentInfo(sectionName, i, 
 			                   this->fileContent + 
 			                        elf64Shdr[i].sh_offset,
 			                        elf64Shdr[i].sh_addr, 
@@ -185,7 +186,7 @@ SegmentInfo ElfFile64::findSegmentByID(uint32_t sectionID){
 		std::string sectionName = toString(this->fileContent + 
 		                      elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + 
 		                      elf64Shdr[sectionID].sh_name);
-		return SegmentInfo(sectionName, 
+		return SegmentInfo(sectionName, sectionID,
 		                   this->fileContent + 
 		                        elf64Shdr[sectionID].sh_offset,
 		                        elf64Shdr[sectionID].sh_addr, 
@@ -325,10 +326,10 @@ bool ElfFile64::isRelocatable(){
 	return (elf64Ehdr->e_type == ET_REL);
 }
 
-uint32_t ElfFile64::getRelocationSection(){
+void ElfFile64::applyRelocations(ElfModuleLoader *loader){
 	
 	if (!this->isRelocatable()){
-		return 0;
+		return;
 	}
 
 	///* loop through every section */
@@ -350,9 +351,9 @@ uint32_t ElfFile64::getRelocationSection(){
 		//	//apply_relocate(fileContent, elf64Shdr, symindex, strindex, i);
 		//}
 		if (elf64Shdr[i].sh_type == SHT_RELA){
-			return i;
+			loader->applyRelocationsOnSection(i);
 		}
 	}
-	return 0;
+	return;
 }
 

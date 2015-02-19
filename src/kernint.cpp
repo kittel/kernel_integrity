@@ -55,6 +55,7 @@ void KernelValidator::loadKernel(std::string dirName){
     kernelLoader = dynamic_cast<ElfKernelLoader *>(
 			kernelFile->parseElf(ElfFile::ELFPROGRAMTYPEKERNEL));
 	kernelLoader->setKernelDir(dirName);
+	kernelLoader->parseSystemMap();
 }
 
 

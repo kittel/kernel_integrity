@@ -9,6 +9,8 @@
 #include <cstring>
 
 #include <iostream>
+#include <fstream>
+
 #include <typeinfo>
 
 #include "libdwarfparser/libdwarfparser.h"
@@ -408,11 +410,12 @@ void ElfLoader::applyParainstr(){
 void ElfLoader::applySmpLocks(){
 	SegmentInfo info = this->elffile->findSegmentWithName(".smp_locks");
 	if (!info.index) return;
+	this->updateSegmentInfoMemAddress(info);
 
     unsigned char lock = 0;
 	uint64_t count = 0;
     
-	int32_t * smpLocksStart = (int32_t *) info.index;;
+	int32_t * smpLocksStart = (int32_t *) info.index;
     int32_t * smpLocksStop  = (int32_t *) (info.index + info.size);
 	
 	//Find boot_cpu_data in kernel
@@ -431,7 +434,6 @@ void ElfLoader::applySmpLocks(){
     }
 
 
-	this->updateSegmentInfoMemAddress(info);
 
     //bool addSmpEntries = false;
     //if(context.smpOffsets.size() == 0) addSmpEntries = true;
@@ -580,7 +582,7 @@ void ElfLoader::parseElfFile(){
 }
 
 KernelManager::KernelManager():
-	dirName(), moduleMap(), moduleInstanceMap()
+	dirName(), moduleMap(), moduleInstanceMap(), symbolMap()
 	{
 }
 
@@ -672,6 +674,32 @@ void KernelManager::loadKernelModules(){
 	}
 }
 
+uint64_t KernelManager::getSystemMapAddress(std::string name){
+	return this->symbolMap[name];
+}
+
+void KernelManager::parseSystemMap(){
+	std::string sysMapFileName = this->dirName;
+	sysMapFileName.append("/System.map");
+	std::string line;
+	std::ifstream sysMapFile (sysMapFileName);
+	if (sysMapFile.is_open()){
+		while ( sysMapFile.good() ){
+			uint64_t address;
+			char mode = '\0';
+			std::string varname;
+			std::getline (sysMapFile,line);
+			std::stringstream iss(line); 
+			iss >> std::hex >>address >> mode >> varname;
+
+			symbolMap[varname] = address;
+		}
+		sysMapFile.close();
+    }else{  
+		std::cout << "Unable to open file" << std::endl;
+		return;
+    }
+}
 
 ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	ElfLoader(elffile),
@@ -950,6 +978,12 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
     Elf64_Sym *symBase = (Elf64_Sym *) this->elffile->
 	                     segmentAddress(this->elffile->symindex);
 
+	SegmentInfo percpuDataSegment = 
+	    this->elffile->findSegmentWithName(".data..percpu");
+	Instance currentModule = this->parent->
+	                               getKernelModuleInstance(this->modName);
+	
+
 
 #ifdef PRINTDEBUG
     bool doPrint = false;
@@ -962,48 +996,19 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 		void *locInMem = 0;
 		void *locOfRelSectionInMem = 0;
 		void *locOfRelSectionInElf = 0;
-		uint64_t val = 0;
 
         /* This is where to make the change */
         locInElf = (void *) ((char*) sectionInfo.index    + rel[i].r_offset);
         locInMem = (void *) ((char*) sectionInfo.memindex + rel[i].r_offset);
 
-		//TODO REMOVE
-		UNUSED(locInElf);
-		UNUSED(locInMem);
-		UNUSED(locOfRelSectionInMem);
-		UNUSED(locOfRelSectionInElf);
-		UNUSED(val);
-
 		Elf64_Sym *sym = 0; 
         sym = symBase + ELF64_R_SYM(rel[i].r_info);
 
-        Variable* v = NULL;
-		UNUSED(v);
-        Instance symbol;
-
-		std::string symbolName = this->elffile->symbolName(sym->st_name);
-
-#ifdef PRINTDEBUG
-        /////////////////////////////////////////////////////////////////////
-        //if ((unsigned long) locInMem == 0xffffffffa0000006) doPrint = true;
-        //if (rel[i].r_offset == 0xf1f) doPrint = true;
-        //if (symbolName.compare("snd_pcm_set_sync") == 0) doPrint = true;
-        //if(context.currentModule.member("name").toString().compare("\"virtio_balloon\"") == 0 && rel[i].r_offset == 0xb43) doPrint = true;
-        //        sectionName.compare(".altinstructions") == 0 && i <= 1) doPrint = true;
-        /////////////////////////////////////////////////////////////////////
-
-        if(doPrint) Console::out() << endl;
-        if(doPrint) Console::out() << "Loc in Elf: " << hex << locInElf << dec << endl;
-        if(doPrint) Console::out() << "Loc in Mem: " << hex << locInMem << dec << endl;
-        if(doPrint) Console::out() << "Sym: " << hex << symbolName << " @ " << sym << " (Offset: 0x" << ELF64_R_SYM(rel[i].r_info) << " , Info: 0x" << sym->st_info << " )" << " Bind type: " << ELF64_ST_BIND(sym->st_info) << dec << endl;
-
-        if(doPrint) Console::out() << "Name of current Section: " << QString(fileContent + sechdrs[context.shstrindex].sh_offset + sechdrs[sectionId].sh_name) << endl;
-        //			Console::out() << "type " << (int)ELF64_R_TYPE(rel[i].r_info) << " st_value " << sym->st_value << " r_addend " << rel[i].r_addend << " loc " << hex << (u64)loc << dec << endl;
-#endif
+		SegmentInfo symRelSectionInfo;
 
         switch(sym->st_shndx){
         case SHN_COMMON:
+
 #ifdef PRINTDEBUG
             if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
             debugerr("This should not happen!");
@@ -1019,105 +1024,9 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
         case SHN_UNDEF:
 #ifdef PRINTDEBUG
             if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
-
-            //Resolve Symbol and write to st_value
-            if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
-            if(doPrint) Console::out() << "System Map contains " << _sym.memSpecs().systemMap.count(symbolName) << " Versions of that symbol." << endl;
 #endif
-
-#if 0
-            if(_symTable.contains(symbolName))
-            {
-                sym->st_value = _symTable.value(symbolName);
-#ifdef PRINTDEBUG
-                if(doPrint) Console::out() << "Found symbol @" << hex << sym->st_value << dec << endl;
-#endif
-            }
-            //Try to find variable in system map
-            else if (_sym.memSpecs().systemMap.count(symbolName) > 0)
-            {
-                //Console::out() << "Found Variable in system.map: " << symbolName) << endl;
-                //sym->st_value = _sym.memSpecs().systemMap.value(symbolName).address;
-                QList<SystemMapEntry> symbols = _sym.memSpecs().systemMap.values(symbolName);
-                for (QList<SystemMapEntry>::iterator i = symbols.begin(); i != symbols.end(); ++i)
-                {
-                    SystemMapEntry currentEntry = (*i);
-
-                    //ELF64_ST_BIND(sym->st_info) => 0: Local, 1: Global, 2: Weak
-                    //currentEntry.type => 'ascii' lowercase: local, uppercase: global
-                    if (ELF64_ST_BIND(sym->st_info) == 1 && currentEntry.type >= 0x41 && currentEntry.type <= 0x5a)
-                    {
-                        if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Global" << dec << endl;
-                        sym->st_value = currentEntry.address;
-                    }
-                    else if (ELF64_ST_BIND(sym->st_info) == 0 && currentEntry.type >= 0x61 && currentEntry.type <= 0x7a)
-                    {
-                        if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Local" << dec << endl;
-                        sym->st_value = currentEntry.address;
-                    }
-                }
-            }
-            else
-            {
-                //Console::out() << "Variable not found in system.map: " << symbolName << endl;
-                //Try to find the variable by name in insight.
-                v = _sym.factory().findVarByName(symbolName);
-                if (!v)
-                {
-                    //debugerr("Variable " << symbolName << " not found! ERROR!");
-                    QList<BaseType*> types = _sym.factory().typesByName().values(symbolName);
-
-                    if(types.size() > 0)
-                    {
-                        BaseType* bt;
-                        //Console::out() << "Type found in insight: " << symbolName << endl;
-                        for(int k = 0 ; k < types.size() ; k++)
-                        {
-                            bt = types.at(k);
-                            //Console::out() << k << ": " << (bt && (bt->type() == rtFunction) ? "function" : "type") << " with size " <<  bt->size() << endl;
-                            // Only use the type if it is a function and got a defined size
-                            if( bt->type() == rtFunction && bt->size() > 0) { break; }
-
-                            if(k == types.size() - 1)
-                            {
-                                //Console::out() << "Function not found in insight: " << symbolName << endl;
-                                //TODO handle this case does this happen??
-                            }
-                        }
-                        const Function* func = dynamic_cast<const Function*>(bt);
-
-                        if (func) {
-                            sym->st_value = func->pcLow();
-                            if(doPrint) Console::out() << "Function found in: " << hex << sym->st_value << dec << endl;
-                            //TODO check if somewhere the startaddress is zero! bug!
-//                            Console::out() << Console::color(ctColHead) << "  Start Address:  "
-//                                 << Console::color(ctAddress) << QString("0x%1").arg(
-//                                                            func->pcLow(),
-//                                                            _sym.memSpecs().sizeofPointer << 1,
-//                                                            16,
-//                                                            QChar('0'))
-//                                 << Console::color(ctReset)
-//                                 << endl;
-                        }
-
-                    } //Else no type with with the given name found.
-                    continue;
-                }
-                //Console::out() << "Variable found in insight: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << endl;
-                symbol = v->toInstance(_vmem, BaseType::trLexical, ksAll);
-                if(!symbol.isValid())
-                {
-                    debugerr("Symbol " << symbolName << " not found! ERROR!");
-                    continue;
-                }
-                //Console::out() << "Symbol found with address : 0x" << hex << symbol.address() << dec << endl;
-                sym->st_value = symbol.address();
-
-                if(doPrint) Console::out() << "Instance found: " << hex << sym->st_value << dec << endl;
-
-            }
-#endif
-
+			sym->st_value = this->relocateShnUndef(
+			                      this->elffile->symbolName(sym->st_name));
             break;
         default:
 #ifdef PRINTDEBUG
@@ -1125,40 +1034,31 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
             //debugerr("Sym Type: default: " << sym->st_shndx);
 #endif
 
-#if 0
             //TODO this is not right yet.
             /* Divert to percpu allocation if a percpu var. */
-            if (sym->st_shndx == context.percpuDataSegment)
-            {
-                locOfRelSectionInMem = context.currentModule.member("percpu").toPointer();
-                //sym->st_value += (unsigned long)mod_percpu(mod);
-                if(doPrint) Console::out() << "Per CPU variable" << endl;
+            if (sym->st_shndx == percpuDataSegment.segID){
+                locOfRelSectionInMem = (void *) currentModule.
+				                                    memberByName("percpu").
+				                                    getValue<uint64_t>();
             }
             else
             {
-				std::string relocSection = this->elffile->segmentName(sym->st_shndx]);
-                locOfRelSectionInElf = (void *) findElfSegmentWithName(fileContent, relocSection).index;
-                locOfRelSectionInMem = (void *) findMemAddressOfSegment(context, relocSection);
-                if(doPrint) Console::out() << "SectionName: " << hex << relocSection << dec << endl;
+				symRelSectionInfo = 
+				    this->elffile->findSegmentByID(sym->st_shndx);
+				this->updateSegmentInfoMemAddress(symRelSectionInfo);
+                locOfRelSectionInElf = (void *) symRelSectionInfo.index;
+                locOfRelSectionInMem = (void *) symRelSectionInfo.memindex;
             }
 
-            //Only add the location of the section if it was not already added
-            if(doPrint) Console::out() << "old st_value: " << hex << sym->st_value << dec;
-            if(doPrint) Console::out() << " locOfRelSectionInMem: " << hex << locOfRelSectionInMem << dec;
-            if(doPrint) Console::out() << " locOfRelSectionInElf: " << hex << locOfRelSectionInElf << dec << endl;
-
-            if(sym->st_value < (long unsigned int) locOfRelSectionInMem)
-            {
+            if(sym->st_value < (long unsigned int) locOfRelSectionInMem){
                 sym->st_value += (long unsigned int) locOfRelSectionInMem;
             }
-#endif
             break;
         }
-#if 0
 
-        val = sym->st_value + rel[i].r_addend;
+        uint64_t val = sym->st_value + rel[i].r_addend;
 
-#if DEBUG
+#if PRINTDEBUG
 		if(doPrint) Console::out() << "raddend: " << hex << rel[i].r_addend << dec << endl;
         if(doPrint) Console::out() << "sym->value: " << hex << sym->st_value << dec << endl;
         if(doPrint) Console::out() << "val: " << hex << val << dec << endl;
@@ -1168,54 +1068,60 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
         case R_X86_64_NONE:
             break;
         case R_X86_64_64:
-            *(quint64 *)locInElf = val;
+            *(uint64_t *)locInElf = val;
             break;
         case R_X86_64_32:
-            *(quint32 *)locInElf = val;
-            if (val != *(quint32 *)locInElf)
-			    return -ENOEXEC;
+            *(uint64_t *)locInElf = val;
+            if (val != *(uint64_t *)locInElf)
+				assert(false);
+			    return;
                 //goto overflow;
             break;
         case R_X86_64_32S:
-            *(qint32 *)locInElf = val;
-            if(doPrint) Console::out() << " 32S final value: " << hex << (qint32) val << dec << endl;
-            if ((qint64)val != *(qint32 *)locInElf)
-			    return -ENOEXEC;
+            *(uint32_t *)locInElf = val;
+            if ((int64_t)val != *(int32_t *)locInElf)
+				assert(false);
+			    return;
                 //goto overflow;
             break;
         case R_X86_64_PC32:
 
-            //This line is from the original source the loc here is the location within the loaded module.
+            // This line is from the original source the loc here is the
+			//  location within the loaded module.
+
             //val -= (u64)loc;
             if(sectionName.compare(".altinstructions") == 0)
             {
                 //This is later used to copy some memory
-                val = val - (quint64)locOfRelSectionInMem + (quint64)locOfRelSectionInElf - (quint64)locInElf;
+                val = val - (uint64_t)locOfRelSectionInMem + 
+				            (uint64_t)locOfRelSectionInElf - 
+				            (uint64_t)locInElf;
             }
             else
             {
                 //This is used as relocation in memory
-                val -= (quint64)locInMem;
+                val -= (uint64_t)locInMem;
             }
 #ifdef PRINTDEBUG
             if(doPrint) Console::out() << "PC32 final value: " << hex << (quint32) val << dec << endl;
 #endif
-            *(quint32 *)locInElf = val;
-//#if 0
-            if ((qint64)val != *(qint32 *)loc)
-			    return -ENOEXEC;
+            *(uint32_t *)locInElf = val;
+#if 0
+            if ((int64_t)val != *(int32_t *)loc)
+				assert(false);
+			    return;
                 //goto overflow;
-//#endif
+#endif
             break;
         default:
 #ifdef PRINTDEBUG
             debugerr("Unknown rela relocation: " << ELF64_R_TYPE(rel[i].r_info));
 #endif
-            return -ENOEXEC;
+			assert(false);
+		    return;
         }
 #ifdef PRINTDEBUG
         doPrint = false;
-#endif
 #endif
     }
     return;
@@ -1228,17 +1134,70 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 //#endif
 
 }
+uint64_t ElfModuleLoader64::relocateShnUndef(std::string symbolName){
+
+	// First look into the system map.
+	// As we depend on dwarf anyway we use that information to find
+	// a variable.
+	
+	uint64_t address = this->parent->getSystemMapAddress(symbolName);
+    if(address != 0){
+        return address;
+    }
+#if 0
+	// Assume we already have the correct object ...
+	// Thus the following is not necessary
+	// If it is, this section filteres weak objects
+	
+    else if (_sym.memSpecs().systemMap.count(symbolName) > 0)
+    {
+		//Try to find variable in system map
+        //Console::out() << "Found Variable in system.map: " << symbolName) << endl;
+        //sym->st_value = _sym.memSpecs().systemMap.value(symbolName).address;
+        QList<SystemMapEntry> symbols = _sym.memSpecs().systemMap.values(symbolName);
+        for (QList<SystemMapEntry>::iterator i = symbols.begin(); i != symbols.end(); ++i)
+        {
+            SystemMapEntry currentEntry = (*i);
+
+            //ELF64_ST_BIND(sym->st_info) => 0: Local, 1: Global, 2: Weak
+            //currentEntry.type => 'ascii' lowercase: local, uppercase: global
+            if (ELF64_ST_BIND(sym->st_info) == 1 && currentEntry.type >= 0x41 && currentEntry.type <= 0x5a)
+            {
+                if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Global" << dec << endl;
+                sym->st_value = currentEntry.address;
+            }
+            else if (ELF64_ST_BIND(sym->st_info) == 0 && currentEntry.type >= 0x61 && currentEntry.type <= 0x7a)
+            {
+                if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Local" << dec << endl;
+                sym->st_value = currentEntry.address;
+            }
+        }
+    }
+#endif
+
+	// Variable not found in system.map
+    // Try to find the variable by name in insight.
+    Function *func = Function::findFunctionByName(symbolName);
+    if (func){
+		return func->getAddress();
+    }
+
+	Variable *var = Variable::findVariableByName(symbolName);
+    if (var){
+		return var->getLocation();
+	}
+	assert(false);
+	return 0;
+}
 
 void ElfModuleLoader::initText(void) {
-        
-	this->applyRelocationsOnSection(this->elffile->getRelocationSection());
+	this->elffile->applyRelocations(this);
+	
 	this->loadDependencies();
 
 	this->textSegment = this->elffile->findSegmentWithName(".text");
+	this->updateSegmentInfoMemAddress(this->textSegment);
 	this->dataSegment = this->elffile->findSegmentWithName(".data");
-
-	SegmentInfo percpuDataSegment = 
-		        this->elffile->findSegmentWithName(".data..percpu");
 
 
 	applyAltinstr();

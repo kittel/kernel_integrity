@@ -14,8 +14,7 @@
 #include <map>
 
 class ElfLoader;
-class ElfLoader32;
-class ElfLoader64;
+class ElfModuleLoader;
 
 class KernelManager;
 
@@ -23,15 +22,16 @@ class SegmentInfo{
 
 	public:
 		SegmentInfo();
-    	SegmentInfo(std::string segName, uint8_t * i, 
+    	SegmentInfo(std::string segName, uint32_t segID, uint8_t * i, 
 				uint64_t a, uint32_t s);
 		virtual ~SegmentInfo();
 
 		std::string segName;
-		uint8_t * index;
-		uint8_t * memindex;
-    	uint64_t address;
-    	uint32_t size;
+		uint32_t    segID;
+		uint8_t *   index;
+		uint8_t *   memindex;
+    	uint64_t    address;
+    	uint32_t    size;
 
 	private:
     	SegmentInfo(uint8_t * i, uint32_t s);
@@ -79,7 +79,7 @@ class ElfFile{
 		                            KernelManager* parent = 0) = 0;
 
 		virtual bool isRelocatable() = 0;
-		virtual uint32_t getRelocationSection() = 0;
+		virtual void applyRelocations(ElfModuleLoader *loader) = 0;
 
 		uint32_t shstrindex;
     	uint32_t symindex;
@@ -118,7 +118,7 @@ class ElfFile32 : public ElfFile {
 		                    KernelManager* parent = 0);
 
 		bool isRelocatable();
-		uint32_t getRelocationSection();
+		void applyRelocations(ElfModuleLoader *loader);
 	protected:
 };
 
@@ -142,7 +142,7 @@ class ElfFile64 : public ElfFile {
 		                    KernelManager* parent = 0);
 
 		bool isRelocatable();
-		uint32_t getRelocationSection();
+		void applyRelocations(ElfModuleLoader *loader);
 
         Elf64_Ehdr * elf64Ehdr;
         Elf64_Shdr * elf64Shdr;

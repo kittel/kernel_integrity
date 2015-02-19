@@ -112,6 +112,9 @@ class KernelManager{
 
 		void loadAllModules();
 		ElfLoader *loadModule(std::string moduleName);
+		void parseSystemMap();
+		uint64_t getSystemMapAddress(std::string name);
+
 	private:
 		std::string dirName;
 		
@@ -123,6 +126,9 @@ class KernelManager{
 
 		Instance nextModule(Instance &instance);
 		std::string findModuleFile(std::string modName);
+
+		typedef std::map<std::string, uint64_t> SymbolMap;
+		SymbolMap symbolMap;
 		
 };
 
@@ -161,6 +167,7 @@ class ElfModuleLoader : public ElfLoader {
 		        KernelManager* parent = 0);
 		virtual ~ElfModuleLoader();
 
+		virtual void applyRelocationsOnSection(uint32_t relSectionID) = 0;
 	protected:
 		void updateSegmentInfoMemAddress(SegmentInfo &info);
 		uint8_t * findMemAddressOfSegment(std::string segName);
@@ -169,9 +176,7 @@ class ElfModuleLoader : public ElfLoader {
 		virtual void initData();
 
 		void loadDependencies();
-		virtual void applyRelocationsOnSection(uint32_t relSectionID) = 0;
 		
-	protected:
 		std::string modName;
 		KernelManager* parent;
 		
@@ -208,8 +213,9 @@ class ElfModuleLoader64 : public ElfModuleLoader{
 		        KernelManager* parent = 0);
 		virtual ~ElfModuleLoader64();
 
-	protected:
 		void applyRelocationsOnSection(uint32_t relSectionID);
+	protected:
+		uint64_t relocateShnUndef(std::string moduleName);
 };
 
 
