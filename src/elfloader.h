@@ -115,6 +115,12 @@ class KernelManager{
 		void parseSystemMap();
 		uint64_t getSystemMapAddress(std::string name);
 
+		void addSymbolAddress(std::string name, uint64_t address);
+		uint64_t getSymbolAddress(std::string name);
+		
+		void addFunctionAddress(std::string name, uint64_t address);
+		uint64_t getFunctionAddress(std::string name);
+
 	private:
 		std::string dirName;
 		
@@ -129,6 +135,9 @@ class KernelManager{
 
 		typedef std::map<std::string, uint64_t> SymbolMap;
 		SymbolMap symbolMap;
+
+		SymbolMap moduleSymbolMap;
+		SymbolMap functionSymbolMap;
 		
 };
 
@@ -174,12 +183,13 @@ class ElfModuleLoader : public ElfLoader {
 		
 		virtual void initText();
 		virtual void initData();
+		virtual void addSymbols() = 0;
 
 		void loadDependencies();
 		
 		std::string modName;
 		KernelManager* parent;
-		
+
 };
 
 class ElfKernelLoader32 : public ElfKernelLoader{
@@ -215,7 +225,8 @@ class ElfModuleLoader64 : public ElfModuleLoader{
 
 		void applyRelocationsOnSection(uint32_t relSectionID);
 	protected:
-		uint64_t relocateShnUndef(std::string moduleName);
+		uint64_t relocateShnUndef(std::string symbolName);
+		void addSymbols();
 };
 
 

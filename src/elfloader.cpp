@@ -582,7 +582,8 @@ void ElfLoader::parseElfFile(){
 }
 
 KernelManager::KernelManager():
-	dirName(), moduleMap(), moduleInstanceMap(), symbolMap()
+	dirName(), moduleMap(), moduleInstanceMap(), symbolMap(),
+	moduleSymbolMap(), functionSymbolMap()
 	{
 }
 
@@ -656,7 +657,12 @@ std::list<std::string> KernelManager::getKernelModules(){
 }
 
 Instance KernelManager::getKernelModuleInstance(std::string modName){
-	return this->moduleInstanceMap[modName];
+	std::replace(modName.begin(), modName.end(), '-', '_');
+	if(this->moduleInstanceMap.find(modName) != this->moduleInstanceMap.end()){
+		return this->moduleInstanceMap[modName];
+	}
+	assert(false);
+	return Instance();
 }
 
 void KernelManager::loadKernelModules(){
@@ -675,8 +681,33 @@ void KernelManager::loadKernelModules(){
 }
 
 uint64_t KernelManager::getSystemMapAddress(std::string name){
-	return this->symbolMap[name];
+	if(this->symbolMap.find(name) != this->symbolMap.end()){
+		return this->symbolMap[name];
+	}
+	return 0;
 }
+void KernelManager::addSymbolAddress(std::string name, uint64_t address){
+	this->moduleSymbolMap[name] = address;
+}
+
+uint64_t KernelManager::getSymbolAddress(std::string name){
+	if(this->moduleSymbolMap.find(name) != this->moduleSymbolMap.end()){
+		return this->moduleSymbolMap[name];
+	}
+	return 0;
+}
+
+void KernelManager::addFunctionAddress(std::string name, uint64_t address){
+	this->functionSymbolMap[name] = address;
+}
+
+uint64_t KernelManager::getFunctionAddress(std::string name){
+	if(this->functionSymbolMap.find(name) != this->functionSymbolMap.end()){
+		return this->functionSymbolMap[name];
+	}
+	return 0;
+}
+
 
 void KernelManager::parseSystemMap(){
 	std::string sysMapFileName = this->dirName;
@@ -988,8 +1019,10 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 #ifdef PRINTDEBUG
     bool doPrint = false;
     if(sectionName.compare("__kcrctab_gpl") == 0) doPrint = true;
-    if(doPrint) Console::out() << "Section to Relocate: " << sectionName << dec << endl;
+    if(doPrint) Console::out() << "SectioN To Relocate: " << sectionName << dec << endl;
 #endif
+	
+	SegmentInfo symRelSectionInfo;
 	
     for (uint32_t i = 0; i < relSectionInfo.size / sizeof(*rel); i++) {
 		void *locInElf = 0;
@@ -1003,8 +1036,6 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
 		Elf64_Sym *sym = 0; 
         sym = symBase + ELF64_R_SYM(rel[i].r_info);
-
-		SegmentInfo symRelSectionInfo;
 
         switch(sym->st_shndx){
         case SHN_COMMON:
@@ -1043,9 +1074,11 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
             }
             else
             {
-				symRelSectionInfo = 
-				    this->elffile->findSegmentByID(sym->st_shndx);
-				this->updateSegmentInfoMemAddress(symRelSectionInfo);
+				if (symRelSectionInfo.segID != sym->st_shndx){
+					symRelSectionInfo = 
+					    this->elffile->findSegmentByID(sym->st_shndx);
+					this->updateSegmentInfoMemAddress(symRelSectionInfo);
+				}
                 locOfRelSectionInElf = (void *) symRelSectionInfo.index;
                 locOfRelSectionInMem = (void *) symRelSectionInfo.memindex;
             }
@@ -1144,6 +1177,14 @@ uint64_t ElfModuleLoader64::relocateShnUndef(std::string symbolName){
     if(address != 0){
         return address;
     }
+	address = this->parent->getSymbolAddress(symbolName);
+    if(address != 0){
+        return address;
+    }
+	address = this->parent->getFunctionAddress(symbolName);
+    if(address != 0){
+        return address;
+    }
 #if 0
 	// Assume we already have the correct object ...
 	// Thus the following is not necessary
@@ -1191,10 +1232,13 @@ uint64_t ElfModuleLoader64::relocateShnUndef(std::string symbolName){
 }
 
 void ElfModuleLoader::initText(void) {
-	this->elffile->applyRelocations(this);
-	
+
+	std::cout << "Loading module " << this->modName << std::endl;
+
 	this->loadDependencies();
 
+	this->elffile->applyRelocations(this);
+	
 	this->textSegment = this->elffile->findSegmentWithName(".text");
 	this->updateSegmentInfoMemAddress(this->textSegment);
 	this->dataSegment = this->elffile->findSegmentWithName(".data");
@@ -1238,101 +1282,94 @@ void ElfModuleLoader::initText(void) {
 //    if(info.index != 0) context.jumpTable.append(info.index, info.size);
 //
 //    updateKernelModule(context);
-//
-//    //Initialize the symTable in the context for later reference
-//    if(fileContent[4] == ELFCLASS32)
-//    {
-//        //TODO
-//    }
-//    else if(fileContent[4] == ELFCLASS64)
-//    {
-//        Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
-//        Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
-//
-//        uint32_t symSize = elf64Shdr[context.symindex].sh_size;
-//        Elf64_Sym *symBase = (Elf64_Sym *) (fileContent + elf64Shdr[context.symindex].sh_offset);
-//
-//        for(Elf64_Sym * sym = symBase; sym < (Elf64_Sym *) (((char*) symBase) + symSize) ; sym++)
-//        {
-//            if((ELF64_ST_TYPE(sym->st_info) & (STT_OBJECT | STT_FUNC)) && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL )
-//            {
-//                QString symbolName = QString(&((fileContent + elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
-//                uint64_t symbolAddress = sym->st_value;
-//
-//
-//                if(!_symTable.contains(symbolName))
-//                {
-//                    _symTable.insert(symbolName, symbolAddress);
-//                }
-//            }
-//            //We also have to consider local functions
-//            //if((ELF64_ST_TYPE(sym->st_info) & STT_FUNC) && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL)
-//            if((ELF64_ST_TYPE(sym->st_info) == STT_FUNC))
-//            {
-//                QString symbolName = QString(&((fileContent + elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
-//                if(symbolName.compare(QString("")) == 0) continue;
-//                if (ELF64_ST_BIND(sym->st_info) == STB_LOCAL){
-//                    //Store local variables with uniq names
-//                    QString moduleName = context.currentModule.member("name").toString();
-//                    symbolName.append("_").append(moduleName.remove(QChar('"'), Qt::CaseInsensitive));
-//                    QString newSymName = symbolName;
-//                    int i = 2;
-//                    while (_funcTable.contains(newSymName)){
-//                        newSymName = symbolName;
-//                        newSymName.append("_").append(i);
-//                    }
-//                    symbolName = newSymName;
-//                }
-//                uint64_t symbolAddress = sym->st_value;
-//                context.textSegment.address = this->findMemAddressOfSegment(context, QString(".text"));
-//                if(symbolAddress < context.textSegment.address){
-//                    symbolAddress += context.textSegment.address;
-//                }
-//                if(!_funcTable.contains(symbolName))
-//                {
-//                    _funcTable.insert(symbolName, symbolAddress);
-//                }
-//            }
-//        }
-//    }
+
+    //Initialize the symTable in the context for later reference
+	this->addSymbols();
+
 //    context.rodataSegment = this->findElfSegmentWithName(context.fileContent, QString(".note.gnu.build-id"));
 //    context.rodataSegment.address = (this->findMemAddressOfSegment(context, QString(".note.gnu.build-id")));
 //
 //    context.rodataContent.clear();
-//
-//    if(fileContent[4] == ELFCLASS32)
+//    
+//    // Populate rodata
+//    Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
+//    Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
+//    for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
 //    {
-//        //TODO
-//    }
-//    else if(fileContent[4] == ELFCLASS64)
-//    {
-//        Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
-//        Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
-//        for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
+//        if(((elf64Shdr[i].sh_flags == SHF_ALLOC  || elf64Shdr[i].sh_flags == (uint64_t) 0x32) &&
+//                ( elf64Shdr[i].sh_type == SHT_PROGBITS )) ||
+//             (elf64Shdr[i].sh_flags == SHF_ALLOC && elf64Shdr[i].sh_type == SHT_NOTE))
 //        {
-//            if(((elf64Shdr[i].sh_flags == SHF_ALLOC  || elf64Shdr[i].sh_flags == (uint64_t) 0x32) &&
-//                    ( elf64Shdr[i].sh_type == SHT_PROGBITS )) ||
-//                 (elf64Shdr[i].sh_flags == SHF_ALLOC && elf64Shdr[i].sh_type == SHT_NOTE))
-//            {
-//                QString sectionName = QString(fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name);
-//                if(sectionName.compare(QString(".modinfo")) == 0 ||
-//                       sectionName.compare(QString("__versions")) == 0 ||
-//                       sectionName.startsWith(".init") ) continue;
-//                uint64_t align = (elf64Shdr[i].sh_addralign ?: 1) - 1;
-//                uint64_t alignmentSize = (context.rodataContent.size() + align) & ~align;
-//                context.rodataContent = context.rodataContent.leftJustified(alignmentSize, 0);
-//                context.rodataContent.append(fileContent + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_size);
+//            QString sectionName = QString(fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name);
+//            if(sectionName.compare(QString(".modinfo")) == 0 ||
+//                   sectionName.compare(QString("__versions")) == 0 ||
+//                   sectionName.startsWith(".init") ) continue;
+//            uint64_t align = (elf64Shdr[i].sh_addralign ?: 1) - 1;
+//            uint64_t alignmentSize = (context.rodataContent.size() + align) & ~align;
+//            context.rodataContent = context.rodataContent.leftJustified(alignmentSize, 0);
+//            context.rodataContent.append(fileContent + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_size);
 //
-////                std::cout << hex << "Adding Section "
-////                               << context.currentModule.member("name").toString() << " / " << sectionName
-////                               << " Align: " << alignmentSize << " Size: " << elf64Shdr[i].sh_size
-////                               << dec << std::endl;
-//            }
+////            std::cout << hex << "Adding Section "
+////                           << context.currentModule.member("name").toString() << " / " << sectionName
+////                           << " Align: " << alignmentSize << " Size: " << elf64Shdr[i].sh_size
+////                           << dec << std::endl;
 //        }
 //    }
 //
 //    //writeModuleToFile(fileName, currentModule, fileContent );
 //    return context;
+
+}
+
+void ElfModuleLoader64::addSymbols(){
+
+    SegmentInfo symInfo = this->elffile->findSegmentByID(this->elffile->symindex);
+
+    uint32_t symSize = symInfo.size;
+    Elf64_Sym *symBase = (Elf64_Sym *) symInfo.index;
+
+    for(Elf64_Sym * sym = symBase; 
+	    sym < (Elf64_Sym *) (((char*) symBase) + symSize) ; 
+	    sym++){
+
+		if (sym->st_name == 0){
+			continue;
+		}
+        
+        std::string symbolName = this->elffile->symbolName(sym->st_name);
+
+		if((ELF64_ST_TYPE(sym->st_info) & (STT_OBJECT | STT_FUNC)) && 
+		    ELF64_ST_BIND(sym->st_info) & STB_GLOBAL )
+        {
+            uint64_t symbolAddress = sym->st_value;
+
+            // TODO update symtable
+			this->parent->addSymbolAddress(symbolName, symbolAddress);
+        }
+
+        //We also have to consider local functions
+        //if((ELF64_ST_TYPE(sym->st_info) & STT_FUNC) && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL)
+        if((ELF64_ST_TYPE(sym->st_info) == STT_FUNC))
+        {
+            if(symbolName.compare("") == 0) continue;
+            if (ELF64_ST_BIND(sym->st_info) == STB_LOCAL){
+			    //Store local variables with uniq names
+                symbolName.append("_").append(this->modName);
+				std::string newSymName = symbolName;
+                //int i = 2;
+                //while (_funcTable.contains(newSymName)){
+                //    newSymName = symbolName;
+                //    newSymName.append("_").append(i);
+                //}
+                symbolName = newSymName;
+            }
+            uint64_t symbolAddress = sym->st_value;
+            if(symbolAddress < (uint64_t) this->textSegment.memindex){
+                symbolAddress += (uint64_t) this->textSegment.memindex;
+            }
+			this->parent->addFunctionAddress(symbolName, symbolAddress);
+        }
+    }
 
 }
 
@@ -1351,7 +1388,7 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(std::string segName){
 	
 	if(segName.compare("__ksymtab_gpl") == 0){
         return (uint8_t *) currentModule.memberByName("gpl_syms").
-		                                 getValue<uint64_t>();
+		                                 getRawValue<uint64_t>();
 	}
 	
 	//Find the address of the current section in the memory image
