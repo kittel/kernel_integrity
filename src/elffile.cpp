@@ -28,7 +28,7 @@ ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type):
 	try{
 		DwarfParser::parseDwarfFromFD(this->getFD());
 	}catch(DwarfException &e){
-		std::cout << e.what() << std::endl;
+		//std::cout << e.what() << std::endl;
 	}
 	//std::cout << "Done loading elfFile" << std::endl;
 }

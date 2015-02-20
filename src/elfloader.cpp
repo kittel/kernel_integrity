@@ -592,7 +592,8 @@ void KernelManager::setKernelDir(std::string dirName){
 }
 
 ElfLoader *KernelManager::loadModule(std::string moduleName){
-	if(moduleMap[moduleName] != NULL){
+	std::replace(moduleName.begin(), moduleName.end(), '-', '_');
+	if(moduleMap.find(moduleName) != moduleMap.end()){
 		return moduleMap[moduleName];
 	}
 	std::string filename = findModuleFile(moduleName);
