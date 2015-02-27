@@ -6,52 +6,19 @@
 #include "elfmodule.h"
 #include "libdwarfparser/libdwarfparser.h"
 
+#include "kernel_headers.h"
+
 #include <vector>
 
-class ElfLoader;
-class ElfLoader32;
-class ElfLoader64;
-class ElfLoader32Kernel;
-class ElfLoader64Kernel;
-class ElfLoader32Module;
-class ElfLoader64Module;
-
-class ElfFile;
-class SegmentInfo;
-
-class ParavirtState{
-
-	public:
-		ParavirtState();
-		virtual ~ParavirtState();
-
-		void updateState();
-
-
-		Instance pv_init_ops;	
-	    Instance pv_time_ops;
-	    Instance pv_cpu_ops;
-	    Instance pv_irq_ops;
-	    Instance pv_apic_ops;
-	    Instance pv_mmu_ops;
-	    Instance pv_lock_ops;
-
-		uint64_t nopFuncAddress;
-	    uint64_t ident32NopFuncAddress;
-	    uint64_t ident64NopFuncAddress;
-		
-		uint32_t pv_irq_opsOffset;
-		uint32_t pv_cpu_opsOffset;
-		uint32_t pv_mmu_opsOffset;
-
-	private:
-};
-
 class ElfLoader{
-
+	
+	friend class ElfKernelLoader;
+	friend class ElfModuleLoader;
 	public:
 		ElfLoader(ElfFile* elffile);
 		virtual ~ElfLoader();
+
+		virtual std::string getName() = 0;
 
 	protected:
 		ElfFile* elffile;
@@ -99,135 +66,7 @@ class ElfLoader{
 
 };
 
-class KernelManager{
-
-	public:
-		KernelManager();
-		
-		void setKernelDir(std::string dirName);
-
-		void loadKernelModules();
-		std::list<std::string> getKernelModules();
-		Instance getKernelModuleInstance(std::string modName);
-
-		void loadAllModules();
-		ElfLoader *loadModule(std::string moduleName);
-		void parseSystemMap();
-		uint64_t getSystemMapAddress(std::string name);
-
-		void addSymbolAddress(std::string name, uint64_t address);
-		uint64_t getSymbolAddress(std::string name);
-		
-		void addFunctionAddress(std::string name, uint64_t address);
-		uint64_t getFunctionAddress(std::string name);
-
-	private:
-		std::string dirName;
-		
-		typedef std::map<std::string, ElfLoader*> ModuleMap;
-		ModuleMap moduleMap;
-		
-		typedef std::map<std::string, Instance> ModuleInstanceMap;
-		ModuleInstanceMap moduleInstanceMap;
-
-		Instance nextModule(Instance &instance);
-		std::string findModuleFile(std::string modName);
-
-		typedef std::map<std::string, uint64_t> SymbolMap;
-		SymbolMap symbolMap;
-
-		SymbolMap moduleSymbolMap;
-		SymbolMap functionSymbolMap;
-		
-};
-
-class ElfKernelLoader : public ElfLoader, public KernelManager {
-	public:
-		ElfKernelLoader(ElfFile* elffile);
-		ElfKernelLoader(ElfFile* elffile, std::string dirName);
-		virtual ~ElfKernelLoader();
-
-	protected:
-
-		SegmentInfo vvarSegment;
-		SegmentInfo dataNosaveSegment;
-		SegmentInfo bssSegment;
-		SegmentInfo rodataSegment;
-		
-	    uint64_t fentryAddress;
-	    uint64_t genericUnrolledAddress;
-
-
-		int apply_relocate();
-
-		void updateSegmentInfoMemAddress(SegmentInfo &info);
-		
-		virtual void initText();
-		virtual void initData();
-
-	private:
-
-};
-
-class ElfModuleLoader : public ElfLoader {
-	public:
-		ElfModuleLoader(ElfFile* elffile, 
-		        std::string name = "", 
-		        KernelManager* parent = 0);
-		virtual ~ElfModuleLoader();
-
-		virtual void applyRelocationsOnSection(uint32_t relSectionID) = 0;
-	protected:
-		void updateSegmentInfoMemAddress(SegmentInfo &info);
-		uint8_t * findMemAddressOfSegment(std::string segName);
-		
-		virtual void initText();
-		virtual void initData();
-		virtual void addSymbols() = 0;
-
-		void loadDependencies();
-		
-		std::string modName;
-		KernelManager* parent;
-
-};
-
-class ElfKernelLoader32 : public ElfKernelLoader{
-	public:
-		ElfKernelLoader32(ElfFile32* elffile);
-		virtual ~ElfKernelLoader32();
-	protected:
-};
-
-class ElfModuleLoader32 : public ElfModuleLoader{
-	public:
-		ElfModuleLoader32(ElfFile32* elffile, 
-		        std::string name = "", 
-		        KernelManager* parent = 0);
-		virtual ~ElfModuleLoader32();
-	protected:
-};
-
-class ElfKernelLoader64 : public ElfKernelLoader{
-	public:
-		ElfKernelLoader64(ElfFile64* elffile);
-		virtual ~ElfKernelLoader64();
-
-	protected:
-};
-
-class ElfModuleLoader64 : public ElfModuleLoader{
-	public:
-		ElfModuleLoader64(ElfFile64* elffile, 
-		        std::string name = "", 
-		        KernelManager* parent = 0);
-		virtual ~ElfModuleLoader64();
-
-		void applyRelocationsOnSection(uint32_t relSectionID);
-	protected:
-		uint64_t relocateShnUndef(std::string symbolName);
-		void addSymbols();
-};
-
+#include "elfkernelloader.h"
+#include "elfmoduleloader.h"
 
 #endif /* ELFLOADER_H */

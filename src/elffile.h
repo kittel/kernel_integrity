@@ -38,8 +38,6 @@ class SegmentInfo{
 };
 
 
-
-
 class ElfFile{
 	
 	public:
@@ -99,56 +97,8 @@ class ElfFile{
 
 };
 
-class ElfFile32 : public ElfFile {
-	public:
-		ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent);
-		virtual ~ElfFile32();
+#include <elffile32.h>
+#include <elffile64.h>
 
-		SegmentInfo findSegmentWithName(std::string sectionName);
-		SegmentInfo findSegmentByID(uint32_t sectionID);
-		std::string segmentName(int sectionID);
-		uint8_t *segmentAddress(int sectionID);
-
-		std::string symbolName(uint32_t index);
-
-		uint64_t findAddressOfVariable(std::string symbolName);
-
-		ElfLoader* parseElf(ElfFile::ElfProgramType type,
-		                    std::string name = "",
-		                    KernelManager* parent = 0);
-
-		bool isRelocatable();
-		void applyRelocations(ElfModuleLoader *loader);
-	protected:
-};
-
-
-class ElfFile64 : public ElfFile {
-	public:
-		ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent);
-		virtual ~ElfFile64();
-
-		SegmentInfo findSegmentWithName(std::string sectionName);
-		SegmentInfo findSegmentByID(uint32_t sectionID);
-		std::string segmentName(int sectionID);
-		uint8_t *segmentAddress(int sectionID);
-
-		std::string symbolName(uint32_t index);
-
-		uint64_t findAddressOfVariable(std::string symbolName);
-
-		ElfLoader* parseElf(ElfFile::ElfProgramType type,
-		                    std::string name = "",
-		                    KernelManager* parent = 0);
-
-		bool isRelocatable();
-		void applyRelocations(ElfModuleLoader *loader);
-
-        Elf64_Ehdr * elf64Ehdr;
-        Elf64_Shdr * elf64Shdr;
-	protected:
-
-	private:
-};
 
 #endif /* ELFFILE_H */

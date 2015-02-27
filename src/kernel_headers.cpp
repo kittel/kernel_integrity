@@ -59,5 +59,53 @@ const unsigned char * const k8_nops[ASM_NOP_MAX+2] =
 /* Undefined instruction for dealing with missing ops pointers. */
 const char ud2a[] = { 0x0f, 0x0b };
 
+#include "libdwarfparser/libdwarfparser.h"
+
+ParavirtState::ParavirtState(){
+        this->updateState();
+}
+
+ParavirtState::~ParavirtState(){}
+
+void ParavirtState::updateState(){
+
+    pv_init_ops = Variable::findVariableByName("pv_init_ops")->getInstance();
+    pv_time_ops = Variable::findVariableByName("pv_time_ops")->getInstance();
+    pv_cpu_ops  = Variable::findVariableByName("pv_cpu_ops" )->getInstance();
+    pv_irq_ops  = Variable::findVariableByName("pv_irq_ops" )->getInstance();
+    pv_apic_ops = Variable::findVariableByName("pv_apic_ops")->getInstance();
+    pv_mmu_ops  = Variable::findVariableByName("pv_mmu_ops" )->getInstance();
+    pv_lock_ops = Variable::findVariableByName("pv_lock_ops")->getInstance();
+
+    
+    Function* func = 0;
+
+        func = Function::findFunctionByName("_paravirt_nop");
+        assert(func);
+        nopFuncAddress = func->getAddress();
+        
+        func = Function::findFunctionByName("_paravirt_ident_32");
+        assert(func);
+    ident32NopFuncAddress = func->getAddress();
+        
+        func = Function::findFunctionByName("_paravirt_ident_64");
+        assert(func);
+    ident64NopFuncAddress = func->getAddress();
+
+        assert(nopFuncAddress);
+        assert(ident32NopFuncAddress);
+        assert(ident64NopFuncAddress);
+
+    const Structured * pptS = 
+                dynamic_cast<const Structured*>(
+                                BaseType::findBaseTypeByName("paravirt_patch_template"));
+        assert(pptS);
+
+    pv_irq_opsOffset = pptS->memberOffset("pv_irq_ops");
+    pv_cpu_opsOffset = pptS->memberOffset("pv_cpu_ops");
+        pv_mmu_opsOffset = pptS->memberOffset("pv_mmu_ops");
+    
+}
+
 
 

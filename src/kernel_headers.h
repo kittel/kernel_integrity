@@ -41,7 +41,7 @@
     extern const char start_##ops##_##name[], end_##ops##_##name[];	\
     asm("start_" #ops "_" #name ": " code "; end_" #ops "_" #name ":")
 
-#define str(x) #x
+#define tostr(x) #x
 
 extern const unsigned char p6nops[];
 extern const unsigned char k8nops[];
@@ -107,5 +107,36 @@ DEF_NATIVE(pv_cpu_ops, swapgs, "swapgs");
 
 DEF_NATIVE(, mov32, "mov %edi, %eax");
 DEF_NATIVE(, mov64, "mov %rdi, %rax");
+
+#include "libdwarfparser/instance.h"
+
+class ParavirtState{
+
+    public:
+        ParavirtState();
+        virtual ~ParavirtState();
+
+        void updateState();
+
+
+        Instance pv_init_ops;   
+        Instance pv_time_ops;
+        Instance pv_cpu_ops;
+        Instance pv_irq_ops;
+        Instance pv_apic_ops;
+        Instance pv_mmu_ops;
+        Instance pv_lock_ops;
+
+        uint64_t nopFuncAddress;
+        uint64_t ident32NopFuncAddress;
+        uint64_t ident64NopFuncAddress;
+        
+        uint32_t pv_irq_opsOffset;
+        uint32_t pv_cpu_opsOffset;
+        uint32_t pv_mmu_opsOffset;
+
+    private:
+};
+
 
 #endif  /* KERNELHEADERS_H */

@@ -24,12 +24,15 @@ class KernelValidator {
 		virtual ~KernelValidator();
 
 
-
+		void validatePage(page_info_t *page);
 
 	protected:
 
 	private:
 		ElfKernelLoader* kernelLoader;
+		
+		void validateCodePage(page_info_t *page/*, ElfLoader* elf*/);
+		void validateDataPage(page_info_t *page/*, EflLoader* elf*/);
 
 		void loadKernel(std::string dirName);
 
@@ -58,6 +61,28 @@ void KernelValidator::loadKernel(std::string dirName){
 	kernelLoader->parseSystemMap();
 }
 
+void KernelValidator::validateCodePage(page_info_t * page/*, ElfLoader* elf*/){
+	assert(elf);
+	std::cout << "Try to verify code page: " << std::hex << page->vaddr << std::dec << std::endl;
+
+	ElfLoader* elfloader = kernelLoader->getModuleForAddress(page->vaddr);
+	if (!elfloader){
+		std::cout << "Warning: Executable Data Page" << std::endl;
+		return;
+	}
+	
+	std::cout << "ModuleName: " << elfloader->getName() << std::endl;
+}
+
+void KernelValidator::validatePage(page_info_t * page){
+	std::cout << "Try to verify page: " << std::hex << page->vaddr << std::dec << std::endl;
+	ElfLoader* elfloader = kernelLoader->getModuleForAddress(page->vaddr);
+	if (elfloader){
+		std::cout << "ModuleName: " << elfloader->getName() << std::endl;
+	}else{
+		std::cout << "Warning: Executable Data Page" << std::endl;
+	}
+}
 
 int main (int argc, char **argv)
 {
@@ -73,12 +98,13 @@ int main (int argc, char **argv)
 		vmi = new VMIInstance("insight", VMI_KVM | VMI_INIT_COMPLETE);
 	}
 	KernelValidator *val = new KernelValidator(argv[1]);
-	//
-	//vmi->getKernelPages();
-    //uint64_t modules = vmi->read64FromVA(file64->findAddressOfVariable("modules"));
+	
+	PageMap executablePageMap = vmi->getExecutableKernelPages();
 
+	for ( auto page : executablePageMap){
+		val->validatePage(page.second);
+	}
 
-	DELETE(val);
-	DELETE(vmi);
-    
+	vmi->destroyMap(executablePageMap);
 }
+

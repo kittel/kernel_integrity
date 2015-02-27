@@ -18,11 +18,29 @@ kernintdir = $(includedir)/kernint
 kernint_HEADERS=kernint.h \
 				kernel_headers.h \
 				elffile.h \
+				elffile32.h \
+				elffile64.h \
 				elfloader.h \
+				kernelmanager.h \
+				elfkernelloader.h \
+				elfmoduleloader.h \
+				elfkernelloader32.h \
+				elfkernelloader64.h \
+				elfmoduleloader32.h \
+				elfmoduleloader64.h \
 				exceptions.h
 
 kernint_SOURCES=kernint.cpp \
 				kernel_headers.cpp \
 				elffile.cpp \
+				elffile32.cpp \
+				elffile64.cpp \
 				elfloader.cpp \
+				kernelmanager.cpp \
+				elfkernelloader.cpp \
+				elfmoduleloader.cpp \
+				elfkernelloader32.cpp \
+				elfkernelloader64.cpp \
+				elfmoduleloader32.cpp \
+				elfmoduleloader64.cpp \
 				exceptions.cpp
