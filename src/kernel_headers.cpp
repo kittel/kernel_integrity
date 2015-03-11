@@ -86,13 +86,13 @@ void ParavirtState::updateState(){
         
         func = Function::findFunctionByName("_paravirt_ident_32");
         assert(func);
-    ident32NopFuncAddress = func->getAddress();
+		ident32NopFuncAddress = func->getAddress();
         
         func = Function::findFunctionByName("_paravirt_ident_64");
         assert(func);
-    ident64NopFuncAddress = func->getAddress();
+	    ident64NopFuncAddress = func->getAddress();
 
-        assert(nopFuncAddress);
+		assert(nopFuncAddress);
         assert(ident32NopFuncAddress);
         assert(ident64NopFuncAddress);
 

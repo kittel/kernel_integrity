@@ -89,35 +89,40 @@ uint8_t ElfLoader::paravirt_patch_call(void *insnbuf, uint64_t target, uint16_t 
 
 uint64_t ElfLoader::get_call_destination(uint32_t type)
 {
-    //These structs contain a function pointers.
-    //In memory they are directly after each other.
-    //Thus type is an index into the resulting array.
-
+    // These structs contain a function pointers.
+    // In memory they are directly after each other.
+    // Thus type is an index into the resulting array.
 
     if(type < paravirtState.pv_init_ops.size()) 
 		return paravirtState.pv_init_ops.memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_init_ops.size();
+
     if(type < paravirtState.pv_time_ops.size()) 
 		return paravirtState.pv_time_ops.memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_time_ops.size();
+
     if(type < paravirtState.pv_cpu_ops.size())  
 		return paravirtState.pv_cpu_ops .memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_cpu_ops.size();
+
     if(type < paravirtState.pv_irq_ops.size())  
 		return paravirtState.pv_irq_ops .memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_irq_ops.size();
+
     if(type < paravirtState.pv_apic_ops.size()) 
 		return paravirtState.pv_apic_ops.memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_apic_ops.size();
+
     if(type < paravirtState.pv_mmu_ops.size())  
 		return paravirtState.pv_mmu_ops .memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
     type -= paravirtState.pv_mmu_ops.size();
+
     if(type < paravirtState.pv_lock_ops.size()) 
 		return paravirtState.pv_lock_ops.memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
@@ -130,7 +135,7 @@ uint8_t ElfLoader::paravirt_patch_default(uint32_t type, uint16_t clobbers, void
 {
     uint8_t ret = 0;
     //Get Memory of paravirt_patch_template + type
-    uint64_t opfunc = get_call_destination(type);
+	uint64_t opfunc = get_call_destination(type);
 
     if (!opfunc)
     {
@@ -141,7 +146,6 @@ uint8_t ElfLoader::paravirt_patch_default(uint32_t type, uint16_t clobbers, void
         //If this the kernel this can happen and is only filled with nops
         ret = paravirt_patch_nop();
     }
-    //TODO get address of Function Paravirt nop
     else if (opfunc == paravirtState.nopFuncAddress){
         /* If the operation is a nop, then nop the callsite */
         ret = paravirt_patch_nop();
@@ -293,7 +297,9 @@ void ElfLoader::applyAltinstr(){
 
         //add_nops
         add_nops(insnbuf + a->replacementlen, a->instrlen - a->replacementlen);
-
+		if(((uint64_t)instr) % 0x1000 == 0x70){
+			std::cout << "Found in " << this->getName() << std::endl;
+		}
         memcpy(instr, insnbuf, a->instrlen);
     }
 
@@ -382,10 +388,8 @@ void ElfLoader::applySmpLocks(){
         lock = 0xf0;
     }
 
-
-
-    //bool addSmpEntries = false;
-    //if(context.smpOffsets.size() == 0) addSmpEntries = true;
+    bool addSmpEntries = false;
+    if(this->smpOffsets.size() == 0) addSmpEntries = true;
     
     for(int32_t * poff = smpLocksStart; poff < smpLocksStop ; poff++)
     {
@@ -400,7 +404,10 @@ void ElfLoader::applySmpLocks(){
 
         *ptr = lock;
 
-        //if (addSmpEntries) context.smpOffsets.insert((quint64) ptr - (quint64) context.textSegment.index);
+        if (addSmpEntries) {
+			this->smpOffsets.insert((uint64_t) ptr - 
+					                (uint64_t) this->textSegment.index);
+		}
     }
 	std::cout << "Applied " << count << " SMP instructions" << std::endl;
 }
@@ -418,32 +425,29 @@ void ElfLoader::applyMcount(SegmentInfo &info){
     {
 		count += 1;
         //if (addMcountEntries) context.mcountEntries.insert((*i));
-        add_nops((void*) (this->textSegmentContent.data() + (*i) - this->textSegment.memindex), 5);
+		
+        add_nops((void*) (this->textSegmentContent.data() + 
+					       ((uint64_t) (*i) - 
+							(uint64_t) this->textSegment.memindex)), 5);
     }
 	std::cout << "Applied " << count << " Mcount instructions" << std::endl;
 }
 
 void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
 	uint64_t count = 0;
-	//Apply the jump tables after the segments are adjacent
-    //jump_label_apply_nops() => http://lxr.free-electrons.com/source/arch/x86/kernel/module.c#L205
-    //the entry type is 0 for disable and 1 for enable
+	// Apply the jump tables after the segments are adjacent
+    // jump_label_apply_nops() => 
+	// http://lxr.free-electrons.com/source/arch/x86/kernel/module.c#L205
+    // the entry type is 0 for disable and 1 for enable
 
-    //bool addJumpEntries = false;
-    //if(context.jumpEntries.size() == 0) addJumpEntries = true;
+    bool addJumpEntries = false;
+    if(this->jumpEntries.size() == 0) addJumpEntries = true;
 
-    //if(context.type == Detect::KERNEL_CODE)
-    //{
-    //    numberOfJumpEntries = (jumpStop - jumpStart) / sizeof(struct jump_entry);
-    //}
-    //else if(context.type == Detect::MODULE)
-    //{
-    //    numberOfJumpEntries = context.currentModule.member("num_jump_entries").toUInt32();
-    //}
-
-    struct jump_entry * startEntry = (struct jump_entry *) this->jumpTable.data();
-    struct jump_entry * endEntry   = (struct jump_entry *) (this->jumpTable.data() + 
-																this->jumpTable.size());
+    struct jump_entry * startEntry = 
+		                (struct jump_entry *) this->jumpTable.data();
+    struct jump_entry * endEntry   = 
+		                (struct jump_entry *) (this->jumpTable.data() + 
+												this->jumpTable.size());
 
 	BaseType* jump_entry_bt = BaseType::findBaseTypeByName("jump_entry");
 	BaseType* static_key_bt = BaseType::findBaseTypeByName("static_key");
@@ -453,22 +457,24 @@ void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
 		if (dynamic_cast<ElfKernelLoader*>(this)){
 			uint64_t instanceAddress = 0;
 			
-			//This is not a real array in memory but has more readability
+			// This is not a real array in memory but has more readability
 			instanceAddress = (uint64_t) &((struct jump_entry *) jumpStart)[i];
 			
 			jumpEntry = jump_entry_bt->getInstance(instanceAddress);
             
 			//Do not apply jump entries to .init.text
-			
-
 			uint64_t codeAddress = jumpEntry.memberByName("code").getValue<uint64_t>();
+			if (codeAddress == 0xffffffff81003c90){
+				std::cout << "Found JumpLabel" << std::endl;
+			}
             if (codeAddress > 
-					(uint64_t) this->textSegment.memindex + this->textSegment.size)
-            {
+					(uint64_t) this->textSegment.memindex + 
+					           this->textSegment.size){
                 continue;
             }
 		}
 		else if (dynamic_cast<ElfModuleLoader*>(this)){
+			assert(false);
 			//	TODO!!!!
 			//    jumpEntry = context.currentModule.member("jump_entries").arrayElem(i);
 		}
@@ -502,10 +508,11 @@ void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
                 //if(doPrint) Console::out() << " " << ((enabled) ? "enabled" : "disabled") << endl;
 
                 int32_t destination = entry->target - (entry->code + 5);
-                //if(addJumpEntries){
-                //    context.jumpEntries.insert(entry->code, destination);
-                //    context.jumpDestinations.insert(entry->target);
-                //}
+                if(addJumpEntries){
+                    this->jumpEntries.insert(
+					    std::pair<uint64_t, int32_t>(entry->code, destination));
+                    //this->jumpDestinations.insert(entry->target);
+                }
 
 
                 if(enabled)

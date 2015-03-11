@@ -9,11 +9,15 @@
 #include "kernel_headers.h"
 
 #include <vector>
+#include <map>
+#include <set>
 
 class ElfLoader{
 	
 	friend class ElfKernelLoader;
 	friend class ElfModuleLoader;
+	friend class KernelValidator;
+
 	public:
 		ElfLoader(ElfFile* elffile);
 		virtual ~ElfLoader();
@@ -26,7 +30,11 @@ class ElfLoader{
 		
 		SegmentInfo textSegment;
 	    std::vector<uint8_t> textSegmentContent;
+		int32_t textSegmentLength;
 	    std::vector<uint8_t> jumpTable;
+
+		std::map<uint64_t, int32_t> jumpEntries;
+		std::set<uint64_t> smpOffsets;
 		
 		SegmentInfo dataSegment;
 		

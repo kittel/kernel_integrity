@@ -66,11 +66,12 @@ void ElfModuleLoader::initText(void) {
 	this->updateSegmentInfoMemAddress(this->textSegment);
 	this->dataSegment = this->elffile->findSegmentWithName(".data");
 
+    //applyJumpEntries();
 
 	applyAltinstr();
 	applyParainstr();
 	applySmpLocks();
-
+	
     //Content of text section in memory:
     //same as the sections in the elf binary
 
@@ -96,6 +97,10 @@ void ElfModuleLoader::initText(void) {
 			      fileContent + elf64Shdr[i].sh_offset + elf64Shdr[i].sh_size);
         }
     }
+
+	SegmentInfo info = this->elffile->findSegmentWithName("__mcount_loc");
+	this->updateSegmentInfoMemAddress(info);
+    applyMcount(info);
 
 	//TODO resume here
 

@@ -6,6 +6,8 @@
 
 
 class ElfKernelLoader : public ElfLoader, public KernelManager {
+	friend class KernelValidator;
+
 	public:
 		ElfKernelLoader(ElfFile* elffile);
 		ElfKernelLoader(ElfFile* elffile, std::string dirName);
