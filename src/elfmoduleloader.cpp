@@ -25,6 +25,7 @@ void ElfModuleLoader::loadDependencies(void) {
 	//parse .modinfo and load dependencies
 	char *modinfo = (char*) miS.index;
 	char *module = NULL;
+	char *saveptr;
 	if(!modinfo) return;
 
 	while (modinfo < (char*) (miS.index) + miS.size)
@@ -41,13 +42,12 @@ void ElfModuleLoader::loadDependencies(void) {
 			//string.compare(0, 7, "depends")
 			modinfo += 8;
 			
-			module = strtok(modinfo, ",");
+			module = strtok_r(modinfo, ",", &saveptr);
 			while(module != NULL){
 				if(*module == 0) break;
 				parent->loadModule(module);
-				module = strtok(NULL, ",");
+				module = strtok_r(NULL, ",", &saveptr);
 			}
-				
 			return;
 		}
 	}
@@ -55,10 +55,15 @@ void ElfModuleLoader::loadDependencies(void) {
 }
 
 void ElfModuleLoader::initText(void) {
-
-	std::cout << "Loading module " << this->modName << std::endl;
+	std::cout << COLOR_GREEN
+	             "Loading dependencies for module " << this->modName;
+	std::cout << COLOR_NORM << std::endl;
 
 	this->loadDependencies();
+
+	std::cout << COLOR_GREEN
+	             "Loading module " << this->modName;
+	std::cout << COLOR_NORM << std::endl;
 
 	this->elffile->applyRelocations(this);
 	
@@ -97,6 +102,12 @@ void ElfModuleLoader::initText(void) {
 			      fileContent + elf64Shdr[i].sh_offset + elf64Shdr[i].sh_size);
         }
     }
+
+	// Fill up the last page
+	this->textSegmentLength = this->textSegmentContent.size();
+	uint32_t fill = 0x1000 - (this->textSegmentLength % 0x1000);
+	this->textSegmentContent.insert(this->textSegmentContent.end(),
+			fill, 0);
 
 	SegmentInfo info = this->elffile->findSegmentWithName("__mcount_loc");
 	this->updateSegmentInfoMemAddress(info);

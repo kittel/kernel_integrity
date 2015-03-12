@@ -3,7 +3,8 @@
 #include "helpers.h"
 
 #include "exceptions.h"
-#include <cassert>
+
+//#define PRINTDEBUG
 
 ElfModuleLoader64::ElfModuleLoader64(ElfFile64* elffile, 
 		                             std::string name,
@@ -41,13 +42,16 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
 #ifdef PRINTDEBUG
     bool doPrint = false;
-    if(sectionName.compare("__kcrctab_gpl") == 0) doPrint = true;
-    if(doPrint) Console::out() << "SectioN To Relocate: " << sectionName << dec << endl;
+    //if(this->getName().compare("floppy") == 0
+	//		&& sectionName.compare(".text") == 0
+	//		) doPrint = true;
+    //if(doPrint) std::cout << "\n\nSection To Relocate: " << sectionName << std::endl;
 #endif
 	
 	SegmentInfo symRelSectionInfo;
 	
     for (uint32_t i = 0; i < relSectionInfo.size / sizeof(*rel); i++) {
+
 		void *locInElf = 0;
 		void *locInMem = 0;
 		void *locOfRelSectionInMem = 0;
@@ -60,31 +64,59 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 		Elf64_Sym *sym = 0; 
         sym = symBase + ELF64_R_SYM(rel[i].r_info);
 
+#ifdef PRINTDEBUG
+		if(this->getName().compare("snd_pcm") == 0
+				//&& sectionName.compare(".text") == 0
+				&& rel[i].r_offset == 0x3d55
+				) doPrint = true;
+
+		if(doPrint) std::cout << "\n\nSymbol: " << 
+		                         this->elffile->symbolName(sym->st_name) <<
+							     std::endl;
+		if(doPrint) std::cout << "Relocation: " << 
+		                         i <<
+							     std::endl;
+		if(doPrint) std::cout << "locInElf = " << std::hex <<
+		                         (uint64_t) locInElf << 
+						         std::dec << std::endl;
+		if(doPrint) std::cout << "locInMem = " << std::hex <<
+		                         (uint64_t) locInMem << 
+						         std::dec << std::endl;
+		if(doPrint) std::cout << "offset = " << std::hex <<
+		                         (uint64_t) rel[i].r_offset << 
+						         std::dec << std::endl;
+#endif
+
+
         switch(sym->st_shndx){
         case SHN_COMMON:
 
 #ifdef PRINTDEBUG
-            if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
-            debugerr("This should not happen!");
+            if(doPrint) std::cout << "Symtype SHN_UNDEF" << std::endl;
+			std::cout << "This should not happen!" << std::endl;
 #endif
 			assert(false);
             continue; //TODO REMOVE
             break;
         case SHN_ABS:
 #ifdef PRINTDEBUG
-            if(doPrint) Console::out() << "Symtype SHN_ABS" << endl;
+            if(doPrint) std::cout << "Symtype SHN_ABS" << std::endl;
 #endif
             break;
         case SHN_UNDEF:
 #ifdef PRINTDEBUG
-            if(doPrint) Console::out() << "Symtype SHN_UNDEF" << endl;
+            if(doPrint) std::cout << "Symtype SHN_UNDEF" << std::endl;
 #endif
 			sym->st_value = this->relocateShnUndef(
 			                      this->elffile->symbolName(sym->st_name));
+#ifdef PRINTDEBUG
+            if(doPrint) std::cout << "Found Symbol at " << std::hex << 
+				                     sym->st_value << std::dec << std::endl;
+#endif
             break;
         default:
 #ifdef PRINTDEBUG
-            if(doPrint) Console::out() << "default: " << endl;
+            if(doPrint) std::cout << "default: " << std::endl;
             //debugerr("Sym Type: default: " << sym->st_shndx);
 #endif
 
@@ -114,10 +146,13 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
         uint64_t val = sym->st_value + rel[i].r_addend;
 
-#if PRINTDEBUG
-		if(doPrint) Console::out() << "raddend: " << hex << rel[i].r_addend << dec << endl;
-        if(doPrint) Console::out() << "sym->value: " << hex << sym->st_value << dec << endl;
-        if(doPrint) Console::out() << "val: " << hex << val << dec << endl;
+#ifdef PRINTDEBUG
+		if(doPrint) std::cout << "raddend: " << std::hex << 
+		                         rel[i].r_addend << std::dec << std::endl;
+        if(doPrint) std::cout << "sym->value: " << std::hex << 
+		                         sym->st_value << std::dec << std::endl;
+        if(doPrint) std::cout << "val: " << std::hex << 
+		                         val << std::dec << std::endl;
 #endif
 
         switch (ELF64_R_TYPE(rel[i].r_info)) {
@@ -128,17 +163,19 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
             break;
         case R_X86_64_32:
             *(uint64_t *)locInElf = val;
-            if (val != *(uint64_t *)locInElf)
+            if (val != *(uint64_t *)locInElf){
 				assert(false);
 			    return;
                 //goto overflow;
+			}
             break;
         case R_X86_64_32S:
             *(uint32_t *)locInElf = val;
-            if ((int64_t)val != *(int32_t *)locInElf)
+            if (val != (uint64_t) *(int32_t *)locInElf){
 				assert(false);
 			    return;
                 //goto overflow;
+			}
             break;
         case R_X86_64_PC32:
 
@@ -159,7 +196,8 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
                 val -= (uint64_t)locInMem;
             }
 #ifdef PRINTDEBUG
-            if(doPrint) Console::out() << "PC32 final value: " << hex << (quint32) val << dec << endl;
+            if(doPrint) std::cout << "PC32 final value: " << std::hex << 
+			                         (uint32_t) val << std::dec << std::endl;
 #endif
             *(uint32_t *)locInElf = val;
 #if 0
@@ -171,7 +209,8 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
             break;
         default:
 #ifdef PRINTDEBUG
-            debugerr("Unknown rela relocation: " << ELF64_R_TYPE(rel[i].r_info));
+			std::cout << "Unknown rela relocation: " << 
+			             ELF64_R_TYPE(rel[i].r_info) << std::endl;
 #endif
 			assert(false);
 		    return;
@@ -181,15 +220,8 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 #endif
     }
     return;
-
-//#if 0
-//overflow:
-//    Console::err() << "overflow in relocation type " << (int)ELF64_R_TYPE(rel[i].r_info) << " val " << hex << val << endl;
-//    Console::err() << "likely not compiled with -mcmodel=kernel" << endl;
-//    return -ENOEXEC;
-//#endif
-
 }
+
 uint64_t ElfModuleLoader64::relocateShnUndef(std::string symbolName){
 
 	// First look into the system map.
@@ -242,12 +274,12 @@ uint64_t ElfModuleLoader64::relocateShnUndef(std::string symbolName){
 	// Variable not found in system.map
     // Try to find the variable by name in insight.
     Function *func = Function::findFunctionByName(symbolName);
-    if (func){
+    if (func && func->getAddress()){
 		return func->getAddress();
     }
 
 	Variable *var = Variable::findVariableByName(symbolName);
-    if (var){
+    if (var && var->getLocation()){
 		return var->getLocation();
 	}
 	assert(false);
@@ -270,13 +302,29 @@ void ElfModuleLoader64::addSymbols(){
 		}
         
         std::string symbolName = this->elffile->symbolName(sym->st_name);
+        uint64_t symbolAddress = sym->st_value;
+		
+		//if (symbolName.compare("snd_timer_notify") == 0){
+		//	std::cout << COLOR_RED <<
+		//	             "Found symbol in: " << 
+		//				 this->getName() <<
+		//				 " at address: " << 
+		//				 std::hex << symbolAddress << std::dec <<
+		//				 COLOR_NORM << 
+		//				 std::endl;
+		//}
 
 		if((ELF64_ST_TYPE(sym->st_info) & (STT_OBJECT | STT_FUNC)) && 
 		    ELF64_ST_BIND(sym->st_info) & STB_GLOBAL )
         {
-            uint64_t symbolAddress = sym->st_value;
+			//if (symbolName.compare("snd_timer_notify") == 0){
+			//	std::cout << COLOR_RED << 
+			//	             "Adding global symbol in: " << 
+			//				 this->getName() << 
+			//				 COLOR_NORM <<
+			//				 std::endl;
+			//}
 
-            // TODO update symtable
 			this->parent->addSymbolAddress(symbolName, symbolAddress);
         }
 
@@ -296,7 +344,13 @@ void ElfModuleLoader64::addSymbols(){
                 //}
                 symbolName = newSymName;
             }
-            uint64_t symbolAddress = sym->st_value;
+			//if (symbolName.compare("snd_timer_notify") == 0){
+			//	std::cout << COLOR_RED << 
+			//	             "Adding symbol in: " << 
+			//				 this->getName() << 
+			//				 COLOR_NORM << std::endl;
+			//}
+
             if(symbolAddress < (uint64_t) this->textSegment.memindex){
                 symbolAddress += (uint64_t) this->textSegment.memindex;
             }
