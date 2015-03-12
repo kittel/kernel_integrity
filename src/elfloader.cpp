@@ -303,7 +303,10 @@ void ElfLoader::applyAltinstr(){
         memcpy(instr, insnbuf, a->instrlen);
     }
 
-	std::cout << "Applied " << count << " / " << count_all << " Altinstructions" << std::endl;
+	std::cout << COLOR_CYAN << 
+	             "Applied " << count << " / " << 
+				 count_all << " Altinstructions" << 
+				 COLOR_NORM << std::endl;
 }
 
 void ElfLoader::applyParainstr(){
@@ -359,7 +362,10 @@ void ElfLoader::applyParainstr(){
         add_nops(insnbuf + used, p->len - used);      //add_nops
         memcpy(instrInElf, insnbuf, p->len);   //memcpy
     }
-	std::cout << "Applied " << count << " Paravirt instructions" << std::endl;
+	std::cout << COLOR_CYAN << 
+	             "Applied " << count << 
+				 " Paravirt instructions" << 
+				 COLOR_NORM << std::endl;
 }
 
 void ElfLoader::applySmpLocks(){
@@ -409,7 +415,11 @@ void ElfLoader::applySmpLocks(){
 					                (uint64_t) this->textSegment.index);
 		}
     }
-	std::cout << "Applied " << count << " SMP instructions" << std::endl;
+	std::cout << COLOR_CYAN << 
+	             "Applied " << count << 
+				 " SMP instructions" << 
+				 COLOR_NORM << 
+				 std::endl;
 }
 
 void ElfLoader::applyMcount(SegmentInfo &info){
@@ -430,7 +440,11 @@ void ElfLoader::applyMcount(SegmentInfo &info){
 					       ((uint64_t) (*i) - 
 							(uint64_t) this->textSegment.memindex)), 5);
     }
-	std::cout << "Applied " << count << " Mcount instructions" << std::endl;
+	std::cout << COLOR_CYAN << 
+	             "Applied " << count << 
+				 " Mcount instructions" << 
+				 COLOR_NORM << 
+				 std::endl;
 }
 
 void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
@@ -464,9 +478,6 @@ void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
             
 			//Do not apply jump entries to .init.text
 			uint64_t codeAddress = jumpEntry.memberByName("code").getValue<uint64_t>();
-			if (codeAddress == 0xffffffff81003c90){
-				std::cout << "Found JumpLabel" << std::endl;
-			}
             if (codeAddress > 
 					(uint64_t) this->textSegment.memindex + 
 					           this->textSegment.size){
@@ -529,7 +540,11 @@ void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
             }
         }
     }
-	std::cout << "Applied " << count << " JMP entries" << std::endl;
+	std::cout << COLOR_CYAN << 
+	             "Applied " << count << 
+				 " JMP entries" << 
+				 COLOR_NORM << 
+				 std::endl;
 }
 
 void ElfLoader::parseElfFile(){
