@@ -23,6 +23,14 @@ class KernelManager{
 		void loadAllModules();
 		ElfLoader *loadModule(std::string moduleName);
 		void parseSystemMap();
+
+		/*
+		 * @param name   Name of the symbol
+		 * @return       Address of the symbol
+		 *
+		 * Notice: This function only returns the address of public symbols
+		 *
+		 */
 		uint64_t getSystemMapAddress(std::string name);
 
 		void addSymbolAddress(std::string name, uint64_t address);

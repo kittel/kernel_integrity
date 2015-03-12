@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <cctype>
 
 #include "elffile.h"
 
@@ -161,7 +162,9 @@ void KernelManager::parseSystemMap(){
 			std::stringstream iss(line); 
 			iss >> std::hex >>address >> mode >> varname;
 
-			symbolMap[varname] = address;
+			if(std::isupper(mode)){
+				symbolMap[varname] = address;
+			}
 		}
 		sysMapFile.close();
     }else{  
