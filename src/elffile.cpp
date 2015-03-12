@@ -11,14 +11,32 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-SegmentInfo::SegmentInfo(): segName(), segID(0), index(0), memindex(0), address(0), size(0){}
+SegmentInfo::SegmentInfo(): segName(), segID(0), index(0), memindex(0), size(0){}
 SegmentInfo::SegmentInfo(uint8_t *i, unsigned int s):
-				segName(), segID(), index(i), memindex(0), address(0), size(s){}
+				segName(), segID(), index(i), memindex(0), size(s){}
 SegmentInfo::SegmentInfo(std::string segName, uint32_t segID, uint8_t *i, 
 					uint64_t a, uint32_t s):
-				segName(segName), segID(segID), index(i), memindex(0),
-			   	address(a), size(s){}
+				segName(segName), segID(segID), index(i), 
+				memindex((uint8_t*) a), size(s){}
 SegmentInfo::~SegmentInfo(){}
+
+bool SegmentInfo::containsElfAddress(uint64_t address){
+	uint64_t addr = (uint64_t) this->index & 0xffffffffffff;
+	if (address >= addr &&
+		address <= addr + this->size){
+		return true;
+	}
+	return false;
+}
+
+bool SegmentInfo::containsMemAddress(uint64_t address){
+	uint64_t addr = (int64_t) this->memindex & 0xffffffffffff;
+	if (address >= addr &&
+		address <= addr + this->size){
+		return true;
+	}
+	return false;
+}
 
 ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type):
 	shstrindex(0), symindex(0), strindex(0),

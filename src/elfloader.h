@@ -37,6 +37,7 @@ class ElfLoader{
 		std::set<uint64_t> smpOffsets;
 		
 		SegmentInfo dataSegment;
+		SegmentInfo bssSegment;
 		
 		const unsigned char* const* ideal_nops;
 		void  add_nops(void *insns, uint8_t len);
@@ -71,6 +72,9 @@ class ElfLoader{
 		virtual void parseElfFile();
 		virtual void initText() = 0;
 		virtual void initData() = 0;
+
+		bool isCodeAddress(uint64_t addr);
+		virtual bool isDataAddress(uint64_t addr) = 0;
 
 };
 

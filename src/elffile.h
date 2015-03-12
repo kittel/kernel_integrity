@@ -30,8 +30,10 @@ class SegmentInfo{
 		uint32_t    segID;
 		uint8_t *   index;
 		uint8_t *   memindex;
-    	uint64_t    address;
     	uint32_t    size;
+
+		bool containsElfAddress(uint64_t address);
+		bool containsMemAddress(uint64_t address);
 
 	private:
     	SegmentInfo(uint8_t * i, uint32_t s);

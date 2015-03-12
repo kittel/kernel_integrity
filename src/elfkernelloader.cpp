@@ -8,17 +8,13 @@
 ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address){
 	
 	//Does the address belong to the kernel?
-	uint64_t text = ((uint64_t) this->textSegment.memindex & 0xffffffffffff);
-	if (address >= text &&
-	    address < text + this->textSegmentContent.size()){
+	if (this->isCodeAddress(address) || this->isDataAddress(address)){
 		return this;
 	}
 
 	for( auto modulePair : moduleMap){
 		ElfLoader* module = dynamic_cast<ElfLoader*>(modulePair.second);
-		text = ((uint64_t) module->textSegment.memindex & 0xffffffffffff);
-		if (address >= text && 
-		    address < text + module->textSegmentContent.size()){
+		if (module->isCodeAddress(address) || module->isDataAddress(address)){
 			return module;
 		}
 	}
@@ -34,7 +30,6 @@ ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	KernelManager(),
 	vvarSegment(),
 	dataNosaveSegment(),
-	bssSegment(),
 	rodataSegment(),
 	fentryAddress(0),
 	genericUnrolledAddress(0)
@@ -49,12 +44,6 @@ void ElfKernelLoader::initText(void) {
 	this->textSegment = elffile->findSegmentWithName(".text");
 	this->updateSegmentInfoMemAddress(this->textSegment);
 	
-	this->dataSegment = elffile->findSegmentWithName(".data");
-	this->vvarSegment = elffile->findSegmentWithName(".vvar");
-	this->dataNosaveSegment = elffile->findSegmentWithName(".data_nosave");
-	this->bssSegment = elffile->findSegmentWithName(".bss");
-
-
 	this->fentryAddress = this->elffile->findAddressOfVariable("__fentry__");
 	this->genericUnrolledAddress = this->
 			elffile->findAddressOfVariable("copy_user_generic_unrolled");
@@ -86,7 +75,7 @@ void ElfKernelLoader::initText(void) {
 
 	//Apply Ftrace changes
 	info = elffile->findSegmentWithName(".init.text");
-	uint64_t initTextOffset = -(uint64_t) info.address + (uint64_t) info.index;
+	uint64_t initTextOffset = -(uint64_t) info.memindex + (uint64_t) info.index;
 
 	info.index = (uint8_t *) elffile->findAddressOfVariable("__start_mcount_loc") + initTextOffset;
 	info.size = (uint8_t *) elffile->findAddressOfVariable("__stop_mcount_loc") + initTextOffset - info.index;
@@ -101,7 +90,7 @@ void ElfKernelLoader::initText(void) {
 	//    applyTracepoints(info, rodata, context, textSegmentContent);
 
 	info = elffile->findSegmentWithName(".data");
-	int64_t dataOffset = -(uint64_t) info.address + (uint64_t) info.index;
+	int64_t dataOffset = -(uint64_t) info.memindex + (uint64_t) info.index;
 	uint64_t jumpStart = elffile->findAddressOfVariable("__start___jump_table");
 	uint64_t jumpStop = elffile->findAddressOfVariable("__stop___jump_table");
 
@@ -125,40 +114,12 @@ void ElfKernelLoader::initText(void) {
 
 }
 
-//TODO the following must also be put in its own function
-//
-//	// Hash
-//	QCryptographicHash hash(QCryptographicHash::Sha1);
-//
-//	for (int i = 0;
-//			i <= context.textSegmentContent.size() / KERNEL_CODEPAGE_SIZE;
-//			i++) {
-//		PageData page = PageData();
-//		hash.reset();
-//		// Caclulate hash of one segment at the ith the offset
-//		QByteArray segment = context.textSegmentContent.mid(
-//				i * KERNEL_CODEPAGE_SIZE, KERNEL_CODEPAGE_SIZE);
-//		if (!segment.isEmpty()) {
-//			//Remember how long the contents of the text segment are,
-//			//this is to identify the uninitialized data
-//			if (segment.size() != KERNEL_CODEPAGE_SIZE) {
-//				if ((segment.size() + 1) % PAGE_SIZE != 0) {
-//					quint32 size = segment.size();
-//					size += PAGE_SIZE - (size % PAGE_SIZE);
-//					context.textSegmentInitialized = i * KERNEL_CODEPAGE_SIZE
-//							+ size;
-//				}
-//			}
-//			segment = segment.leftJustified(KERNEL_CODEPAGE_SIZE, 0);
-//			page.content = segment;
-//			hash.addData(page.content);
-//			page.hash = hash.result();
-//			context.textSegmentData.append(page);
-//		}
-//		//Console::out() << "The " << i << "th segment got a hash of: " << segmentHashes.last().toHex() << " Sections." << endl;
-//	}
-//
 void ElfKernelLoader::initData(void){
+
+	this->dataSegment = elffile->findSegmentWithName(".data");
+	this->vvarSegment = elffile->findSegmentWithName(".vvar");
+	this->dataNosaveSegment = elffile->findSegmentWithName(".data_nosave");
+	this->bssSegment = elffile->findSegmentWithName(".bss");
 
 //	//TODO
 //	//.data
@@ -199,50 +160,15 @@ void ElfKernelLoader::initData(void){
 //	//.bss
 //
 }
-//
-//	//Initialize the symTable in the context for later reference
-//	if (fileContent[4] == ELFCLASS32) {
-//		//TODO
-//	} else if (fileContent[4] == ELFCLASS64) {
-//		Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
-//		Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent
-//				+ elf64Ehdr->e_shoff);
-//
-//		quint32 symSize = elf64Shdr[context.symindex].sh_size;
-//		Elf64_Sym *symBase = (Elf64_Sym *) (fileContent
-//				+ elf64Shdr[context.symindex].sh_offset);
-//
-//		for (Elf64_Sym * sym = symBase;
-//				sym < (Elf64_Sym *) (((char*) symBase) + symSize); sym++) {
-//			//We also need to know about private functions for data verification, so also save them here.
-//			//TODO fix scope
-//			if (ELF64_ST_TYPE(sym->st_info) & (STT_FUNC)
-//					|| (ELF64_ST_TYPE(sym->st_info) == (STT_NOTYPE)))
-//					//if(ELF64_ST_TYPE(sym->st_info) & (STT_FUNC) || (ELF64_ST_TYPE(sym->st_info) == (STT_NOTYPE) && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL))
-//					{
-//				QString symbolName =
-//						QString(
-//								&((fileContent
-//										+ elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
-//				quint64 symbolAddress = sym->st_value;
-//				_funcTable.insert(symbolName, symbolAddress);
-//			}
-//			if (ELF64_ST_BIND(sym->st_info) & STB_GLOBAL) {
-//				QString symbolName =
-//						QString(
-//								&((fileContent
-//										+ elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
-//				quint64 symbolAddress = sym->st_value;
-//				if (!_symTable.contains(symbolName)) {
-//					_symTable.insert(symbolName, symbolAddress);
-//				}
-//			}
-//		}
-//	}
-//
-//	return context;
-// end of parseElfFile()
 
 void ElfKernelLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
-	info.memindex = (uint8_t *) info.address;
+	UNUSED(info);
+}
+
+bool ElfKernelLoader::isDataAddress(uint64_t addr){
+	addr = addr & 0xffffffffffff;
+	return (this->dataSegment.containsMemAddress(addr) ||
+	        this->vvarSegment.containsMemAddress(addr) || 
+	        this->dataNosaveSegment.containsMemAddress(addr) || 
+	        this->bssSegment.containsMemAddress(addr));
 }

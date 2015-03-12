@@ -20,7 +20,6 @@ class ElfKernelLoader : public ElfLoader, public KernelManager {
 
 		SegmentInfo vvarSegment;
 		SegmentInfo dataNosaveSegment;
-		SegmentInfo bssSegment;
 		SegmentInfo rodataSegment;
 		
 	    uint64_t fentryAddress;
@@ -33,6 +32,8 @@ class ElfKernelLoader : public ElfLoader, public KernelManager {
 		
 		virtual void initText();
 		virtual void initData();
+		
+		bool isDataAddress(uint64_t addr);
 
 	private:
 

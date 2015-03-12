@@ -69,7 +69,6 @@ void ElfModuleLoader::initText(void) {
 	
 	this->textSegment = this->elffile->findSegmentWithName(".text");
 	this->updateSegmentInfoMemAddress(this->textSegment);
-	this->dataSegment = this->elffile->findSegmentWithName(".data");
 
     //applyJumpEntries();
 
@@ -160,7 +159,10 @@ void ElfModuleLoader::initText(void) {
 
 }
 
-void ElfModuleLoader::initData(void) {}
+void ElfModuleLoader::initData(void) {
+	this->dataSegment = this->elffile->findSegmentWithName(".data");
+	this->bssSegment = elffile->findSegmentWithName(".bss");
+}
 
 uint8_t *ElfModuleLoader::findMemAddressOfSegment(std::string segName){
 	Instance module;
@@ -199,4 +201,11 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(std::string segName){
 
 void ElfModuleLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
 	info.memindex = this->findMemAddressOfSegment(info.segName);
+}
+
+bool ElfModuleLoader::isDataAddress(uint64_t addr){
+	addr = addr & 0xffffffffffff;
+
+	return (this->dataSegment.containsMemAddress(addr) ||
+	        this->bssSegment.containsMemAddress(addr));
 }

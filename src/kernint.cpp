@@ -36,7 +36,7 @@ class KernelValidator {
 		ElfKernelLoader* kernelLoader;
 		
 		void validateCodePage(page_info_t *page, ElfLoader* elf);
-		void validateDataPage(page_info_t *page/*, EflLoader* elf*/);
+		void validateDataPage(page_info_t *page, ElfLoader* elf);
 
 		void loadKernel(std::string dirName);
 
@@ -66,6 +66,7 @@ void KernelValidator::loadKernel(std::string dirName){
 }
 
 void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
+	assert(page);
 	assert(elf);
 
 	uint32_t pageOffset = 0;
@@ -260,15 +261,14 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 			}
 
 			std::cout << std::dec << std::endl << std::endl;
-			exit(0);
 		}
 		changeCount++;
 	}
 	if (changeCount > 0)
 	{
 		std::cout << elf->getName() << 
-		             " Section: " << pageOffset / page->size << 
-					 " hash mismatch! " << changeCount << 
+		             " Section: " << pageIndex << 
+					 " mismatch! " << changeCount << 
 					 " inconsistent changes." << std::endl;
 	}
 	return;
@@ -279,15 +279,37 @@ void KernelValidator::validatePage(page_info_t * page){
 	//std::cout << "Try to verify page: " << std::hex << 
 	//             page->vaddr << std::dec << std::endl;
 	ElfLoader* elfloader = kernelLoader->getModuleForAddress(page->vaddr);
-	if (elfloader){
+	//assert(elfloader);
+	if(!elfloader){
+		std::cout << COLOR_RED << COLOR_BOLD << 
+			"No Module found for address: " << std::hex <<
+			page->vaddr << std::dec << COLOR_RESET << std::endl;
+	}else if (elfloader->isCodeAddress(page->vaddr)){
 		this->validateCodePage(page, elfloader);
+	}else if (elfloader->isDataAddress(page->vaddr)){
+		if(this->vmi->isPageExecutable(page)){
+		    std::cout << COLOR_RED << 
+		    		     "Warning: Executable Data Page" << 
+                         COLOR_NORM << std::endl;
+		}
+
+		this->validateDataPage(page, elfloader);
 	}else{
-		// std::cout << "Warning: Executable Data Page" << std::endl;
+		std::cout << COLOR_MARGENTA << COLOR_BOLD << 
+			"No Module found for address: " << std::hex <<
+			page->vaddr << std::dec << COLOR_RESET << std::endl;
 	}
+}
+
+void KernelValidator::validateDataPage(page_info_t * page, ElfLoader* elf){
+	assert(page);
+	assert(elf);
+
 }
 
 int main (int argc, char **argv)
 {	
+	std::cout << COLOR_RESET;
     VMIInstance *vmi;
     /* this is the VM or file that we are looking at */
     if (argc < 2) {

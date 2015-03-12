@@ -21,6 +21,8 @@ class ElfModuleLoader : public ElfLoader {
 
 		void loadDependencies();
 		
+		bool isDataAddress(uint64_t addr);
+
 		std::string modName;
 		KernelManager* parent;
 

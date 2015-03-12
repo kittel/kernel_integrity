@@ -24,6 +24,7 @@ ElfLoader::ElfLoader(ElfFile* elffile):
 	textSegmentContent(),
 	jumpTable(),
 	dataSegment(),
+	bssSegment(),
 	paravirtState(){
 
 	this->ideal_nops = p6_nops;
@@ -551,3 +552,10 @@ void ElfLoader::parseElfFile(){
 	this->initText();
 	this->initData();
 }
+
+bool ElfLoader::isCodeAddress(uint64_t addr){
+	addr = addr & 0xffffffffffff;
+
+	return this->textSegment.containsMemAddress(addr);
+}
+
