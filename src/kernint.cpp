@@ -71,23 +71,20 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 	uint32_t pageOffset = 0;
 	uint32_t pageIndex = 0;
 	pageOffset = (page->vaddr - 
-			     ((uint64_t) elf->textSegment.memindex & 0xffffffffffff )
-				) % page->size;
+			     ((uint64_t) elf->textSegment.memindex & 0xffffffffffff ));
 	pageIndex = (page->vaddr - 
 			     ((uint64_t) elf->textSegment.memindex & 0xffffffffffff )
 				) / page->size;
-	std::cout << "Validating: " << elf->getName() << 
-	             " Page: " << std::hex << pageIndex
-	                       << std::dec << std::endl;
+	//std::cout << "Validating: " << elf->getName() << 
+	//             " Page: " << std::hex << pageIndex
+	//                       << std::dec << std::endl;
 
 	// get Page from module
-	if(elf->textSegmentContent.size() < pageOffset + pageIndex * page->size){
+	if(elf->textSegmentContent.size() < pageOffset){
 		//This section is not completely loaded
 		assert(false);
 	}
-	uint8_t* loadedPage = elf->textSegmentContent.data() + 
-	                           pageOffset + 
-	                           pageIndex * page->size;
+	uint8_t* loadedPage = elf->textSegmentContent.data() + pageOffset;
 	// get Page from memdump
 	std::vector<uint8_t> pageInMem = 
 	                     vmi->readVectorFromVA(page->vaddr, page->size);
@@ -149,20 +146,39 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 			}
 		}
 
-		if(i > 0 && loadedPage[i-1] == (uint8_t) 0xe8 &&
-				dynamic_cast<ElfKernelLoader*>(elf))
-		{
-			int32_t jmpDestElfInt = 0;
+		if(i > 0 && loadedPage[i-1] == (uint8_t) 0xe8){
+			uint32_t jmpDestElfInt = 0;
 			memcpy(&jmpDestElfInt, loadedPage + i + 1, 4);
 
 			uint64_t elfDestAddress = (uint64_t) elf->textSegment.memindex + 
 									  pageOffset + i + 
 									  jmpDestElfInt + 5;
 
-			if ( dynamic_cast<ElfKernelLoader*>(elf)->
-			       genericUnrolledAddress == elfDestAddress){
-				i += 4;
-				continue;
+			if (dynamic_cast<ElfKernelLoader*>(elf)){
+				if ( dynamic_cast<ElfKernelLoader*>(elf)->
+					   genericUnrolledAddress == elfDestAddress){
+					i += 4;
+					continue;
+				}
+			}
+			else if (dynamic_cast<ElfModuleLoader*>(elf)){
+				uint32_t jmpDestMemInt = 0;
+				memcpy(&jmpDestMemInt, pageInMem.data() + i + 1, 4);
+
+				uint64_t memDestAddress = (uint64_t) elf->textSegment.memindex + 
+										  pageOffset + i + 
+										  jmpDestMemInt + 5;
+				std::cout << "Error: " << std::endl;
+				std::cout << "Jump in mem to: " << std::hex <<
+							 memDestAddress << std::dec << std::endl;	
+				std::cout << "Offset: " << std::hex <<
+							 jmpDestMemInt << std::dec << std::endl;	
+				std::cout << "Jump in elf to: " << std::hex <<
+							 elfDestAddress << std::dec << std::endl;	
+				std::cout << "Offset: " << std::hex <<
+							 jmpDestElfInt << std::dec << std::endl;	
+				std::cout << "Difference: " << std::hex <<
+							 elfDestAddress - memDestAddress << std::dec << std::endl;	
 			}
 		}
 
@@ -173,41 +189,37 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 			pageInMem[i] == (uint8_t) 0x3e))
 		{
 			//TODO get es.ismpOffsets
-			if (elf->smpOffsets.find(i + pageIndex * page->size) !=
+			if (elf->smpOffsets.find(i + pageOffset) !=
 					elf->smpOffsets.end()){
 				continue;
 			}
 		}
 
-		//  if(currentSegment.at(i) == (char) 0xe9 &&
-		//          currentSegment.at(i+1) == (char) 0x0 &&
-		//          currentSegment.at(i+2) == (char) 0x0 &&
-		//          currentSegment.at(i+3) == (char) 0x0 &&
-		//          currentSegment.at(i+4) == (char) 0x0 &&
-		//          currentPage.data.at(i) == (char) 0xf &&
-		//          currentPage.data.at(i+1) == (char) 0x1f &&
-		//          currentPage.data.at(i+2) == (char) 0x44 &&
-		//          currentPage.data.at(i+3) == (char) 0x0 &&
-		//          currentPage.data.at(i+4) == (char) 0x0 &&
-		//          moduleName.compare(QString("kernel")) == 0)
-		//  {
-		//      i += 5;
-		//      continue;
-		//  }
+        // TODO investigate
+		if (memcmp(loadedPage + i, "\xe9\x00\x00\x00\x00", 5) == 0 && 
+		    memcmp(pageInMem.data() + i, elf->ideal_nops[9], 5) == 0){
+		    i += 5;
+		    continue;
+		}
 
 		// check for uninitialized content after initialized 
 		// part of kernels text segment
 		if ( dynamic_cast<ElfKernelLoader*>(elf) && 
-			 i >= (int32_t) (elf->textSegmentLength - pageIndex * page->size))
+			 i >= (int32_t) (elf->textSegmentLength - pageOffset))
 		{
-			uint64_t unkCodeAddress = (uint64_t) elf->textSegment.memindex + pageIndex * page->size + i;
+			uint64_t unkCodeAddress = (uint64_t) elf->textSegment.memindex + 
+			                                     pageOffset + i;
+			std::cout << COLOR_RED << 
+			             "Validating: " << elf->getName() << 
+			             " Page: " << std::hex << pageIndex
+			                       << std::dec << std::endl;
 			std::cout << "Unknown code @ " << std::hex << unkCodeAddress <<
-			             std::dec << std::endl;
-			if(changeCount > 0)
+			             std::dec << COLOR_NORM << std::endl;
+			if(changeCount == 0)
 			{
 				std::cout << "The Code Segment is fully intact but " << 
 					"the rest of the page is uninitialized" << 
-					std::dec << std::endl;
+					std::dec << std::endl << std::endl;
 			}
 
 			break;
@@ -215,8 +227,12 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 
 
 		if(changeCount == 0){
+			std::cout << COLOR_RED << 
+			             "Validating: " << elf->getName() << 
+			             " Page: " << std::hex << pageIndex
+			                       << std::dec << COLOR_NORM << std::endl;
 			std::cout << "First change on section " << 
-			                 pageOffset % page->size <<
+			                 pageIndex <<
 						 " in byte 0x" << std::hex << i << 
 						 " ( " << i + pageOffset << 
 						 " ) is 0x" << (uint32_t) loadedPage[i] <<
@@ -271,7 +287,7 @@ void KernelValidator::validatePage(page_info_t * page){
 }
 
 int main (int argc, char **argv)
-{
+{	
     VMIInstance *vmi;
     /* this is the VM or file that we are looking at */
     if (argc < 2) {
