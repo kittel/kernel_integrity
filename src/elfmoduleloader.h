@@ -17,7 +17,6 @@ class ElfModuleLoader : public ElfLoader {
 		
 		virtual void initText();
 		virtual void initData();
-		virtual void addSymbols() = 0;
 
 		void loadDependencies();
 		

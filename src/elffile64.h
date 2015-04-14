@@ -22,6 +22,8 @@ class ElfFile64 : public ElfFile {
 
 		SegmentInfo findSegmentWithName(std::string sectionName);
 		SegmentInfo findSegmentByID(uint32_t sectionID);
+		bool isCodeAddress(uint64_t address);
+		bool isDataAddress(uint64_t address);
 		std::string segmentName(int sectionID);
 		uint8_t *segmentAddress(int sectionID);
 

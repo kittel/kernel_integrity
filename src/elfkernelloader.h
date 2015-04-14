@@ -25,6 +25,10 @@ class ElfKernelLoader : public ElfLoader, public KernelManager {
 	    uint64_t fentryAddress;
 	    uint64_t genericUnrolledAddress;
 
+		uint64_t idt_tableAddress;
+		uint64_t nmi_idt_tableAddress;
+		uint64_t sinittextAddress;
+		uint64_t irq_entries_startAddress;
 
 		int apply_relocate();
 

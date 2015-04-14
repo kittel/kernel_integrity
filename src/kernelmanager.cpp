@@ -126,6 +126,9 @@ uint64_t KernelManager::getSystemMapAddress(std::string name){
 	return 0;
 }
 void KernelManager::addSymbolAddress(std::string name, uint64_t address){
+	while(this->moduleSymbolMap.find(name) != this->moduleSymbolMap.end()){
+		name = name.append("_");
+	}
 	this->moduleSymbolMap[name] = address;
 }
 
@@ -136,7 +139,26 @@ uint64_t KernelManager::getSymbolAddress(std::string name){
 	return 0;
 }
 
+std::string KernelManager::getSymbolName(uint64_t address){
+	if(this->moduleSymbolRevMap.find(address) != this->moduleSymbolRevMap.end()){
+		return this->moduleSymbolRevMap[address];
+	}
+	return "";
+}
+
+bool KernelManager::isSymbol(uint64_t address){
+	
+	if(this->moduleSymbolRevMap.find(address) != this->moduleSymbolRevMap.end()){
+		return true;
+	}
+	return false;
+}
+
+
 void KernelManager::addFunctionAddress(std::string name, uint64_t address){
+	while(this->functionSymbolMap.find(name) != this->functionSymbolMap.end()){
+		name = name.append("_");
+	}
 	this->functionSymbolMap[name] = address;
 }
 
@@ -147,6 +169,31 @@ uint64_t KernelManager::getFunctionAddress(std::string name){
 	return 0;
 }
 
+std::string KernelManager::getFunctionName(uint64_t address){
+	if(this->functionSymbolRevMap.find(address) != this->functionSymbolRevMap.end()){
+		return this->functionSymbolRevMap[address];
+	}
+	return "";
+}
+
+bool KernelManager::isFunction(uint64_t address){
+	if(this->functionSymbolRevMap.find(address) != this->functionSymbolRevMap.end()){
+		return true;
+	}
+	return false;
+}
+
+void KernelManager::updateRevMaps(){
+	this->moduleSymbolRevMap.clear();
+	this->functionSymbolRevMap.clear();
+
+	for( auto i : this->moduleSymbolMap){
+		this->moduleSymbolRevMap[i.second] = i.first;
+	}
+	for( auto i : this->functionSymbolMap){
+		this->functionSymbolRevMap[i.second] = i.first;
+	}
+}
 
 void KernelManager::parseSystemMap(){
 	std::string sysMapFileName = this->dirName;

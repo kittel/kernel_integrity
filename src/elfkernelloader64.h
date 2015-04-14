@@ -9,6 +9,7 @@ class ElfKernelLoader64 : public ElfKernelLoader{
 		virtual ~ElfKernelLoader64();
 
 	protected:
+		void addSymbols();
 };
 
 

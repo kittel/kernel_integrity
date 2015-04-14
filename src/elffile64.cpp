@@ -43,7 +43,6 @@ ElfFile64::ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent):
 ElfFile64::~ElfFile64(){}
 
 SegmentInfo ElfFile64::findSegmentWithName(std::string sectionName){
-	
 	char * tempBuf = 0;
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
 		tempBuf = (char*) this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset
@@ -74,6 +73,33 @@ SegmentInfo ElfFile64::findSegmentByID(uint32_t sectionID){
 		                   elf64Shdr[sectionID].sh_size);
 	}
 	return SegmentInfo();
+}
+bool ElfFile64::isCodeAddress(uint64_t address){
+	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
+		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)){
+			if( CHECKFLAGS(this->elf64Shdr[i].sh_flags,
+						   (SHF_ALLOC & SHF_EXECINSTR))){
+				return true;
+			}else{
+				return false;
+			}
+		}
+	}
+	return false;
+}
+
+bool ElfFile64::isDataAddress(uint64_t address){
+	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
+		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)){
+			if( CHECKFLAGS(this->elf64Shdr[i].sh_flags, (SHF_ALLOC)) &&
+				!CHECKFLAGS(this->elf64Shdr[i].sh_flags, (SHF_EXECINSTR))){
+				return true;
+			}else{
+				return false;
+			}
+		}
+	}
+	return false;
 }
 
 std::string ElfFile64::segmentName(int sectionID){

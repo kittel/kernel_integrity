@@ -35,9 +35,15 @@ class KernelManager{
 
 		void addSymbolAddress(std::string name, uint64_t address);
 		uint64_t getSymbolAddress(std::string name);
+		std::string getSymbolName(uint64_t address);
+		bool isSymbol(uint64_t address);
 		
 		void addFunctionAddress(std::string name, uint64_t address);
 		uint64_t getFunctionAddress(std::string name);
+		std::string getFunctionName(uint64_t address);
+		bool isFunction(uint64_t address);
+
+		void updateRevMaps();
 
 	protected:
 		typedef std::map<std::string, ElfLoader*> ModuleMap;
@@ -54,10 +60,13 @@ class KernelManager{
 		std::string findModuleFile(std::string modName);
 
 		typedef std::map<std::string, uint64_t> SymbolMap;
+		typedef std::map<uint64_t, std::string> SymbolRevMap;
 		SymbolMap symbolMap;
 
 		SymbolMap moduleSymbolMap;
 		SymbolMap functionSymbolMap;
+		SymbolRevMap moduleSymbolRevMap;
+		SymbolRevMap functionSymbolRevMap;
 		
 };
 

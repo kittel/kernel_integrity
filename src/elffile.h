@@ -60,6 +60,8 @@ class ElfFile{
 
 		virtual SegmentInfo findSegmentWithName(std::string sectionName) = 0;
 		virtual SegmentInfo findSegmentByID(uint32_t sectionID) = 0;
+		virtual bool isCodeAddress(uint64_t address) = 0;
+		virtual bool isDataAddress(uint64_t address) = 0;
 		virtual std::string segmentName(int sectionID) = 0;
 
 		virtual uint64_t findAddressOfVariable(std::string symbolName) = 0;

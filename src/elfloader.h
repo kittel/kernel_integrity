@@ -33,11 +33,17 @@ class ElfLoader{
 		int32_t textSegmentLength;
 	    std::vector<uint8_t> jumpTable;
 
+		std::vector<uint8_t> roData;
+
 		std::map<uint64_t, int32_t> jumpEntries;
+		std::set<uint64_t> jumpDestinations;
 		std::set<uint64_t> smpOffsets;
 		
 		SegmentInfo dataSegment;
 		SegmentInfo bssSegment;
+		SegmentInfo roDataSegment;
+
+		
 		
 		const unsigned char* const* ideal_nops;
 		void  add_nops(void *insns, uint8_t len);
@@ -72,6 +78,7 @@ class ElfLoader{
 		virtual void parseElfFile();
 		virtual void initText() = 0;
 		virtual void initData() = 0;
+		virtual void addSymbols() = 0;
 
 		bool isCodeAddress(uint64_t addr);
 		virtual bool isDataAddress(uint64_t addr) = 0;

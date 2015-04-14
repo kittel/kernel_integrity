@@ -4,6 +4,9 @@
 #define UNUSED(expr) do { (void)(expr); } while (0)
 #define DELETE(expr) do { if(expr){ delete expr; expr = 0; }; } while (0)
 
+#define CHECKFLAGS(byte, flags)    ((byte & flags) == flags)
+#define CONTAINS(min, size, what)  (min <= what && min + size >= what)
+
 #include <string>
 #include <sstream>
 #include <vector>
@@ -20,6 +23,8 @@
 #define	COLOR_WHITE         "\033[37m"
 #define	COLOR_CRIMSON       "\033[38m"
 
+#define	COLOR_FAINT_OFF     "\033[22m"
+#define	COLOR_ITALIC        "\033[3m"
 #define	COLOR_BOLD          "\033[1m"
 #define	COLOR_BOLD_OFF      "\033[22m"
 #define	COLOR_FAINT         "\033[2m"

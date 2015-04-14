@@ -33,7 +33,8 @@ ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	rodataSegment(),
 	fentryAddress(0),
 	genericUnrolledAddress(0)
-	{}
+	{
+	}
 
 ElfKernelLoader::~ElfKernelLoader(){}
 
@@ -112,6 +113,8 @@ void ElfKernelLoader::initText(void) {
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 			fill, 0);
 
+	this->addSymbols();
+
 }
 
 void ElfKernelLoader::initData(void){
@@ -120,6 +123,25 @@ void ElfKernelLoader::initData(void){
 	this->vvarSegment = elffile->findSegmentWithName(".vvar");
 	this->dataNosaveSegment = elffile->findSegmentWithName(".data_nosave");
 	this->bssSegment = elffile->findSegmentWithName(".bss");
+	this->roDataSegment = elffile->findSegmentWithName(".rodata");
+
+	this->idt_tableAddress = this->getSystemMapAddress("idt_table");
+	this->nmi_idt_tableAddress = this->getSystemMapAddress("nmi_idt_table");
+	this->sinittextAddress = this->getSystemMapAddress("_sinittext");
+	this->irq_entries_startAddress = 
+		this->getSystemMapAddress("irq_entries_start");
+
+
+	// initialize roData Segment
+	SegmentInfo info = elffile->findSegmentWithName("__modver");
+	assert(info.index);
+	this->roData.insert(this->roData.end(),
+			roDataSegment.index, info.index + info.size);
+   
+    this->roData.insert(this->roData.end(),
+			0x200000 - (this->roData.size() % 0x200000), 0);
+	
+	this->roDataSegment.size = this->roData.size();
 
 //	//TODO
 //	//.data
@@ -166,9 +188,10 @@ void ElfKernelLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
 }
 
 bool ElfKernelLoader::isDataAddress(uint64_t addr){
-	addr = addr & 0xffffffffffff;
-	return (this->dataSegment.containsMemAddress(addr) ||
-	        this->vvarSegment.containsMemAddress(addr) || 
-	        this->dataNosaveSegment.containsMemAddress(addr) || 
-	        this->bssSegment.containsMemAddress(addr));
+	return this->elffile->isDataAddress(addr | 0xffff000000000000);
+	//addr = addr & 0xffffffffffff;
+	//return (this->dataSegment.containsMemAddress(addr) ||
+	//        this->vvarSegment.containsMemAddress(addr) || 
+	//        this->dataNosaveSegment.containsMemAddress(addr) || 
+	//        this->bssSegment.containsMemAddress(addr));
 }

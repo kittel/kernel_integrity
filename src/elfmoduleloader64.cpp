@@ -302,29 +302,24 @@ void ElfModuleLoader64::addSymbols(){
 		}
         
         std::string symbolName = this->elffile->symbolName(sym->st_name);
+        if(symbolName.compare("") == 0) continue;
         uint64_t symbolAddress = sym->st_value;
 		
-		//if (symbolName.compare("snd_timer_notify") == 0){
-		//	std::cout << COLOR_RED <<
-		//	             "Found symbol in: " << 
-		//				 this->getName() <<
-		//				 " at address: " << 
-		//				 std::hex << symbolAddress << std::dec <<
-		//				 COLOR_NORM << 
-		//				 std::endl;
-		//}
+        if (ELF64_ST_BIND(sym->st_info) == STB_LOCAL){
+		    //Store local variables with uniq names
+            symbolName.append("_").append(this->modName);
+			std::string newSymName = symbolName;
+            //int i = 2;
+            //while (_funcTable.contains(newSymName)){
+            //    newSymName = symbolName;
+            //    newSymName.append("_").append(i);
+            //}
+            symbolName = newSymName;
+        }
 
-		if((ELF64_ST_TYPE(sym->st_info) & (STT_OBJECT | STT_FUNC)) && 
-		    ELF64_ST_BIND(sym->st_info) & STB_GLOBAL )
-        {
-			//if (symbolName.compare("snd_timer_notify") == 0){
-			//	std::cout << COLOR_RED << 
-			//	             "Adding global symbol in: " << 
-			//				 this->getName() << 
-			//				 COLOR_NORM <<
-			//				 std::endl;
-			//}
-
+		if((ELF64_ST_TYPE(sym->st_info) & (STT_OBJECT | STT_FUNC))
+			   // && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL 
+			){
 			this->parent->addSymbolAddress(symbolName, symbolAddress);
         }
 
@@ -332,25 +327,6 @@ void ElfModuleLoader64::addSymbols(){
         //if((ELF64_ST_TYPE(sym->st_info) & STT_FUNC) && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL)
         if((ELF64_ST_TYPE(sym->st_info) == STT_FUNC))
         {
-            if(symbolName.compare("") == 0) continue;
-            if (ELF64_ST_BIND(sym->st_info) == STB_LOCAL){
-			    //Store local variables with uniq names
-                symbolName.append("_").append(this->modName);
-				std::string newSymName = symbolName;
-                //int i = 2;
-                //while (_funcTable.contains(newSymName)){
-                //    newSymName = symbolName;
-                //    newSymName.append("_").append(i);
-                //}
-                symbolName = newSymName;
-            }
-			//if (symbolName.compare("snd_timer_notify") == 0){
-			//	std::cout << COLOR_RED << 
-			//	             "Adding symbol in: " << 
-			//				 this->getName() << 
-			//				 COLOR_NORM << std::endl;
-			//}
-
             if(symbolAddress < (uint64_t) this->textSegment.memindex){
                 symbolAddress += (uint64_t) this->textSegment.memindex;
             }

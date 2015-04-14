@@ -21,7 +21,7 @@ SegmentInfo::SegmentInfo(std::string segName, uint32_t segID, uint8_t *i,
 SegmentInfo::~SegmentInfo(){}
 
 bool SegmentInfo::containsElfAddress(uint64_t address){
-	uint64_t addr = (uint64_t) this->index & 0xffffffffffff;
+	uint64_t addr = (uint64_t) this->index;
 	if (address >= addr &&
 		address <= addr + this->size){
 		return true;
@@ -30,7 +30,7 @@ bool SegmentInfo::containsElfAddress(uint64_t address){
 }
 
 bool SegmentInfo::containsMemAddress(uint64_t address){
-	uint64_t addr = (int64_t) this->memindex & 0xffffffffffff;
+	uint64_t addr = (int64_t) this->memindex;
 	if (address >= addr &&
 		address <= addr + this->size){
 		return true;

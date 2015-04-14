@@ -29,6 +29,15 @@ SegmentInfo ElfFile32::findSegmentByID(uint32_t sectionID){
 	throw NotImplementedException();
 }
 
+bool ElfFile32::isCodeAddress(uint64_t address){
+	UNUSED(address);
+	throw NotImplementedException();
+}
+
+bool ElfFile32::isDataAddress(uint64_t address){
+	UNUSED(address);
+	throw NotImplementedException();
+}
 
 std::string ElfFile32::segmentName(int sectionID){
 	UNUSED(sectionID);

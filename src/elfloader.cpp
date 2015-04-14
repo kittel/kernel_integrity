@@ -23,8 +23,13 @@ ElfLoader::ElfLoader(ElfFile* elffile):
 	textSegment(),
 	textSegmentContent(),
 	jumpTable(),
+	roData(),
+	jumpEntries(),
+	jumpDestinations(),
+	smpOffsets(),
 	dataSegment(),
 	bssSegment(),
+	roDataSegment(),
 	paravirtState(){
 
 	this->ideal_nops = p6_nops;
@@ -523,7 +528,7 @@ void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
                 if(addJumpEntries){
                     this->jumpEntries.insert(
 					    std::pair<uint64_t, int32_t>(entry->code, destination));
-                    //this->jumpDestinations.insert(entry->target);
+					this->jumpDestinations.insert(entry->target);
                 }
 
 
@@ -554,7 +559,7 @@ void ElfLoader::parseElfFile(){
 }
 
 bool ElfLoader::isCodeAddress(uint64_t addr){
-	addr = addr & 0xffffffffffff;
+	addr = addr | 0xffff000000000000;
 
 	return this->textSegment.containsMemAddress(addr);
 }
