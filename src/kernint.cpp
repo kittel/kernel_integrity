@@ -7,6 +7,11 @@
 #include <cassert>
 #include <iostream>
 #include <typeinfo>
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
@@ -559,21 +564,79 @@ void KernelValidator::displayChange(uint8_t* memory, uint8_t* reference,
 	std::cout << std::dec << std::endl << std::endl;
 }
 
+
+
+
 int main (int argc, char **argv)
 {	
 	std::cout << COLOR_RESET;
     VMIInstance *vmi;
-    /* this is the VM or file that we are looking at */
-    if (argc < 2) {
-        printf("Usage: %s <kerneldir> [ramdump]\n", argv[0]);
-        return 1;
-    }
-	if(argc == 3){
-		vmi = new VMIInstance(argv[2], VMI_FILE | VMI_INIT_COMPLETE);
-	}else{   
-		vmi = new VMIInstance("insight", VMI_KVM | VMI_INIT_COMPLETE);
+
+    //Parse options from cmdline
+	const char* guestvm = NULL;
+	const char* kerndir = NULL;
+	int hypflag = 0;
+	int index;
+	int c;
+
+	opterr = 0;
+
+	while ((c = getopt (argc, argv, ":kxf")) != -1)
+		switch (c)
+		{
+			case 'k':
+				if(hypflag != 0){
+					std::cout << "Could not set multiple hypervisors." <<
+					   " Exiting..." << std::endl;
+					return 0;
+				}
+				hypflag = VMI_KVM;
+				break;
+			case 'x':
+				if(hypflag != 0){
+					std::cout << "Could not set multiple hypervisors." <<
+					   " Exiting..." << std::endl;
+					return 0;
+				}
+				hypflag = VMI_XEN;
+				break;
+			case 'f':
+				if(hypflag != 0){
+					std::cout << "Could not set multiple hypervisors." <<
+					   " Exiting..." << std::endl;
+					return 0;
+				}
+				hypflag = VMI_FILE;
+				break;
+			case '?':
+				if (isprint (optopt))
+					fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+				else
+					fprintf (stderr,
+							"Unknown option character `\\x%x'.\n",
+							optopt);
+			default:
+				printf("Usage: %s [-x|-k|-f] <kerneldir> [ramdump]\n", argv[0]);
+				return 1;
+		}
+	
+	if (hypflag == 0){
+		hypflag = VMI_FILE;
 	}
-	KernelValidator *val = new KernelValidator(argv[1], vmi);
+
+	index = optind;
+
+	kerndir = argv[index++];
+	if(index < argc){
+		guestvm = argv[index];
+	} else {
+		guestvm = "insight";
+		hypflag = VMI_XEN;
+	}
+
+	vmi = new VMIInstance(guestvm, hypflag | VMI_INIT_COMPLETE);
+
+	KernelValidator *val = new KernelValidator(kerndir, vmi);
 
 	PageMap executablePageMap = vmi->getKernelPages();
 
