@@ -507,9 +507,9 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page,
 					continue;
                 }
 
-				if(*longPtr == 0xffffffff81412843){
-					continue;
-				}
+				//if(*longPtr == 0xffffffff81412843){
+				//	continue;
+				//}
 
 				std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
 				   	"Found possible malicious pointer: 0x" << *longPtr << 
