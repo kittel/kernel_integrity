@@ -32,7 +32,23 @@ ElfLoader::ElfLoader(ElfFile* elffile):
 	roDataSegment(),
 	paravirtState(){
 
-	this->ideal_nops = p6_nops;
+	//get the current cpu architecture to adapt nops
+	Instance ideal_nops_instance = 
+		Variable::findVariableByName("ideal_nops")->getInstance();
+	uint64_t p6_address = Variable::findVariableByName("p6_nops")->
+		                                                getInstance().
+							                        	getAddress();
+	uint64_t k8_address = Variable::findVariableByName("k8_nops")->
+		                                                getInstance().
+							                        	getAddress();
+
+	uint64_t nopaddr = ideal_nops_instance.getRawValue<uint64_t>(false);
+	
+	if (nopaddr == p6_address){
+		this->ideal_nops = p6_nops;
+	}else if (nopaddr == k8_address){
+		this->ideal_nops = k8_nops;
+	}
 }
 
 ElfLoader::~ElfLoader(){}
