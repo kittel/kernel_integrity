@@ -39,6 +39,7 @@ AC_LANG([C++])
 AC_HEADER_STDC
 AC_CHECK_HEADERS([string])
 AC_CHECK_HEADERS([iostream])
+AX_BOOST_FILESYSTEM
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T

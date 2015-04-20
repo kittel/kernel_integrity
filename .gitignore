@@ -21,7 +21,7 @@ autoscan.log
 dwarfsymbols
 test
 
-m4
+m4/lt*
 
 aclocal.m4
 ar-lib
