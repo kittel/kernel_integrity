@@ -430,11 +430,13 @@ void ElfLoader::applySmpLocks(){
 			(info.memindex - this->textSegment.memindex);
         ptr -= offset;
 
-        *ptr = lock;
+		if (this->textSegment.containsElfAddress((uint64_t) ptr)){
+	        *ptr = lock;
 
-        if (addSmpEntries) {
-			this->smpOffsets.insert((uint64_t) ptr - 
-					                (uint64_t) this->textSegment.index);
+            if (addSmpEntries) {
+		    	this->smpOffsets.insert((uint64_t) ptr - 
+				                (uint64_t) this->textSegment.index);
+		    }
 		}
     }
 	std::cout << COLOR_CYAN << 

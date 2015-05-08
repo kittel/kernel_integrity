@@ -42,9 +42,9 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
 #ifdef PRINTDEBUG
     bool doPrint = false;
-    //if(this->getName().compare("floppy") == 0
-	//		&& sectionName.compare(".text") == 0
-	//		) doPrint = true;
+    if(this->getName().compare("nfs") == 0
+			&& sectionName.compare(".text") == 0
+			) doPrint = true;
     //if(doPrint) std::cout << "\n\nSection To Relocate: " << sectionName << std::endl;
 #endif
 	
@@ -124,8 +124,10 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
             /* Divert to percpu allocation if a percpu var. */
             if (sym->st_shndx == percpuDataSegment.segID){
                 locOfRelSectionInMem = (void *) currentModule.
-				                                    memberByName("percpu").
-				                                    getValue<uint64_t>();
+				                                memberByName("percpu").
+				                                getRawValue<uint64_t>(false);
+				std::cout << "relocation @ " << std::hex <<
+					locOfRelSectionInMem << std::dec << std::endl;
             }
             else
             {
@@ -282,6 +284,9 @@ uint64_t ElfModuleLoader64::relocateShnUndef(std::string symbolName){
     if (var && var->getLocation()){
 		return var->getLocation();
 	}
+	std::cout << COLOR_RED << COLOR_BOLD <<
+		"Could not find address for variable " << symbolName <<
+		COLOR_NORM << COLOR_BOLD_OFF << std::endl;
 	assert(false);
 	return 0;
 }

@@ -9,6 +9,8 @@
 #include <fstream>
 #include <cctype>
 
+#include <regex>
+
 #include "elffile.h"
 
 #include "libdwarfparser/variable.h"
@@ -42,7 +44,9 @@ ElfLoader *KernelManager::loadModule(std::string moduleName){
 		//std::cout << filename << std::endl;
 	}
 	ElfFile *file = ElfFile::loadElfFile(filename);
-	auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE, moduleName, this);
+	auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE, 
+			                     moduleName, 
+								 this);
 	moduleMap[moduleName] = module;
 
 	return module;
@@ -64,18 +68,17 @@ Instance KernelManager::nextModule(Instance &instance){
 }
 
 std::string KernelManager::findModuleFile(std::string modName){
+	std::replace(modName.begin(), modName.end(), '-', '_');
+    size_t start_pos = 0;
+	while((start_pos = modName.find("_", start_pos)) != std::string::npos) {
+	    modName.replace(start_pos, 1, "[_|-]");
+	    start_pos += 5;
+	}
+	std::regex regex = std::regex(modName);
 	for( fs::recursive_directory_iterator end, dir(this->dirName);
 			dir != end; dir++){
 		if(fs::extension(*dir) == ".ko"){
-			if((*dir).path().stem() == modName){
-				return (*dir).path().native();
-			}
-			std::replace(modName.begin(), modName.end(), '_', '-');
-			if((*dir).path().stem() == modName){
-				return (*dir).path().native();
-			}
-			std::replace(modName.begin(), modName.end(), '-', '_');
-			if((*dir).path().stem() == modName){
+			if (std::regex_match((*dir).path().stem().string(), regex)){
 				return (*dir).path().native();
 			}
 		}

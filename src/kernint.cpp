@@ -220,7 +220,8 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 				std::cout << "Offset: " << std::hex <<
 							 jmpDestElfInt << std::dec << std::endl;	
 				std::cout << "Difference: " << std::hex <<
-							 elfDestAddress - memDestAddress << std::dec << std::endl;	
+							 elfDestAddress - memDestAddress << 
+							 std::dec << std::endl;	
 			}
 		}
 
@@ -268,13 +269,17 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 		}
 
 
-		if(changeCount == 0){
+	//	if(changeCount == 0){
+			uint64_t unkCodeAddress = (uint64_t) elf->textSegment.memindex + 
+			                                     pageOffset + i;
 			std::cout << COLOR_RED << 
 			             "Validating: " << elf->getName() << 
 			             " Page: " << std::hex << pageIndex
-			                       << std::dec << COLOR_NORM << std::endl;
+			                       << std::dec << 
+						 " Address: " << std::hex << unkCodeAddress <<
+						                 std::dec << COLOR_NORM << std::endl;
 			displayChange(pageInMem.data(), loadedPage, i, page->size);
-		}
+	//	}
 		changeCount++;
 	}
 	if (changeCount > 0)
@@ -283,6 +288,7 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 		             " Section: " << pageIndex << 
 					 " mismatch! " << changeCount << 
 					 " inconsistent changes." << std::endl;
+		exit(0);
 	}
 	return;
 	//return changeCount;
@@ -381,7 +387,9 @@ void KernelValidator::validateDataPage(page_info_t * page, ElfLoader* elf){
                     else{
 						std::cout << COLOR_RED << 
                             "Could not find function @ " << 
-							std::hex << currentPtr << std::dec <<
+							std::hex << currentPtr << 
+							" ( " << count + page->vaddr << " ) " <<
+							std::dec <<
 							COLOR_NORM << std::endl;
                     }
 					displayChange(pageInMem.data(), loadedPage, count, page->size);
@@ -621,7 +629,7 @@ int main (int argc, char **argv)
 		}
 	
 	if (hypflag == 0){
-		hypflag = VMI_FILE;
+		hypflag = VMI_AUTO;
 	}
 
 	index = optind;
@@ -631,7 +639,7 @@ int main (int argc, char **argv)
 		guestvm = argv[index];
 	} else {
 		guestvm = "insight";
-		hypflag = VMI_XEN;
+		hypflag = VMI_AUTO;
 	}
 
 	vmi = new VMIInstance(guestvm, hypflag | VMI_INIT_COMPLETE);
