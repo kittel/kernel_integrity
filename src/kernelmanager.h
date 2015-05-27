@@ -1,6 +1,7 @@
 #ifndef KERNELMANAGER_H
 #define KERNELMANAGER_H
 
+#include <iostream>
 #include <list>
 #include <map>
 
@@ -68,7 +69,6 @@ class KernelManager{
 		SymbolMap functionSymbolMap;
 		SymbolRevMap moduleSymbolRevMap;
 		SymbolRevMap functionSymbolRevMap;
-		
 };
 
 

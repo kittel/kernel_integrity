@@ -228,6 +228,7 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(std::string segName){
     return 0;
 }
 
+/* Update the target virtual address of the segment */
 void ElfModuleLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
 	info.memindex = this->findMemAddressOfSegment(info.segName);
 }

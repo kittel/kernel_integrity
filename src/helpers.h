@@ -10,6 +10,8 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <iostream>
+#include <iomanip>
 
 #define	COLOR_RESET         "\033[0m"  
 #define	COLOR_NORM          "\033[39m"  
@@ -23,8 +25,6 @@
 #define	COLOR_WHITE         "\033[37m"
 #define	COLOR_CRIMSON       "\033[38m"
 
-#define	COLOR_FAINT_OFF     "\033[22m"
-#define	COLOR_ITALIC        "\033[3m"
 #define	COLOR_BOLD          "\033[1m"
 #define	COLOR_BOLD_OFF      "\033[22m"
 #define	COLOR_FAINT         "\033[2m"
@@ -33,6 +33,10 @@
 #define	COLOR_ITALIC_OFF    "\033[23m"
 #define	COLOR_UNDERLINE     "\033[4m"
 #define	COLOR_UNDERLINE_OFF "\033[24m"
+
+// determining updateMemIndex target. extendable.
+#define SEG_NR_TEXT 0
+#define SEG_NR_DATA 1
 
 inline std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
     std::stringstream ss(s);
@@ -52,6 +56,79 @@ inline std::vector<std::string> split(const std::string &s, char delim) {
 
 inline std::string toString(uint8_t * string){
 	return std::string((const char*) string);
+}
+
+inline void printHexDump(std::vector<uint8_t> *bytes){
+	using namespace std;
+
+	unsigned long address = 0;
+	int nread = 0; //buffer filler [0,16]
+	char buf[16];
+
+	cout << hex << setfill('0');
+	auto lenBytes = bytes->size();
+
+	while(address < lenBytes){
+
+		//get 16 bytes into the fresh buffer
+		for( nread = 0; nread < 16; nread++){buf[nread] = 0;}; // clear buf
+		for( nread = 0; nread < 16 && (address + nread < lenBytes); nread++ ){
+			buf[nread] = (*bytes)[(address + nread)];
+		}
+
+		if( address + nread > lenBytes ) break;
+
+		// Show the address
+		cout << right << setw(8) << address << ":";
+
+		// Show the hex codes
+		for( int i = 0; i < 16; i++ )
+		{
+			/* Format in pairs of two
+			if( i % 8 == 0 ) cout << ' ';
+			if( i < nread ){
+				cout << ' ' << setw(2) << ((unsigned)buf[i] & 0x000000ff);
+			}
+			else{ 
+				cout << "	";
+			}
+			*/
+
+			/* Format in pairs of 4 (xxd-style) */
+			if(i % 2 == 0) cout << ' ';
+			if(i < nread ){
+				cout << setw(2) << ((unsigned)buf[i] & 0x000000ff);
+			}
+			else{
+				cout << ">>";
+			}
+		}
+
+		// Show printable characters
+		cout << "  ";
+		for( int i = 0; i < nread; i++)
+		{
+			if( buf[i] < 32 || buf[i] > 126 ) cout << '.';
+			else cout << buf[i];
+		}
+
+		cout << "\n";
+		address += 16;
+	}
+	return;
+}
+
+/* Convert a C-String into a std::string for gdb use (don't use elsewhere)*/
+inline std::string& toSTDstring(const char *input){
+	return *(new std::string(input));
+}
+
+/* Reduce given path to filename */
+inline std::string getNameFromPath(std::string path){
+	std::string ret = path.substr(path.rfind("/", std::string::npos),
+									std::string::npos);
+	ret.erase(std::begin(ret));
+	return ret;
 }
 
 #endif /* _HELPERS_H_ */

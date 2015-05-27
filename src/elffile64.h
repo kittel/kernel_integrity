@@ -40,6 +40,10 @@ class ElfFile64 : public ElfFile {
 
         Elf64_Ehdr * elf64Ehdr;
         Elf64_Shdr * elf64Shdr;
+		Elf64_Phdr * elf64Phdr;
+		
+		int getNrOfSections();
+
 	protected:
 
 	private:

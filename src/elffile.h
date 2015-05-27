@@ -26,11 +26,12 @@ class SegmentInfo{
 				uint64_t a, uint32_t s);
 		virtual ~SegmentInfo();
 
-		std::string segName;
-		uint32_t    segID;
-		uint8_t *   index;
-		uint8_t *   memindex;
-    	uint32_t    size;
+		std::string segName;    // name of the segment, init with first sec name
+		uint32_t    segID;      // section ID in SHT
+		uint8_t *   index;      // section offset from beginning of ELF file
+		// if dereferenced contains data of the section
+		uint8_t *   memindex;   // target virtual address in process image
+		uint32_t    size;       // size of the section content (in bytes?)
 
 		bool containsElfAddress(uint64_t address);
 		bool containsMemAddress(uint64_t address);
@@ -53,7 +54,8 @@ class ElfFile{
 		typedef enum {
 			ELFPROGRAMTYPENONE = 0,
 			ELFPROGRAMTYPEKERNEL,
-			ELFPROGRAMTYPEMODULE
+			ELFPROGRAMTYPEMODULE,
+			ELFPROGRAMTYPEEXEC      // NEW: Type for loading executables
 		} ElfProgramType;
 
 		virtual ~ElfFile();
@@ -71,8 +73,14 @@ class ElfFile{
 		virtual std::string symbolName(uint32_t index) = 0;
 
 		virtual ElfType getType();
+		virtual ElfProgramType getProgramType();
+
+		std::string getFilename();
 		void printSymbols();
+
 		uint8_t* getFileContent();
+		size_t getFileSize();
+		
 		int getFD();
 
 		static ElfFile* loadElfFile(std::string filename) throw();
@@ -89,11 +97,15 @@ class ElfFile{
 
 	protected:
 
-		ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type);
+		ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type,
+                ElfProgramType programType);
+
 		FILE* fd;
 		size_t fileSize;
 		uint8_t* fileContent;
 		ElfType type;
+		ElfProgramType programType;
+
 		std::string filename;
 
 		typedef std::map<std::string, uint64_t> SymbolNameMap;

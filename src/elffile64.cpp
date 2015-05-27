@@ -12,11 +12,12 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 
 ElfFile64::ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent):
-		ElfFile(fd, fileSize, fileContent, ELFTYPE64){
+		ElfFile(fd, fileSize, fileContent, ELFTYPE64, ELFPROGRAMTYPEEXEC){ //TODO make this general
 
     uint8_t *elfEhdr = this->fileContent;
     this->elf64Ehdr = (Elf64_Ehdr *) elfEhdr;
     this->elf64Shdr = (Elf64_Shdr *) (elfEhdr + elf64Ehdr->e_shoff);
+	this->elf64Phdr = (Elf64_Phdr *) (elfEhdr + elf64Ehdr->e_phoff);
 
 	this->shstrindex = elf64Ehdr->e_shstrndx;
 
@@ -42,6 +43,11 @@ ElfFile64::ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent):
 
 ElfFile64::~ElfFile64(){}
 
+int ElfFile64::getNrOfSections(){
+	return this->elf64Ehdr->e_shnum;
+}
+
+/* This function actually searches for a _section_ in the ELF file */
 SegmentInfo ElfFile64::findSegmentWithName(std::string sectionName){
 	char * tempBuf = 0;
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
@@ -74,6 +80,7 @@ SegmentInfo ElfFile64::findSegmentByID(uint32_t sectionID){
 	}
 	return SegmentInfo();
 }
+
 bool ElfFile64::isCodeAddress(uint64_t address){
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
 		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)){
@@ -113,10 +120,9 @@ uint8_t *ElfFile64::segmentAddress(int sectionID){
 
 }
 
-std::string ElfFile64::symbolName(uint32_t index){
+std::string ElfFile64::symbolName(Elf64_Word index){
 	return toString(&((this->fileContent + 
 								elf64Shdr[this->strindex].sh_offset)[index]));
-
 }
 
 uint64_t ElfFile64::findAddressOfVariable(std::string symbolName){

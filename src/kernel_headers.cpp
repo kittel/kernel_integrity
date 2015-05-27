@@ -61,8 +61,11 @@ const char ud2a[] = { 0x0f, 0x0b };
 
 #include "libdwarfparser/libdwarfparser.h"
 
-ParavirtState::ParavirtState(){
-        this->updateState();
+ParavirtState::ParavirtState(bool hasParavirt){
+
+	if(hasParavirt){
+		this->updateState();
+	}
 }
 
 ParavirtState::~ParavirtState(){}
@@ -124,8 +127,6 @@ void ParavirtState::updateState(){
     pv_irq_opsOffset = pptS->memberOffset("pv_irq_ops");
     pv_cpu_opsOffset = pptS->memberOffset("pv_cpu_ops");
     pv_mmu_opsOffset = pptS->memberOffset("pv_mmu_ops");
-    
 }
-
 
 

@@ -42,9 +42,15 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
 #ifdef PRINTDEBUG
     bool doPrint = false;
+<<<<<<< HEAD
     if(this->getName().compare("nfs") == 0
 			&& sectionName.compare(".text") == 0
 			) doPrint = true;
+=======
+    //if(this->getName().compare("floppy") == 0
+	//		&& sectionName.compare(".text") == 0
+	//		) doPrint = true;
+>>>>>>> initial commit ready for merging
     //if(doPrint) std::cout << "\n\nSection To Relocate: " << sectionName << std::endl;
 #endif
 	

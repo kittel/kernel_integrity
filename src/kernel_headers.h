@@ -113,7 +113,7 @@ DEF_NATIVE(, mov64, "mov %rdi, %rax");
 class ParavirtState{
 
     public:
-        ParavirtState();
+        ParavirtState(bool hasParavirt = true); //For ordinary use
         virtual ~ParavirtState();
 
         void updateState();

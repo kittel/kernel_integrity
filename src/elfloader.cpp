@@ -19,7 +19,7 @@
 
 ElfLoader::ElfLoader(ElfFile* elffile):
 	elffile(elffile),
-	kernelModule(),
+	debugInstance(),
 	textSegment(),
 	textSegmentContent(),
 	jumpTable(),
@@ -30,7 +30,7 @@ ElfLoader::ElfLoader(ElfFile* elffile):
 	dataSegment(),
 	bssSegment(),
 	roDataSegment(),
-	paravirtState(){
+	paravirtState(elffile->getProgramType() == ElfFile::ELFPROGRAMTYPEEXEC){
 
 	//get the current cpu architecture to adapt nops
 	Instance ideal_nops_instance = 
@@ -49,6 +49,11 @@ ElfLoader::ElfLoader(ElfFile* elffile):
 	}else if (nopaddr == k8_address){
 		this->ideal_nops = k8_nops;
 	}
+
+#ifdef DEBUG
+	std::cout << "Trying to initialize ElfLoader..." << std::endl;
+#endif
+
 }
 
 ElfLoader::~ElfLoader(){}
@@ -578,7 +583,6 @@ void ElfLoader::parseElfFile(){
 
 bool ElfLoader::isCodeAddress(uint64_t addr){
 	addr = addr | 0xffff000000000000;
-
 	return this->textSegment.containsMemAddress(addr);
 }
 

@@ -12,11 +12,19 @@
 #include <map>
 #include <set>
 
+
+/* An ElfLoader is a memory representation we construct from the whitelisted
+ * file. After a full initialization (depending on the type of ELF file) one
+ * sould be able to bytewise compare the actual memory with an instance of this
+ * class.
+ */
 class ElfLoader{
 	
 	friend class ElfKernelLoader;
 	friend class ElfModuleLoader;
 	friend class KernelValidator;
+	friend class ElfProcessLoader;  //NEW
+	friend class ProcessValidator;  //NEW
 
 	public:
 		ElfLoader(ElfFile* elffile);
@@ -25,12 +33,12 @@ class ElfLoader{
 		virtual std::string getName() = 0;
 
 	protected:
-		ElfFile* elffile;
-		Instance* kernelModule;
+		ElfFile* elffile;           // Wrapped ElfFile, provides to file and seg
+		Instance* debugInstance;    // Wrapped debug instance of the file
 		
-		SegmentInfo textSegment;
+		SegmentInfo textSegment;    // The first big memory segment
 	    std::vector<uint8_t> textSegmentContent;
-		int32_t textSegmentLength;
+		uint32_t textSegmentLength;
 	    std::vector<uint8_t> jumpTable;
 
 		std::vector<uint8_t> roData;
@@ -39,16 +47,15 @@ class ElfLoader{
 		std::set<uint64_t> jumpDestinations;
 		std::set<uint64_t> smpOffsets;
 		
-		SegmentInfo dataSegment;
-		SegmentInfo bssSegment;
+		SegmentInfo dataSegment;    // The second big memory segment
+		SegmentInfo bssSegment;     // The last memory segment
 		SegmentInfo roDataSegment;
+	
 
-		
-		
 		const unsigned char* const* ideal_nops;
 		void  add_nops(void *insns, uint8_t len);
 
-		ParavirtState paravirtState;
+		ParavirtState paravirtState; 
 
 		uint8_t paravirt_patch_nop(void);
 		uint8_t paravirt_patch_ignore(unsigned len);
@@ -87,5 +94,6 @@ class ElfLoader{
 
 #include "elfkernelloader.h"
 #include "elfmoduleloader.h"
+#include "elfprocessloader.h"
 
 #endif /* ELFLOADER_H */

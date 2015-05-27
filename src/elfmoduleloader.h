@@ -2,6 +2,7 @@
 #define ELFMODULELOADER_H
 
 #include "elfloader.h"
+
 class ElfModuleLoader : public ElfLoader {
 	public:
 		ElfModuleLoader(ElfFile* elffile, 

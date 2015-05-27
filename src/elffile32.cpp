@@ -12,8 +12,7 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 
 ElfFile32::ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent):
-	ElfFile(fd, fileSize, fileContent, ELFTYPE32){
-
+	ElfFile(fd, fileSize, fileContent, ELFTYPE32, ELFPROGRAMTYPEMODULE){
     throw NotImplementedException();
 }
 

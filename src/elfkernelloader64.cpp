@@ -54,5 +54,4 @@ void ElfKernelLoader64::addSymbols(){
 			parent->addFunctionAddress(symbolName, symbolAddress);
         }
     }
-
 }

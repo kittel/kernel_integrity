@@ -53,7 +53,6 @@ ElfLoader *KernelManager::loadModule(std::string moduleName){
 	return module;
 }
 
-
 void KernelManager::loadAllModules(){
 	std::list<std::string> moduleNames = this->getKernelModules();
 

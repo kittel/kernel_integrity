@@ -49,8 +49,7 @@ ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	rodataSegment(),
 	fentryAddress(0),
 	genericUnrolledAddress(0)
-	{
-	}
+	{}
 
 ElfKernelLoader::~ElfKernelLoader(){}
 
@@ -130,7 +129,6 @@ void ElfKernelLoader::initText(void) {
 			fill, 0);
 
 	this->addSymbols();
-
 }
 
 void ElfKernelLoader::initData(void){
@@ -205,9 +203,4 @@ void ElfKernelLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
 
 bool ElfKernelLoader::isDataAddress(uint64_t addr){
 	return this->elffile->isDataAddress(addr | 0xffff000000000000);
-	//addr = addr & 0xffffffffffff;
-	//return (this->dataSegment.containsMemAddress(addr) ||
-	//        this->vvarSegment.containsMemAddress(addr) || 
-	//        this->dataNosaveSegment.containsMemAddress(addr) || 
-	//        this->bssSegment.containsMemAddress(addr));
 }

@@ -38,17 +38,21 @@ bool SegmentInfo::containsMemAddress(uint64_t address){
 	return false;
 }
 
-ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type):
+ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type,
+				 ElfProgramType programType):
 	shstrindex(0), symindex(0), strindex(0),
-	fd(fd), fileSize(fileSize), fileContent(fileContent), type(type),
+	fd(fd), fileSize(fileSize), fileContent(fileContent), 
+	type(type), programType(programType),
 	filename(""), symbolNameMap(){
 	
 	try{
 		DwarfParser::parseDwarfFromFD(this->getFD());
 	}catch(DwarfException &e){
-		//std::cout << e.what() << std::endl;
+		std::cout << e.what() << std::endl;
 	}
-	//std::cout << "Done loading elfFile" << std::endl;
+#ifdef DEBUG
+	std::cout << "Done loading elfFile" << std::endl;
+#endif
 }
 
 ElfFile::~ElfFile(){
@@ -101,6 +105,8 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 }
 
 ElfFile::ElfType ElfFile::getType(){ return this->type; }
+
+ElfFile::ElfProgramType ElfFile::getProgramType(){ return this->programType;}
 
 int ElfFile::getFD(){ return fileno(this->fd); }
 
@@ -179,6 +185,10 @@ uint8_t* ElfFile::getFileContent(){
 	return this->fileContent;
 }
 
+size_t ElfFile::getFileSize(){
+	return this->fileSize;
+}
+
 ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type,
 		                       std::string name,
                                KernelManager* parent){
@@ -186,8 +196,15 @@ ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type,
 		return new ElfKernelLoader64(this);
 	}else if(type == ElfFile::ELFPROGRAMTYPEMODULE){
 		return new ElfModuleLoader64(this, name, parent);
+	}else if(type == ElfFile::ELFPROGRAMTYPEEXEC){
+		return new ElfProcessLoader64(this, name);
+		//TODO: name doesn't get handled properly
 	}
+	std::cout << "No usable ELFPROGRAMTYPE defined." << std::endl;
 	return NULL;
 }
 
 
+std::string ElfFile::getFilename(){
+	return this->filename;
+}

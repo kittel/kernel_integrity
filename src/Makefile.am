@@ -17,6 +17,7 @@ kernintdir = $(includedir)/kernint
 
 kernint_HEADERS=kernint.h \
 				kernelvalidator.h \
+				processvalidator.h \
 				kernel_headers.h \
 				elffile.h \
 				elffile32.h \
@@ -25,14 +26,18 @@ kernint_HEADERS=kernint.h \
 				kernelmanager.h \
 				elfkernelloader.h \
 				elfmoduleloader.h \
+				elfprocessloader.h \
 				elfkernelloader32.h \
 				elfkernelloader64.h \
 				elfmoduleloader32.h \
 				elfmoduleloader64.h \
+				elfprocessloader64.h \
+				taskmanager.h \
 				exceptions.h
 
 kernint_SOURCES=kernint.cpp \
 				kernelvalidator.cpp \
+				processvalidator.cpp \
 				kernel_headers.cpp \
 				elffile.cpp \
 				elffile32.cpp \
@@ -41,8 +46,11 @@ kernint_SOURCES=kernint.cpp \
 				kernelmanager.cpp \
 				elfkernelloader.cpp \
 				elfmoduleloader.cpp \
+				elfprocessloader.cpp \
 				elfkernelloader32.cpp \
 				elfkernelloader64.cpp \
 				elfmoduleloader32.cpp \
 				elfmoduleloader64.cpp \
+				elfprocessloader64.cpp \
+				taskmanager.cpp \
 				exceptions.cpp
