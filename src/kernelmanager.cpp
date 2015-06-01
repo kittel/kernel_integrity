@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <cctype>
 
 #include <regex>
@@ -155,6 +156,24 @@ bool KernelManager::isSymbol(uint64_t address){
 		return true;
 	}
 	return false;
+}
+
+uint64_t KernelManager::getContainingSymbol(uint64_t address){
+	auto iter = this->moduleSymbolRevMap.upper_bound(address);
+	if(iter != this->moduleSymbolRevMap.end() && 
+			iter-- != this->moduleSymbolRevMap.begin()){
+		return iter->first;
+	}
+	return 0;
+}
+
+void KernelManager::dumpSymbols(){
+	//std::ofstream outfile ("/home/kittel/linux-symbols-3.16.txt",std::ofstream::binary);
+	//for(auto symbol : this->moduleSymbolRevMap ){
+	//	outfile << std::hex << symbol.first << std::dec << 
+	//		" " << symbol.second << std::endl;
+	//}
+	//outfile.close();
 }
 
 

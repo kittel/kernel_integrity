@@ -1,7 +1,6 @@
 #ifndef KERNELMANAGER_H
 #define KERNELMANAGER_H
 
-#include <iostream>
 #include <list>
 #include <map>
 
@@ -37,10 +36,12 @@ class KernelManager{
 		uint64_t getSymbolAddress(std::string name);
 		std::string getSymbolName(uint64_t address);
 		bool isSymbol(uint64_t address);
+		void dumpSymbols();
 		
 		void addFunctionAddress(std::string name, uint64_t address);
 		uint64_t getFunctionAddress(std::string name);
 		std::string getFunctionName(uint64_t address);
+		uint64_t getContainingSymbol(uint64_t address);
 		bool isFunction(uint64_t address);
 
 		void updateRevMaps();

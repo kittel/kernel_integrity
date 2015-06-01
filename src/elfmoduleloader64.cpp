@@ -322,9 +322,11 @@ void ElfModuleLoader64::addSymbols(){
             symbolName = newSymName;
         }
 
-		if((ELF64_ST_TYPE(sym->st_info) & (STT_OBJECT | STT_FUNC))
-			   // && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL 
-			){
+		if((ELF64_ST_TYPE(sym->st_info) & (STT_OBJECT | STT_FUNC))){
+			if (ELF64_ST_BIND(sym->st_info) & STB_LOCAL){
+				symbolName.append("_");
+				symbolName.append(this->getName());
+			}
 			this->parent->addSymbolAddress(symbolName, symbolAddress);
         }
 
