@@ -16,6 +16,7 @@ bin_PROGRAMS=kernint
 kernintdir = $(includedir)/kernint
 
 kernint_HEADERS=kernint.h \
+				kernelvalidator.h \
 				kernel_headers.h \
 				elffile.h \
 				elffile32.h \
@@ -31,6 +32,7 @@ kernint_HEADERS=kernint.h \
 				exceptions.h
 
 kernint_SOURCES=kernint.cpp \
+				kernelvalidator.cpp \
 				kernel_headers.cpp \
 				elffile.cpp \
 				elffile32.cpp \
