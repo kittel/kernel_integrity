@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <csignal>
+#include <chrono>
 
 #include <kernelvalidator.h>
 
@@ -64,10 +65,10 @@ int main (int argc, char **argv)
 				loopMode = true;
 				break;
 			case 'c':
-				codeValidation = true;
+				codeValidation = false;
 				break;
 			case 'd':
-				pointerExamination = true;
+				pointerExamination = false;
 				break;
 			case 't':
 				targetsFile = std::string(optarg);
@@ -123,7 +124,18 @@ int main (int argc, char **argv)
 
 	val->setOptions(loopMode, codeValidation, pointerExamination);
 
-	val->validatePages();
+	const auto time_start = std::chrono::system_clock::now();
+	
+	uint64_t iterations = val->validatePages();
 
+	const auto time_stop = std::chrono::system_clock::now();
+
+	const auto d_actual = 
+		std::chrono::duration_cast<std::chrono::milliseconds>
+							(time_stop - time_start).count();
+
+	std::cout << "Executed " << iterations << " iterations in " <<
+		d_actual << " ms ( " << 
+		(((double) d_actual) / iterations) << " ms/iteration) " << std::endl;
 }
 

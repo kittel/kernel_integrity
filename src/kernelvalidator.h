@@ -17,7 +17,7 @@ class KernelValidator {
 		virtual ~KernelValidator();
 
 
-		void validatePages();
+		uint64_t validatePages();
 		void validatePage(page_info_t *page);
 		void setOptions(bool lm = false, bool cv = true, bool pe = true);
 		static KernelValidator* getInstance();
@@ -40,6 +40,7 @@ class KernelValidator {
 		
 		void validateCodePage(page_info_t *page, ElfLoader* elf);
 		void validateDataPage(page_info_t *page, ElfLoader* elf);
+		uint64_t globalCodePtrs;
 		void validateStackPage(uint8_t* memory,
 				uint64_t stackBottom, uint64_t stackEnd);
 

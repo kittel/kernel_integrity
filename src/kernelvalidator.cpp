@@ -76,14 +76,23 @@ void KernelValidator::loadKernel(std::string dirName){
 	kernelLoader->parseElfFile();
 }
 
-void KernelValidator::validatePages(){
+uint64_t KernelValidator::validatePages(){
+	uint64_t iterations = 0;
+	
 	do{
-		//Validate all Stacks
-		this->updateStackAddresses();
-		for (auto stack : this->stackAddresses){
-			std::vector<uint8_t> pageInMem = 
-	                     vmi->readVectorFromVA(stack.first, 0x2000);
-			this->validateStackPage(pageInMem.data(), stack.first, stack.second);
+		iterations++;
+		
+		globalCodePtrs = 0;
+		if(this->options.pointerExamination){
+			//Validate all Stacks
+			this->updateStackAddresses();
+			for (auto stack : this->stackAddresses){
+				std::vector<uint8_t> pageInMem = 
+	    	                 vmi->readVectorFromVA(stack.first, 0x2000);
+				this->validateStackPage(pageInMem.data(), 
+						stack.first, 
+						stack.second);
+			}
 		}
 
 		PageMap executablePageMap = vmi->getKernelPages();
@@ -98,6 +107,8 @@ void KernelValidator::validatePages(){
 
 		vmi->destroyMap(executablePageMap);
 	} while (this->options.loopMode);
+
+	return iterations;
 }
 
 
@@ -147,7 +158,7 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 	
 	static std::set<uint64_t> retFuncs;
 	
-	std::cout << "Checking stack at: " << std::hex << stackBottom << std::dec << std::endl;
+	//std::cout << "Checking stack at: " << std::hex << stackBottom << std::dec << std::endl;
 
     // Go through every byte and check if it contains a kernel pointer
     for(int32_t i = stackEnd % 0x2000 ; i < 0x2000 - 4; i++){
@@ -192,11 +203,11 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 				        offset,
 					    (uint64_t) elfloader->textSegment.memindex);
 				if ( callAddr ){
-					std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
-					   	"return address: 0x" << *longPtr << 
-						" ( @ 0x" << i - 4 + stackBottom << " )" << 
-						COLOR_NORM << COLOR_BOLD_OFF << 
-						std::dec << std::endl;
+					//std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
+					//   	"return address: 0x" << *longPtr << 
+					//	" ( @ 0x" << i - 4 + stackBottom << " )" << 
+					//	COLOR_NORM << COLOR_BOLD_OFF << 
+					//	std::dec << std::endl;
 						
 					returnAddresses++;
 					uint64_t retFunc = 
@@ -233,19 +244,19 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 							}
 						}
 						if(found) continue;
-						std::cout << std::hex << 
-							"callAddr:      " << callAddr << std::endl <<
-							"addressOfCall: " << addressOfCall << std::endl <<
-							"retFunc:       " << retFunc << std::endl <<
-							"oldRetFunc:    " << oldRetFunc << std::endl <<
-							std::dec << std::endl;
-						for( auto element = boundaries.first;
-								element != boundaries.second;
-								element++){
-								std::cout << "Found call to " << 
-									std::hex << element->second << 
-									std::dec << std::endl;
-						}
+						//std::cout << std::hex << 
+						//	"callAddr:      " << callAddr << std::endl <<
+						//	"addressOfCall: " << addressOfCall << std::endl <<
+						//	"retFunc:       " << retFunc << std::endl <<
+						//	"oldRetFunc:    " << oldRetFunc << std::endl <<
+						//	std::dec << std::endl;
+						//for( auto element = boundaries.first;
+						//		element != boundaries.second;
+						//		element++){
+						//		std::cout << "Found call to " << 
+						//			std::hex << element->second << 
+						//			std::dec << std::endl;
+						//}
 
 
 						retFuncs.insert(retFunc);
@@ -276,7 +287,7 @@ void KernelValidator::validateStackPage(uint8_t *memory,
             //stats.dataPtrs++;
         }
     }
-	std::cout << "Currently " << retFuncs.size() << " unknown retFuncs" << std:: endl;
+	//std::cout << "Currently " << retFuncs.size() << " unknown retFuncs" << std:: endl;
 }
 		
 void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
@@ -573,7 +584,6 @@ void KernelValidator::validateDataPage(page_info_t * page, ElfLoader* elf){
         }
         return;
     }
-	static uint64_t globalCodePtrs = 0;
 	uint64_t codePtrs = this->findCodePtrs(page, pageInMem.data());
 	if(!codePtrs){
 		return;
