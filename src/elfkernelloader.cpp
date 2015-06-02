@@ -5,6 +5,22 @@
 #include "exceptions.h"
 #include <cassert>
 
+ElfLoader* ElfKernelLoader::getModuleForCodeAddress(uint64_t address){
+	
+	//Does the address belong to the kernel?
+	if (this->isCodeAddress(address)){
+		return this;
+	}
+
+	for( auto modulePair : moduleMap){
+		ElfLoader* module = dynamic_cast<ElfLoader*>(modulePair.second);
+		if (module->isCodeAddress(address)){
+			return module;
+		}
+	}
+	return 0;
+}
+
 ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address){
 	
 	//Does the address belong to the kernel?

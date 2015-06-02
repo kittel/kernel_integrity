@@ -14,6 +14,7 @@ class ElfKernelLoader : public ElfLoader, public KernelManager {
 		virtual ~ElfKernelLoader();
 
 		ElfLoader* getModuleForAddress(uint64_t address);
+		ElfLoader* getModuleForCodeAddress(uint64_t address);
 
 		std::string getName();
 	protected:

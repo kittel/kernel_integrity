@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <iomanip>
+#include <chrono>
 
 
 #include <list>
@@ -98,6 +99,9 @@ uint64_t KernelValidator::validatePages(){
 		PageMap executablePageMap = vmi->getKernelPages();
 
 		for ( auto page : executablePageMap){
+			if ((page.second->vaddr & 0xff0000000000) == 0x8800000000000){
+				continue;
+			}
 			this->validatePage(page.second);
 		}
 
@@ -301,9 +305,11 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 	pageIndex = (page->vaddr - 
 			     ((uint64_t) elf->textSegment.memindex & 0xffffffffffff )
 				) / page->size;
-	//std::cout << "Validating: " << elf->getName() << 
-	//             " Page: " << std::hex << pageIndex
-	//                       << std::dec << std::endl;
+	std::cout << "Validating: " << elf->getName() << 
+	             " Page: " << std::hex << pageIndex
+	                       << std::dec << std::endl;
+
+	//const auto time2_start = std::chrono::system_clock::now();
 
 	// get Page from module
 	if(elf->textSegmentContent.size() < pageOffset){
@@ -312,8 +318,10 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 	}
 	uint8_t* loadedPage = elf->textSegmentContent.data() + pageOffset;
 	// get Page from memdump
+	//const auto time1_start = std::chrono::system_clock::now();
 	std::vector<uint8_t> pageInMem = 
 	                     vmi->readVectorFromVA(page->vaddr, page->size);
+	//const auto time1_stop = std::chrono::system_clock::now();
 
     uint32_t changeCount = 0;
 
@@ -326,6 +334,13 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 		// Show first changed byte only thus continue
 		// if last byte also is different
 		if(i>0 && loadedPage[i-1] != pageInMem[i-1]){
+			continue;
+		}
+
+		uint64_t unkCodeAddress = (uint64_t) elf->textSegment.memindex + 
+			                                     pageOffset + i;
+		// Ignore hypercall_page for now
+		if ((unkCodeAddress & 0xfffffffffffff000) == 0xffffffff81001000){
 			continue;
 		}
 
@@ -362,10 +377,10 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 			memcpy(&jmpDestInt, loadedPage + i + 1, 4);
 			
 			uint64_t labelOffset = page->vaddr + i + 0xffff000000000000;
-			
-			if(elf->jumpEntries.find(labelOffset) != 
-			        elf->jumpEntries.end() &&
-			   elf->jumpEntries[labelOffset] == jmpDestInt){
+		
+			auto entry = elf->jumpEntries.find(labelOffset);	
+			if(entry != elf->jumpEntries.end() &&
+			   entry->second == jmpDestInt){
 				//std::cout << "Jump Entry not disabled (inconsistency)" << std::endl;
 				i += 5;
 				continue;
@@ -379,9 +394,10 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 			uint64_t elfDestAddress = (uint64_t) elf->textSegment.memindex + 
 									  pageOffset + i + 
 									  jmpDestElfInt + 5;
-
-			if (dynamic_cast<ElfKernelLoader*>(elf)){
-				if ( dynamic_cast<ElfKernelLoader*>(elf)->
+			
+			auto kernelLoader = dynamic_cast<ElfKernelLoader*>(elf);
+			if (kernelLoader){
+				if ( kernelLoader->
 					   genericUnrolledAddress == elfDestAddress){
 					i += 4;
 					continue;
@@ -434,8 +450,6 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 		if ( dynamic_cast<ElfKernelLoader*>(elf) && 
 			 i >= (int32_t) (elf->textSegmentLength - pageOffset))
 		{
-			uint64_t unkCodeAddress = (uint64_t) elf->textSegment.memindex + 
-			                                     pageOffset + i;
 			std::cout << COLOR_RED << 
 			             "Validating: " << elf->getName() << 
 			             " Page: " << std::hex << pageIndex
@@ -453,17 +467,13 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 		}
 
 
-	//	if(changeCount == 0){
-			uint64_t unkCodeAddress = (uint64_t) elf->textSegment.memindex + 
-			                                     pageOffset + i;
-			std::cout << COLOR_RED << 
-			             "Validating: " << elf->getName() << 
-			             " Page: " << std::hex << pageIndex
-			                       << std::dec << 
-						 " Address: " << std::hex << unkCodeAddress <<
-						                 std::dec << COLOR_NORM << std::endl;
-			displayChange(pageInMem.data(), loadedPage, i, page->size);
-	//	}
+		std::cout << COLOR_RED << 
+		             "Validating: " << elf->getName() << 
+		             " Page: " << std::hex << pageIndex
+		                       << std::dec << 
+					 " Address: " << std::hex << unkCodeAddress <<
+					                 std::dec << COLOR_NORM << std::endl;
+		displayChange(pageInMem.data(), loadedPage, i, page->size);
 		changeCount++;
 	}
 	if (changeCount > 0)
@@ -474,6 +484,16 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 					 " inconsistent changes." << std::endl;
 		//exit(0);
 	}
+	//const auto time2_stop = std::chrono::system_clock::now();
+
+	//const auto time1 = 
+	//	std::chrono::duration_cast<std::chrono::milliseconds>
+	//						(time1_stop - time1_start).count();
+	//const auto time2 = 
+	//	std::chrono::duration_cast<std::chrono::milliseconds>
+	//						(time2_stop - time2_start).count();
+
+	//std::cout << "Needed " << time1 << " / " << time2 << " ms " << std::endl;
 	return;
 	//return changeCount;
 }
@@ -697,8 +717,9 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page,
                 continue;
             }
 
-			ElfLoader* elfloader = kernelLoader->getModuleForAddress(*longPtr);
-			if (elfloader && elfloader->isCodeAddress(*longPtr)){
+			ElfLoader* elfloader = 
+				kernelLoader->getModuleForCodeAddress(*longPtr);
+			if (elfloader){
                 
 				uint64_t offset = *longPtr - 
 					(uint64_t) elfloader->textSegment.memindex;
