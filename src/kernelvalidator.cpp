@@ -305,9 +305,9 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 	pageIndex = (page->vaddr - 
 			     ((uint64_t) elf->textSegment.memindex & 0xffffffffffff )
 				) / page->size;
-	std::cout << "Validating: " << elf->getName() << 
-	             " Page: " << std::hex << pageIndex
-	                       << std::dec << std::endl;
+	//std::cout << "Validating: " << elf->getName() << 
+	//             " Page: " << std::hex << pageIndex
+	//                       << std::dec << std::endl;
 
 	//const auto time2_start = std::chrono::system_clock::now();
 
