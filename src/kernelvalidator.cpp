@@ -169,68 +169,72 @@ void KernelValidator::validateStackPage(uint8_t *memory,
         uint32_t* intPtr = (uint32_t*) (memory + i);
         
 		//Check if this could be a valid kernel address.
-        if(*intPtr == (uint32_t) 0xffffffff){
-            //The first 4 byte could belong to a kernel address.
-            uint64_t* longPtr = (uint64_t*) (intPtr -1);
-            if (*longPtr == (uint64_t) 0xffffffffffffffffL){
-                i += 8;
-                continue;
-            }
+        if(*intPtr != (uint32_t) 0xffffffff){
+			continue;
+		}
+        //The first 4 byte could belong to a kernel address.
+        uint64_t* longPtr = (uint64_t*) (intPtr -1);
+        if (*longPtr == (uint64_t) 0xffffffffffffffffL){
+            i += 8;
+            continue;
+        }
 
-            if (kernelLoader->isFunction(*longPtr)){
-                 continue;
-            }
+        if (kernelLoader->isFunction(*longPtr)){
+             continue;
+        }
+        
+		if(kernelLoader->isSymbol(*longPtr)){
+            //stats.symPtrs++;
+            continue;
+        }
+
+		ElfLoader* elfloader = kernelLoader->getModuleForAddress(*longPtr);
+		if (elfloader && elfloader->isCodeAddress(*longPtr)){
             
-			if(kernelLoader->isSymbol(*longPtr)){
-                //stats.symPtrs++;
-                continue;
-            }
+			uint64_t offset = *longPtr - 
+				(uint64_t) elfloader->textSegment.memindex;
+			
+			if(offset > elfloader->textSegmentContent.size()){
+				std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
+				   	"Found possible malicious pointer: 0x" << *longPtr << 
+					" ( @ 0x" << i - 4 + stackBottom << " )" << 
+					" Pointing to code after initialized content" <<
+					COLOR_NORM << COLOR_BOLD_OFF << std::dec << std::endl;
+				continue;
+			}
+			
+			//Return Address (Stack)
+			uint64_t callAddr = 
+				isReturnAddress(elfloader->textSegmentContent.data(), 
+			        offset,
+				    (uint64_t) elfloader->textSegment.memindex);
+			if ( callAddr ){
+				//std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
+				//   	"return address: 0x" << *longPtr << 
+				//	" ( @ 0x" << i - 4 + stackBottom << " )" << 
+				//	COLOR_NORM << COLOR_BOLD_OFF << 
+				//	std::dec << std::endl;
+					
+				returnAddresses++;
+				uint64_t retFunc = 
+					kernelLoader->getContainingSymbol(*longPtr);
 
-			ElfLoader* elfloader = kernelLoader->getModuleForAddress(*longPtr);
-			if (elfloader && elfloader->isCodeAddress(*longPtr)){
-                
-				uint64_t offset = *longPtr - 
-					(uint64_t) elfloader->textSegment.memindex;
-				
-				if(offset > elfloader->textSegmentContent.size()){
-					std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
-					   	"Found possible malicious pointer: 0x" << *longPtr << 
-						" ( @ 0x" << i - 4 + stackBottom << " )" << 
-						" Pointing to code after initialized content" <<
-						COLOR_NORM << COLOR_BOLD_OFF << std::dec << std::endl;
+				if (oldRetFunc == 0){
+					oldRetFunc = retFunc;
 					continue;
 				}
-				
-				//Return Address (Stack)
-				uint64_t callAddr = 
-					isReturnAddress(elfloader->textSegmentContent.data(), 
-				        offset,
-					    (uint64_t) elfloader->textSegment.memindex);
-				if ( callAddr ){
-					//std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
-					//   	"return address: 0x" << *longPtr << 
-					//	" ( @ 0x" << i - 4 + stackBottom << " )" << 
-					//	COLOR_NORM << COLOR_BOLD_OFF << 
-					//	std::dec << std::endl;
-						
-					returnAddresses++;
-					uint64_t retFunc = 
-						kernelLoader->getContainingSymbol(*longPtr);
 
-					if (oldRetFunc == 0){
+				if (callAddr != oldRetFunc ){
+				
+					if ((i - 4 == 0x1f50 && *longPtr == 0xffffffff816d48ac) ||
+						(i - 4 == 0x1ed0 && *longPtr == 0xffffffff8107d360) ||
+						*longPtr == 0xffffffff816cb199){
 						oldRetFunc = retFunc;
 						continue;
 					}
 
-					if (callAddr != oldRetFunc ){
 					
-						if ((i - 4 == 0x1f50 && *longPtr == 0xffffffff816d48ac) ||
-							(i - 4 == 0x1ed0 && *longPtr == 0xffffffff8107d360) ||
-							*longPtr == 0xffffffff816cb199){
-							oldRetFunc = retFunc;
-							continue;
-						}
-
+					if(this->callTargets.size() > 0){
 						auto call = 
 							(this->callTargets.upper_bound(*longPtr)--);
 						while(call->first > *longPtr) call--;
@@ -248,48 +252,49 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 							}
 						}
 						if(found) continue;
-						//std::cout << std::hex << 
-						//	"callAddr:      " << callAddr << std::endl <<
-						//	"addressOfCall: " << addressOfCall << std::endl <<
-						//	"retFunc:       " << retFunc << std::endl <<
-						//	"oldRetFunc:    " << oldRetFunc << std::endl <<
-						//	std::dec << std::endl;
-						//for( auto element = boundaries.first;
-						//		element != boundaries.second;
-						//		element++){
-						//		std::cout << "Found call to " << 
-						//			std::hex << element->second << 
-						//			std::dec << std::endl;
-						//}
-
-
-						retFuncs.insert(retFunc);
-						std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
-							"Unvalidated return address: 0x" << *longPtr << 
-							" ( @ 0x" << i - 4 + stackBottom << " )" << 
-							std::endl << "\t-> " << 
-							kernelLoader->getSymbolName(retFunc) << 
-							" ( " << retFunc << " ) " <<
-							std::endl;
-						std::cout << COLOR_NORM << COLOR_BOLD_OFF << 
-							std::dec << std::endl;
 					}
-					oldRetFunc = retFunc;
-					continue;
-                }
 
-				std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
-				   	"Found possible malicious pointer: 0x" << *longPtr << 
-					" ( @ 0x" << i - 4 + stackBottom << " )" << std::endl << 
-					" Pointing to module: " << elfloader->getName() <<
-					COLOR_NORM << COLOR_BOLD_OFF << std::dec << std::endl;
-                //stats.unknownPtrs++;
-				codePtrs++;
+					//std::cout << std::hex << 
+					//	"callAddr:      " << callAddr << std::endl <<
+					//	"addressOfCall: " << addressOfCall << std::endl <<
+					//	"retFunc:       " << retFunc << std::endl <<
+					//	"oldRetFunc:    " << oldRetFunc << std::endl <<
+					//	std::dec << std::endl;
+					//for( auto element = boundaries.first;
+					//		element != boundaries.second;
+					//		element++){
+					//		std::cout << "Found call to " << 
+					//			std::hex << element->second << 
+					//			std::dec << std::endl;
+					//}
+
+
+					retFuncs.insert(retFunc);
+					std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
+						"Unvalidated return address: 0x" << *longPtr << 
+						" ( @ 0x" << i - 4 + stackBottom << " )" << 
+						std::endl << "\t-> " << 
+						kernelLoader->getSymbolName(retFunc) << 
+						" ( " << retFunc << " ) " <<
+						std::endl;
+					std::cout << COLOR_NORM << COLOR_BOLD_OFF << 
+						std::dec << std::endl;
+				}
+				oldRetFunc = retFunc;
+				continue;
             }
-            //At this point the pointer seems to point to arbitrary kernel data
-            //Maybe we could check if it was initialized
-            //stats.dataPtrs++;
+
+			std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
+			   	"Found possible malicious pointer: 0x" << *longPtr << 
+				" ( @ 0x" << i - 4 + stackBottom << " )" << std::endl << 
+				" Pointing to module: " << elfloader->getName() <<
+				COLOR_NORM << COLOR_BOLD_OFF << std::dec << std::endl;
+            //stats.unknownPtrs++;
+			codePtrs++;
         }
+        //At this point the pointer seems to point to arbitrary kernel data
+        //Maybe we could check if it was initialized
+        //stats.dataPtrs++;
     }
 	//std::cout << "Currently " << retFuncs.size() << " unknown retFuncs" << std:: endl;
 }

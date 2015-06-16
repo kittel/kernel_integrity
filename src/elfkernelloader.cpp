@@ -156,45 +156,6 @@ void ElfKernelLoader::initData(void){
 			0x200000 - (this->roData.size() % 0x200000), 0);
 	
 	this->roDataSegment.size = this->roData.size();
-
-//	//TODO
-//	//.data
-//	//.vvar
-//	QByteArray vvarSegmentContent = QByteArray();
-//	vvarSegmentContent.append(context.vvarSegment.index,
-//			context.vvarSegment.size);
-//	for (int i = 0; i <= vvarSegmentContent.size() / 0x1000; i++) {
-//		PageData page = PageData();
-//		hash.reset();
-//		// Caclulate hash of one segment at the ith the offset
-//		QByteArray segment = vvarSegmentContent.mid(i * 0x1000, 0x1000);
-//		if (!segment.isEmpty()) {
-//			segment = segment.leftJustified(0x1000, 0);
-//			page.content = segment;
-//			hash.addData(page.content);
-//			page.hash = hash.result();
-//			context.vvarSegmentData.append(page);
-//		}
-//	}
-//	//.data_nosave
-//	QByteArray dataNosaveSegmentContent = QByteArray();
-//	dataNosaveSegmentContent.append(context.vvarSegment.index,
-//			context.vvarSegment.size);
-//	for (int i = 0; i <= dataNosaveSegmentContent.size() / 0x1000; i++) {
-//		PageData page = PageData();
-//		hash.reset();
-//		// Caclulate hash of one segment at the ith the offset
-//		QByteArray segment = dataNosaveSegmentContent.mid(i * 0x1000, 0x1000);
-//		if (!segment.isEmpty()) {
-//			segment = segment.leftJustified(0x1000, 0);
-//			page.content = segment;
-//			hash.addData(page.content);
-//			page.hash = hash.result();
-//			context.dataNosaveSegmentData.append(page);
-//		}
-//	}
-//	//.bss
-//
 }
 
 void ElfKernelLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
