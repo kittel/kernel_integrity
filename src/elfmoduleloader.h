@@ -14,7 +14,7 @@ class ElfModuleLoader : public ElfLoader {
 		std::string getName();
 	protected:
 		void updateSegmentInfoMemAddress(SegmentInfo &info);
-		uint8_t * findMemAddressOfSegment(std::string segName);
+		uint8_t * findMemAddressOfSegment(SegmentInfo &info);
 		
 		virtual void initText();
 		virtual void initData();

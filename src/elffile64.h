@@ -26,6 +26,7 @@ class ElfFile64 : public ElfFile {
 		bool isDataAddress(uint64_t address);
 		std::string segmentName(int sectionID);
 		uint8_t *segmentAddress(int sectionID);
+		uint64_t segmentAlign(int sectionID);
 
 		std::string symbolName(uint32_t index);
 

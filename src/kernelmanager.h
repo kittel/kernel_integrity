@@ -31,7 +31,7 @@ class KernelManager{
 		 * Notice: This function only returns the address of public symbols
 		 *
 		 */
-		uint64_t getSystemMapAddress(std::string name);
+		uint64_t getSystemMapAddress(std::string name, bool priv = false);
 
 		void addSymbolAddress(std::string name, uint64_t address);
 		uint64_t getSymbolAddress(std::string name);
@@ -64,6 +64,7 @@ class KernelManager{
 		typedef std::map<std::string, uint64_t> SymbolMap;
 		typedef std::map<uint64_t, std::string> SymbolRevMap;
 		SymbolMap symbolMap;
+		SymbolMap privSymbolMap;
 
 		SymbolMap moduleSymbolMap;
 		SymbolMap functionSymbolMap;

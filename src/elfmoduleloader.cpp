@@ -195,7 +195,9 @@ void ElfModuleLoader::initData(void) {
 	this->roDataSegment.size = this->roData.size();
 }
 
-uint8_t *ElfModuleLoader::findMemAddressOfSegment(std::string segName){
+uint8_t *ElfModuleLoader::findMemAddressOfSegment(SegmentInfo &info){
+
+	std::string segName = info.segName;
 	Instance module;
 	Instance currentModule = this->parent->
 	                               getKernelModuleInstance(this->modName);
@@ -203,7 +205,14 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(std::string segName){
 	//If the searching for the .bss section
     //This section is right after the modules struct
 	if(segName.compare(".bss") == 0){
-        return (uint8_t *) currentModule.getAddress() + currentModule.size();
+		uint64_t align = this->elffile->segmentAlign(info.segID);
+	
+		uint64_t offset = currentModule.size() % align;
+		(offset == 0)
+		   	? offset = currentModule.size()
+			: offset = currentModule.size() + align - offset;
+
+        return (uint8_t *) currentModule.getAddress() + offset;
 	}
 	
 	if(segName.compare("__ksymtab_gpl") == 0){
@@ -230,7 +239,7 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(std::string segName){
 
 /* Update the target virtual address of the segment */
 void ElfModuleLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
-	info.memindex = this->findMemAddressOfSegment(info.segName);
+	info.memindex = this->findMemAddressOfSegment(info);
 }
 
 bool ElfModuleLoader::isDataAddress(uint64_t addr){

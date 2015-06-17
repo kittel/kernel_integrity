@@ -69,6 +69,7 @@ class ElfFile{
 		virtual uint64_t findAddressOfVariable(std::string symbolName) = 0;
 
 		virtual uint8_t *segmentAddress(int sectionID) = 0;
+		virtual uint64_t segmentAlign(int sectionID) = 0;
 
 		virtual std::string symbolName(uint32_t index) = 0;
 

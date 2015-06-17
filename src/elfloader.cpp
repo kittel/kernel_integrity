@@ -234,7 +234,7 @@ uint32_t ElfLoader::paravirtNativePatch(uint32_t type, uint16_t clobbers, void *
     PATCH_SITE(pv_irq_ops, save_fl)
     PATCH_SITE(pv_irq_ops, irq_enable)
     PATCH_SITE(pv_irq_ops, irq_disable)
-    PATCH_SITE(pv_cpu_ops, iret)
+    //PATCH_SITE(pv_cpu_ops, iret)
     PATCH_SITE(pv_cpu_ops, irq_enable_sysexit)
     PATCH_SITE(pv_cpu_ops, usergs_sysret32)
     PATCH_SITE(pv_cpu_ops, usergs_sysret64)
@@ -381,9 +381,6 @@ void ElfLoader::applyParainstr(){
 		//Here we only use ist as Offset.
         used = paravirtNativePatch(p->instrtype * 8, p->clobbers, insnbuf,
                                    (unsigned long)p->instr, p->len);
-
-		//"parainstructions: impossible length"
-        assert(p->len < 255);
 
         /* Pad the rest with nops */
         add_nops(insnbuf + used, p->len - used);      //add_nops

@@ -117,7 +117,10 @@ std::string ElfFile64::segmentName(int sectionID){
 
 uint8_t *ElfFile64::segmentAddress(int sectionID){
 	return this->fileContent + this->elf64Shdr[sectionID].sh_offset;
+}
 
+uint64_t ElfFile64::segmentAlign(int sectionID){
+	return this->elf64Shdr[sectionID].sh_addralign;
 }
 
 std::string ElfFile64::symbolName(Elf64_Word index){

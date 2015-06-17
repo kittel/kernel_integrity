@@ -24,7 +24,7 @@ namespace fs = boost::filesystem;
 
 KernelManager::KernelManager():
 	moduleMap(), dirName(), moduleInstanceMap(), symbolMap(),
-	moduleSymbolMap(), functionSymbolMap()
+	privSymbolMap(), moduleSymbolMap(), functionSymbolMap()
 	{
 }
 
@@ -122,9 +122,14 @@ void KernelManager::loadKernelModules(){
 	}
 }
 
-uint64_t KernelManager::getSystemMapAddress(std::string name){
+uint64_t KernelManager::getSystemMapAddress(std::string name, bool priv){
 	if(this->symbolMap.find(name) != this->symbolMap.end()){
 		return this->symbolMap[name];
+	}
+	if (!priv) return 0;
+
+	if(this->privSymbolMap.find(name) != this->privSymbolMap.end()){
+		return this->privSymbolMap[name];
 	}
 	return 0;
 }
@@ -232,6 +237,8 @@ void KernelManager::parseSystemMap(){
 
 			if(std::isupper(mode)){
 				symbolMap[varname] = address;
+			} else {
+				privSymbolMap[varname] = address;
 			}
 		}
 		sysMapFile.close();

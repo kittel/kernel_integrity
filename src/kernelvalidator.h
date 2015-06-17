@@ -21,6 +21,7 @@ class KernelValidator {
 		void validatePage(page_info_t *page);
 		void setOptions(bool lm = false, bool cv = true, bool pe = true);
 		static KernelValidator* getInstance();
+		ElfKernelLoader* getKernelLoader(){ return this->kernelLoader;}
 
 	protected:
 
@@ -39,6 +40,10 @@ class KernelValidator {
 		std::multimap<uint64_t,uint64_t> callTargets;
 		
 		void validateCodePage(page_info_t *page, ElfLoader* elf);
+		bool isValidJmpLabel(uint8_t* pageInMem, 
+				uint64_t codeAddress, int32_t i, ElfLoader* elf);
+
+
 		void validateDataPage(page_info_t *page, ElfLoader* elf);
 		uint64_t globalCodePtrs;
 		void validateStackPage(uint8_t* memory,

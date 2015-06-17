@@ -48,6 +48,11 @@ uint8_t *ElfFile32::segmentAddress(int sectionID){
 	throw NotImplementedException();
 }
 
+uint64_t ElfFile32::segmentAlign(int sectionID){
+	UNUSED(sectionID);
+	throw NotImplementedException();
+}
+
 void ElfFile32::applyRelocations(ElfModuleLoader *loader){
 	UNUSED(loader);
 	throw NotImplementedException();

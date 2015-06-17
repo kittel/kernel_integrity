@@ -23,8 +23,8 @@ class ElfLoader{
 	friend class ElfKernelLoader;
 	friend class ElfModuleLoader;
 	friend class KernelValidator;
-	friend class ElfProcessLoader;  //NEW
-	friend class ProcessValidator;  //NEW
+	friend class ElfProcessLoader;  
+	friend class ProcessValidator;  
 
 	public:
 		ElfLoader(ElfFile* elffile);
