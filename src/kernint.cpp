@@ -277,7 +277,6 @@ int main (int argc, char **argv)
 	
 	vmi = new VMIInstance(vmPath, hypflag | VMI_INIT_COMPLETE);
 	
-
 	if(!kerndir.empty()){
 		std::cout << "Starting Kernel Validation" << std::endl;
 		KernelValidator *val = new KernelValidator(kerndir, vmi, targetsFile);
@@ -285,8 +284,7 @@ int main (int argc, char **argv)
 		val->setOptions(loopMode, codeValidation, pointerExamination);
 
 		validateKernel(val);
-	}
-	else if(!referencePath.empty()){
+	} else if(!referencePath.empty()){
 		std::cout << "Starting Process Validation..." << std::endl;
 		ProcessValidator *val = new ProcessValidator(referencePath, vmi, pid,
                                                  vdsoPath, libraryDir,

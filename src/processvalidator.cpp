@@ -343,7 +343,7 @@ void ProcessValidator::updateMemindexes(){
 	}
 
 
-	ElfProcessLoader64 *lib;
+	ElfProcessLoader64 *lib = 0;
 	uint64_t lastInode = 0;
 	uint64_t lastOffset = (uint64_t)-1; // set to greates possible value
 //	bool isDataSet = false; // is dataSegment->memindex already set for curLoader
@@ -767,7 +767,7 @@ SegmentInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr){
  */
 int ProcessValidator::evalLazy(uint64_t start, uint64_t addr){
 
-	ElfProcessLoader64* loader;
+	ElfProcessLoader64* loader = 0;
 
 	try{
 		loader = this->addrToLoaderMap.at(start);

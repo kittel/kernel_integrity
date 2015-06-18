@@ -66,9 +66,9 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 
 	ElfFile * elfFile = 0;
 
-	FILE* fd;
-	size_t fileSize;
-	uint8_t* fileContent;
+	FILE* fd = 0;
+	size_t fileSize = 0;
+	uint8_t* fileContent = 0;
 
 	fd = fopen(filename.c_str(), "rb");
     if (fd != NULL) {
