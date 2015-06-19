@@ -34,8 +34,9 @@ void KernelManager::setKernelDir(std::string dirName){
 
 ElfLoader *KernelManager::loadModule(std::string moduleName){
 	std::replace(moduleName.begin(), moduleName.end(), '-', '_');
-	if(moduleMap.find(moduleName) != moduleMap.end()){
-		return moduleMap[moduleName];
+	auto moduleIter = moduleMap.find(moduleName);
+	if(moduleIter != moduleMap.end()){
+		return moduleIter->second;
 	}
 	std::string filename = findModuleFile(moduleName);
 	if(filename.empty()){
@@ -100,8 +101,9 @@ std::list<std::string> KernelManager::getKernelModules(){
 
 Instance KernelManager::getKernelModuleInstance(std::string modName){
 	std::replace(modName.begin(), modName.end(), '-', '_');
-	if(this->moduleInstanceMap.find(modName) != this->moduleInstanceMap.end()){
-		return this->moduleInstanceMap[modName];
+	auto moduleInstance = this->moduleInstanceMap.find(modName);
+	if(moduleInstance != this->moduleInstanceMap.end()){
+		return moduleInstance->second;
 	}
 	assert(false);
 	return Instance();
@@ -123,13 +125,15 @@ void KernelManager::loadKernelModules(){
 }
 
 uint64_t KernelManager::getSystemMapAddress(std::string name, bool priv){
-	if(this->symbolMap.find(name) != this->symbolMap.end()){
-		return this->symbolMap[name];
+	auto symbol = this->symbolMap.find(name);
+	if(symbol != this->symbolMap.end()){
+		return symbol->second;
 	}
 	if (!priv) return 0;
 
-	if(this->privSymbolMap.find(name) != this->privSymbolMap.end()){
-		return this->privSymbolMap[name];
+	symbol = this->privSymbolMap.find(name);
+	if(symbol != this->privSymbolMap.end()){
+		return symbol->second;
 	}
 	return 0;
 }
@@ -141,21 +145,22 @@ void KernelManager::addSymbolAddress(std::string name, uint64_t address){
 }
 
 uint64_t KernelManager::getSymbolAddress(std::string name){
-	if(this->moduleSymbolMap.find(name) != this->moduleSymbolMap.end()){
-		return this->moduleSymbolMap[name];
+	auto symbol = this->moduleSymbolMap.find(name);
+	if(symbol != this->moduleSymbolMap.end()){
+		return symbol->second;
 	}
 	return 0;
 }
 
 std::string KernelManager::getSymbolName(uint64_t address){
-	if(this->moduleSymbolRevMap.find(address) != this->moduleSymbolRevMap.end()){
-		return this->moduleSymbolRevMap[address];
+	auto symbol = this->moduleSymbolRevMap.find(address);
+	if(symbol != this->moduleSymbolRevMap.end()){
+		return symbol->second;
 	}
 	return "";
 }
 
 bool KernelManager::isSymbol(uint64_t address){
-	
 	if(this->moduleSymbolRevMap.find(address) != this->moduleSymbolRevMap.end()){
 		return true;
 	}
@@ -189,15 +194,17 @@ void KernelManager::addFunctionAddress(std::string name, uint64_t address){
 }
 
 uint64_t KernelManager::getFunctionAddress(std::string name){
-	if(this->functionSymbolMap.find(name) != this->functionSymbolMap.end()){
-		return this->functionSymbolMap[name];
+	auto function = this->functionSymbolMap.find(name);
+	if(function != this->functionSymbolMap.end()){
+		return function->second;
 	}
 	return 0;
 }
 
 std::string KernelManager::getFunctionName(uint64_t address){
-	if(this->functionSymbolRevMap.find(address) != this->functionSymbolRevMap.end()){
-		return this->functionSymbolRevMap[address];
+	auto function = this->functionSymbolRevMap.find(address);
+	if(function != this->functionSymbolRevMap.end()){
+		return function->second;
 	}
 	return "";
 }

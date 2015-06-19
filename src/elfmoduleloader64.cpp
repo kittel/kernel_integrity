@@ -248,36 +248,6 @@ uint64_t ElfModuleLoader64::relocateShnUndef(std::string symbolName){
     if(address != 0){
         return address;
     }
-#if 0
-	// Assume we already have the correct object ...
-	// Thus the following is not necessary
-	// If it is, this section filteres weak objects
-	
-    else if (_sym.memSpecs().systemMap.count(symbolName) > 0)
-    {
-		//Try to find variable in system map
-        //Console::out() << "Found Variable in system.map: " << symbolName) << endl;
-        //sym->st_value = _sym.memSpecs().systemMap.value(symbolName).address;
-        QList<SystemMapEntry> symbols = _sym.memSpecs().systemMap.values(symbolName);
-        for (QList<SystemMapEntry>::iterator i = symbols.begin(); i != symbols.end(); ++i)
-        {
-            SystemMapEntry currentEntry = (*i);
-
-            //ELF64_ST_BIND(sym->st_info) => 0: Local, 1: Global, 2: Weak
-            //currentEntry.type => 'ascii' lowercase: local, uppercase: global
-            if (ELF64_ST_BIND(sym->st_info) == 1 && currentEntry.type >= 0x41 && currentEntry.type <= 0x5a)
-            {
-                if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Global" << dec << endl;
-                sym->st_value = currentEntry.address;
-            }
-            else if (ELF64_ST_BIND(sym->st_info) == 0 && currentEntry.type >= 0x61 && currentEntry.type <= 0x7a)
-            {
-                if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Local" << dec << endl;
-                sym->st_value = currentEntry.address;
-            }
-        }
-    }
-#endif
 
 	// Variable not found in system.map
     // Try to find the variable by name in insight.
