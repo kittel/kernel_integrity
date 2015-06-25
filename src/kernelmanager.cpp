@@ -79,6 +79,10 @@ std::string KernelManager::findModuleFile(std::string modName){
 	for( fs::recursive_directory_iterator end, dir(this->dirName);
 			dir != end; dir++){
 		if(fs::extension(*dir) == ".ko"){
+			if (std::string((*dir).path().string()).find("debian") != 
+					std::string::npos){
+			   	continue;
+			}
 			if (std::regex_match((*dir).path().stem().string(), regex)){
 				return (*dir).path().native();
 			}
