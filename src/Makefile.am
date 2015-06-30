@@ -9,7 +9,7 @@ kernint_LDFLAGS=$(GLIB_LIBS) \
 				-ldwarfparser -ldwarf -lelf \
 				-lvmiwrapper \
 				-L$(top_builddir)/../libdwarf/libdwarf/ \
-				-lboost_system -lboost_filesystem
+				-lboost_system -lboost_filesystem -lpthread
 
 bin_PROGRAMS=kernint
 

@@ -89,9 +89,9 @@ uint64_t KernelValidator::validatePages(){
 			for (auto stack : this->stackAddresses){
 				std::vector<uint8_t> pageInMem = 
 	    	                 vmi->readVectorFromVA(stack.first, 0x2000);
-				this->validateStackPage(pageInMem.data(), 
-						stack.first, 
-						stack.second);
+				//this->validateStackPage(pageInMem.data(), 
+				//		stack.first, 
+				//		stack.second);
 			}
 		}
 
@@ -101,7 +101,7 @@ uint64_t KernelValidator::validatePages(){
 			if ((page.second->vaddr & 0xff0000000000) == 0x8800000000000){
 				continue;
 			}
-			this->validatePage(page.second);
+			//this->validatePage(page.second);
 		}
 
 		std::cout << COLOR_GREEN << COLOR_BOLD << 
@@ -125,9 +125,11 @@ void KernelValidator::validatePage(page_info_t * page){
 	ElfLoader* elfloader = kernelLoader->getModuleForAddress(page->vaddr);
 	//assert(elfloader);
 	if(!elfloader){
-		//std::cout << COLOR_MARGENTA << COLOR_BOLD << 
-		//	"No Module found for address: " << std::hex <<
-		//	page->vaddr << std::dec << COLOR_RESET << std::endl;
+		if(this->vmi->isPageExecutable(page)){
+			std::cout << COLOR_MARGENTA << COLOR_BOLD << 
+				"No Module found for address: " << std::hex <<
+				page->vaddr << std::dec << COLOR_RESET << std::endl;
+		}
 	}else if (this->options.codeValidation &&
 			elfloader->isCodeAddress(page->vaddr)){
 		this->validateCodePage(page, elfloader);
@@ -149,28 +151,26 @@ void KernelValidator::validatePage(page_info_t * page){
 
 void KernelValidator::validateStackPage(uint8_t *memory,
 				uint64_t stackBottom, uint64_t stackEnd){
-	
-	uint64_t returnAddresses = 0;
-	uint64_t oldRetFunc = 0;
-	
-	uint64_t codePtrs = 0;
 
+	std::cout << std::endl << COLOR_BOLD << COLOR_GREEN <<
+		"Checking stack at: " << 
+		std::hex << stackBottom << std::dec << 
+		COLOR_NORM << COLOR_BOLD_OFF <<
+		std::endl;
+
+	std::map<uint64_t, uint64_t> returnAddresses;
+	
 	// Reset unused part of Stack to Zero
 	// TODO
 	//
 	
-	static std::set<uint64_t> retFuncs;
-	
-	//std::cout << "Checking stack at: " << std::hex << stackBottom << std::dec << std::endl;
-
     // Go through every byte and check if it contains a kernel pointer
     for(int32_t i = stackEnd % 0x2000 ; i < 0x2000 - 4; i++){
         uint32_t* intPtr = (uint32_t*) (memory + i);
         
 		//Check if this could be a valid kernel address.
-        if(*intPtr != (uint32_t) 0xffffffff){
-			continue;
-		}
+        if(*intPtr != (uint32_t) 0xffffffff) continue;
+
         //The first 4 byte could belong to a kernel address.
         uint64_t* longPtr = (uint64_t*) (intPtr -1);
         if (*longPtr == (uint64_t) 0xffffffffffffffffL){
@@ -183,14 +183,9 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 			continue;
 		}
 
-        if (kernelLoader->isFunction(*longPtr)){
-            continue;
-        }
+        if (kernelLoader->isFunction(*longPtr)) continue;
         
-		if(kernelLoader->isSymbol(*longPtr)){
-            //stats.symPtrs++;
-            continue;
-        }
+		if (kernelLoader->isSymbol(*longPtr)) continue;
 
             
 		uint64_t offset = *longPtr - 
@@ -204,97 +199,127 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 				COLOR_NORM << COLOR_BOLD_OFF << std::dec << std::endl;
 			continue;
 		}
+
+		returnAddresses[i - 4 + stackBottom] = *longPtr;
 		
+    }
+
+
+	uint64_t oldRetFunc = 0;
+	std::string oldRetFuncName;
+
+	
+    for ( auto &retAddr : returnAddresses ){
+		
+		ElfLoader* elfloader = 
+			kernelLoader->getModuleForAddress(retAddr.second);
 		//Return Address (Stack)
+		uint64_t offset = retAddr.second - 
+			(uint64_t) elfloader->textSegment.memindex;
+
 		uint64_t callAddr = 
 			isReturnAddress(elfloader->textSegmentContent.data(), 
 		        offset,
 			    (uint64_t) elfloader->textSegment.memindex);
-		if ( callAddr ){
-			//std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
-			//   	"return address: 0x" << *longPtr << 
-			//	" ( @ 0x" << i - 4 + stackBottom << " )" << 
-			//	COLOR_NORM << COLOR_BOLD_OFF << 
-			//	std::dec << std::endl;
-				
-			returnAddresses++;
-			uint64_t retFunc = 
-				kernelLoader->getContainingSymbol(*longPtr);
 
-			if (oldRetFunc == 0){
-				oldRetFunc = retFunc;
-				continue;
-			}
+		if (!callAddr){
+			std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
+			   	"Found possible malicious pointer: 0x" << retAddr.second << 
+				" ( @ 0x" << retAddr.first << " )" << std::endl << 
+				" Pointing to module: " << elfloader->getName() <<
+				COLOR_NORM << COLOR_BOLD_OFF << std::dec << std::endl;
+		}
 
-			if (callAddr != oldRetFunc ){
-			
-				if ((i - 4 == 0x1f50 && *longPtr == 0xffffffff816d48ac) ||
-					(i - 4 == 0x1ed0 && *longPtr == 0xffffffff8107d360) ||
-					*longPtr == 0xffffffff816cb199){
-					oldRetFunc = retFunc;
-					continue;
-				}
+		uint64_t retFunc = 
+			kernelLoader->getContainingSymbol(retAddr.second);
+		
+		std::string retFuncName = kernelLoader->getSymbolName(retFunc);
 
-				
-				if(this->callTargets.size() > 0){
-					auto call = 
-						(this->callTargets.upper_bound(*longPtr)--);
-					while(call->first > *longPtr) call--;
-					uint64_t addressOfCall = call->first;
-					auto boundaries = 
-						this->callTargets.equal_range(addressOfCall);
-					bool found = false;
-					for( auto element = boundaries.first;
-							element != boundaries.second;
-							element++){
-						if (element->second == oldRetFunc){
-							oldRetFunc = retFunc;
-							found = true;
-							break;
-						}
-					}
-					if(found) continue;
-				}
-
-				//std::cout << std::hex << 
-				//	"callAddr:      " << callAddr << std::endl <<
-				//	"addressOfCall: " << addressOfCall << std::endl <<
-				//	"retFunc:       " << retFunc << std::endl <<
-				//	"oldRetFunc:    " << oldRetFunc << std::endl <<
-				//	std::dec << std::endl;
-				//for( auto element = boundaries.first;
-				//		element != boundaries.second;
-				//		element++){
-				//		std::cout << "Found call to " << 
-				//			std::hex << element->second << 
-				//			std::dec << std::endl;
-				//}
+		std::cout << std::hex << COLOR_GREEN << COLOR_BOLD <<
+			"return address: 0x" << retAddr.second << 
+			" ( @ 0x" << retAddr.first << " )" << 
+			std::endl << "\t-> " << 
+			retFuncName << " ( " << retFunc << " ) " <<
+			COLOR_NORM << COLOR_BOLD_OFF << std::dec <<
+			std::endl;
 
 
-				retFuncs.insert(retFunc);
-				std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
-					"Unvalidated return address: 0x" << *longPtr << 
-					" ( @ 0x" << i - 4 + stackBottom << " )" << 
-					std::endl << "\t-> " << 
-					kernelLoader->getSymbolName(retFunc) << 
-					" ( " << retFunc << " ) " <<
-					std::endl;
-				std::cout << COLOR_NORM << COLOR_BOLD_OFF << 
-					std::dec << std::endl;
-			}
+		// The first return address is always allowed
+		if (oldRetFunc == 0){
 			oldRetFunc = retFunc;
+			oldRetFuncName = retFuncName;
 			continue;
-        }
+		}
 
-		std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
-		   	"Found possible malicious pointer: 0x" << *longPtr << 
-			" ( @ 0x" << i - 4 + stackBottom << " )" << std::endl << 
-			" Pointing to module: " << elfloader->getName() <<
-			COLOR_NORM << COLOR_BOLD_OFF << std::dec << std::endl;
-        //stats.unknownPtrs++;
-		codePtrs++;
+		// The return Address points to the function that
+		// was previously called
+		if (oldRetFunc == callAddr){
+			oldRetFunc = retFunc;
+			oldRetFuncName = retFuncName;
+			continue;
+		}
+
+		if (
+			(oldRetFuncName == "__schedule_kernel" &&
+				retFuncName == "kthread_kernel") ||
+			(oldRetFuncName == "kthread_kernel" &&
+				retFuncName == "do_exit") // ||
+			//(oldRetFuncName == "do_exit" &&
+			//	retFuncName == "ret_from_fork") 
+				){
+			oldRetFunc = retFunc;
+			oldRetFuncName = retFuncName;
+			continue;
+		}
+
+		// Check common stack frames for 3.8
+		// Make this nicer...
+		//if ((i - 4 == 0x1f50 && *longPtr == 0xffffffff816d48ac) ||
+		//	(i - 4 == 0x1ed0 && *longPtr == 0xffffffff8107d360) ||
+		//	*longPtr == 0xffffffff816cb199){
+		//	oldRetFunc = retFunc;
+		//	continue;
+		//}
+
+		
+		if(this->callTargets.size() > 0){
+			auto call = 
+				(this->callTargets.upper_bound(retAddr.second)--);
+			while(call->first > retAddr.second) call--;
+			uint64_t addressOfCall = call->first;
+			auto boundaries = 
+				this->callTargets.equal_range(addressOfCall);
+			bool found = false;
+			for( auto element = boundaries.first;
+					element != boundaries.second;
+					element++){
+				if (element->second == oldRetFunc){
+					oldRetFunc = retFunc;
+					found = true;
+					break;
+				}
+			}
+			if(found) continue;
+		}
+
+		std::cout << std::hex << 
+			"callAddr:      " << callAddr << std::endl <<
+			"retFunc:       " << retFunc << std::endl <<
+			"oldRetFunc:    " << oldRetFunc << std::endl <<
+			std::dec << std::endl;
+
+		std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
+			"Unvalidated return address: 0x" << retAddr.second << 
+			" ( @ 0x" << retAddr.first << " )" << 
+			std::endl << "\t-> " << 
+			retFuncName << 
+			" ( " << retFunc << " ) " <<
+			COLOR_NORM << COLOR_BOLD_OFF << std::dec <<
+			std::endl << std::endl;
+
+		oldRetFunc = retFunc;
+		oldRetFuncName = retFuncName;
     }
-	//std::cout << "Currently " << retFuncs.size() << " unknown retFuncs" << std:: endl;
 }
 
 bool KernelValidator::isValidJmpLabel( 

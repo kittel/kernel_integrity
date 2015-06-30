@@ -11,6 +11,7 @@
 #include <cctype>
 
 #include <regex>
+#include <thread>
 
 #include "elffile.h"
 
@@ -23,7 +24,8 @@ namespace fs = boost::filesystem;
 //namespace fs = std::filesystem;
 
 KernelManager::KernelManager():
-	moduleMap(), dirName(), moduleInstanceMap(), symbolMap(),
+	moduleMapMutex(), moduleMap(), 
+	dirName(), moduleInstanceMap(), symbolMap(),
 	privSymbolMap(), moduleSymbolMap(), functionSymbolMap()
 	{
 }
@@ -34,31 +36,51 @@ void KernelManager::setKernelDir(std::string dirName){
 
 ElfLoader *KernelManager::loadModule(std::string moduleName){
 	std::replace(moduleName.begin(), moduleName.end(), '-', '_');
-	auto moduleIter = moduleMap.find(moduleName);
-	if(moduleIter != moduleMap.end()){
-		return moduleIter->second;
+	
+	moduleMapMutex.lock();
+	// Check if module is already loaded
+	if (moduleMap.find(moduleName) != moduleMap.end()){
+		// This might be NULL! Think about
+		moduleMapMutex.unlock();
+		while (moduleMap[moduleName] == NULL){
+			std::this_thread::yield();
+		}
+		return moduleMap[moduleName];
 	}
+	moduleMap[moduleName] = NULL;
+	moduleMapMutex.unlock();
+	
 	std::string filename = findModuleFile(moduleName);
 	if(filename.empty()){
 		std::cout << moduleName << ": Module File not found" << std::endl;
 		return NULL;
-	}else{
-		//std::cout << filename << std::endl;
 	}
 	ElfFile *file = ElfFile::loadElfFile(filename);
 	auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE, 
 			                     moduleName, 
 								 this);
+	
+	moduleMapMutex.lock();
 	moduleMap[moduleName] = module;
-
-	return module;
+	moduleMapMutex.unlock();
+	
+	return moduleMap[moduleName];
 }
 
 void KernelManager::loadAllModules(){
 	std::list<std::string> moduleNames = this->getKernelModules();
 
+	std::vector<std::thread*> threads;
+
 	for (auto curStr : moduleNames ){
-		this->loadModule(curStr);
+		std::thread* t;
+	   	t = new std::thread(&KernelManager::loadModule, this, curStr);
+		threads.push_back(t);
+	}
+
+	for (auto &&thread : threads){
+		thread->join();
+		delete(thread);
 	}
 }
 

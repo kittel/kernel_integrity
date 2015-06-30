@@ -4,6 +4,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <mutex>
 
 #include "libdwarfparser/instance.h"
 
@@ -48,6 +49,7 @@ class KernelManager{
 		void updateRevMaps();
 
 	protected:
+		std::mutex moduleMapMutex;
 		typedef std::map<std::string, ElfLoader*> ModuleMap;
 		ModuleMap moduleMap;
 		
