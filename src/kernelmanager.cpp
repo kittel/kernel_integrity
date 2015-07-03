@@ -16,6 +16,8 @@
 #include "elffile.h"
 
 #include "libdwarfparser/variable.h"
+#include "libdwarfparser/function.h"
+#include "libdwarfparser/array.h"
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
@@ -82,6 +84,8 @@ void KernelManager::loadAllModules(){
 		thread->join();
 		delete(thread);
 	}
+	Array::cleanArrays();
+	Function::cleanFunctions();
 }
 
 Instance KernelManager::nextModule(Instance &instance){
