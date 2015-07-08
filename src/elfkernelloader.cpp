@@ -42,7 +42,7 @@ std::string ElfKernelLoader::getName(){
 }
 
 ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
-	ElfLoader(elffile),
+	ElfLoader(elffile, ParavirtState::getInstance()),
 	KernelManager(),
 	vvarSegment(),
 	dataNosaveSegment(),

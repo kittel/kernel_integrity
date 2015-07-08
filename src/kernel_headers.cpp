@@ -61,6 +61,15 @@ const char ud2a[] = { 0x0f, 0x0b };
 
 #include "libdwarfparser/libdwarfparser.h"
 
+ParavirtState* ParavirtState::instance = NULL;
+
+ParavirtState* ParavirtState::getInstance(){
+	if(instance == NULL){
+		instance = new ParavirtState(true);
+	}
+	return instance;
+}
+
 ParavirtState::ParavirtState(bool hasParavirt){
 
 	if(hasParavirt){

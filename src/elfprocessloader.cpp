@@ -1,8 +1,12 @@
 #include "elfprocessloader.h"
 
 
-ElfProcessLoader::ElfProcessLoader(ElfFile *file, std::string name)
-                                   : ElfLoader(file), execName(name){
+ElfProcessLoader::ElfProcessLoader(ElfFile *file, 
+	   	KernelManager *parent,
+		std::string name
+		):
+   	ElfLoader(file, dynamic_cast<ElfKernelLoader*>(parent)->getPVState()),
+	execName(name){
 //	std::cout << "ElfProcessLoader initialized with name " << name << std::endl;
 }
 

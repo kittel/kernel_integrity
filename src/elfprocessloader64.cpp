@@ -7,8 +7,10 @@ RelSym::RelSym(std::string name, uint64_t value, uint8_t info, uint32_t shndx,
 RelSym::~RelSym(){}
 
 
-ElfProcessLoader64::ElfProcessLoader64(ElfFile64 *file, std::string name)
-									   : ElfProcessLoader(file, name),
+ElfProcessLoader64::ElfProcessLoader64(ElfFile64 *file, 
+		KernelManager *parent,
+		std::string name)
+									   : ElfProcessLoader(file, parent, name),
 										 bindLazy(true), isDynamicExec(false),
 										 isInLibs(false), isRelocatable(false),
 										 dataSegBaseAddr(0), textSegBaseAddr(0),

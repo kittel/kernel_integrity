@@ -109,7 +109,9 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 
 	public:
 		ElfProcessLoader64(ElfFile64 *elffile, 
-		        std::string name = "");
+			   	KernelManager *parent,
+		        std::string name = ""
+				);
 		virtual ~ElfProcessLoader64();
 		virtual void printImage();
 		virtual std::string getName();

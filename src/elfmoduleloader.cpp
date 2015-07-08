@@ -8,7 +8,7 @@
 ElfModuleLoader::ElfModuleLoader(ElfFile* elffile, 
 	    std::string name,
 		KernelManager* parent):
-	ElfLoader(elffile),
+	ElfLoader(elffile, dynamic_cast<ElfKernelLoader*>(parent)->getPVState()),
 	modName(name),
 	parent(parent){
 }

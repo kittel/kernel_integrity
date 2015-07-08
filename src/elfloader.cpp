@@ -17,7 +17,7 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 
 
-ElfLoader::ElfLoader(ElfFile* elffile):
+ElfLoader::ElfLoader(ElfFile* elffile, ParavirtState* para):
 	elffile(elffile),
 	debugInstance(),
 	textSegment(),
@@ -30,7 +30,7 @@ ElfLoader::ElfLoader(ElfFile* elffile):
 	dataSegment(),
 	bssSegment(),
 	roDataSegment(),
-	paravirtState(elffile->getProgramType() == ElfFile::ELFPROGRAMTYPEEXEC){
+	paravirtState(para){
 
 	//get the current cpu architecture to adapt nops
 	Instance ideal_nops_instance = 
@@ -57,6 +57,10 @@ ElfLoader::ElfLoader(ElfFile* elffile):
 }
 
 ElfLoader::~ElfLoader(){}
+
+ParavirtState* ElfLoader::getPVState(){
+	return paravirtState;
+}
 
 void  ElfLoader::add_nops(void *insns, uint8_t len)
 {
@@ -120,38 +124,38 @@ uint64_t ElfLoader::get_call_destination(uint32_t type)
     // In memory they are directly after each other.
     // Thus type is an index into the resulting array.
 
-    if(type < paravirtState.pv_init_ops.size()) 
-		return paravirtState.pv_init_ops.memberByOffset(type)
+    if(type < paravirtState->pv_init_ops.size()) 
+		return paravirtState->pv_init_ops.memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
-    type -= paravirtState.pv_init_ops.size();
+    type -= paravirtState->pv_init_ops.size();
 
-    if(type < paravirtState.pv_time_ops.size()) 
-		return paravirtState.pv_time_ops.memberByOffset(type)
+    if(type < paravirtState->pv_time_ops.size()) 
+		return paravirtState->pv_time_ops.memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
-    type -= paravirtState.pv_time_ops.size();
+    type -= paravirtState->pv_time_ops.size();
 
-    if(type < paravirtState.pv_cpu_ops.size())  
-		return paravirtState.pv_cpu_ops .memberByOffset(type)
+    if(type < paravirtState->pv_cpu_ops.size())  
+		return paravirtState->pv_cpu_ops .memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
-    type -= paravirtState.pv_cpu_ops.size();
+    type -= paravirtState->pv_cpu_ops.size();
 
-    if(type < paravirtState.pv_irq_ops.size())  
-		return paravirtState.pv_irq_ops .memberByOffset(type)
+    if(type < paravirtState->pv_irq_ops.size())  
+		return paravirtState->pv_irq_ops .memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
-    type -= paravirtState.pv_irq_ops.size();
+    type -= paravirtState->pv_irq_ops.size();
 
-    if(type < paravirtState.pv_apic_ops.size()) 
-		return paravirtState.pv_apic_ops.memberByOffset(type)
+    if(type < paravirtState->pv_apic_ops.size()) 
+		return paravirtState->pv_apic_ops.memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
-    type -= paravirtState.pv_apic_ops.size();
+    type -= paravirtState->pv_apic_ops.size();
 
-    if(type < paravirtState.pv_mmu_ops.size())  
-		return paravirtState.pv_mmu_ops .memberByOffset(type)
+    if(type < paravirtState->pv_mmu_ops.size())  
+		return paravirtState->pv_mmu_ops .memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
-    type -= paravirtState.pv_mmu_ops.size();
+    type -= paravirtState->pv_mmu_ops.size();
 
-    if(type < paravirtState.pv_lock_ops.size()) 
-		return paravirtState.pv_lock_ops.memberByOffset(type)
+    if(type < paravirtState->pv_lock_ops.size()) 
+		return paravirtState->pv_lock_ops.memberByOffset(type)
 		    .getRawValue<uint64_t>(false);
 
     return 0;
@@ -173,25 +177,25 @@ uint8_t ElfLoader::paravirt_patch_default(uint32_t type, uint16_t clobbers, void
         //If this the kernel this can happen and is only filled with nops
         ret = paravirt_patch_nop();
     }
-    else if (opfunc == paravirtState.nopFuncAddress){
+    else if (opfunc == paravirtState->nopFuncAddress){
         /* If the operation is a nop, then nop the callsite */
         ret = paravirt_patch_nop();
 	}
     /* identity functions just return their single argument */
-    else if (opfunc == paravirtState.ident32NopFuncAddress){
+    else if (opfunc == paravirtState->ident32NopFuncAddress){
         ret = paravirt_patch_insns(insnbuf, len, start__mov32, end__mov32);
 	}
-    else if (opfunc == paravirtState.ident64NopFuncAddress){
+    else if (opfunc == paravirtState->ident64NopFuncAddress){
         ret = paravirt_patch_insns(insnbuf, len, start__mov64, end__mov64);
 	}
-    else if (type == paravirtState.pv_cpu_opsOffset + 
-				paravirtState.pv_cpu_ops.memberOffset("iret") ||
-             type == paravirtState.pv_cpu_opsOffset + 
-				paravirtState.pv_cpu_ops.memberOffset("irq_enable_sysexit") ||
-             type == paravirtState.pv_cpu_opsOffset + 
-				paravirtState.pv_cpu_ops.memberOffset("usergs_sysret32") ||
-             type == paravirtState.pv_cpu_opsOffset + 
-				paravirtState.pv_cpu_ops.memberOffset("usergs_sysret64"))
+    else if (type == paravirtState->pv_cpu_opsOffset + 
+				paravirtState->pv_cpu_ops.memberOffset("iret") ||
+             type == paravirtState->pv_cpu_opsOffset + 
+				paravirtState->pv_cpu_ops.memberOffset("irq_enable_sysexit") ||
+             type == paravirtState->pv_cpu_opsOffset + 
+				paravirtState->pv_cpu_ops.memberOffset("usergs_sysret32") ||
+             type == paravirtState->pv_cpu_opsOffset + 
+				paravirtState->pv_cpu_ops.memberOffset("usergs_sysret64"))
     {
         /* If operation requires a jmp, then jmp */
         //std::cout << "Patching jump!" << std::endl;
@@ -224,7 +228,7 @@ uint32_t ElfLoader::paravirtNativePatch(uint32_t type, uint16_t clobbers, void *
 
 
 #define PATCH_SITE(ops, x)		\
-  else if(type == paravirtState.ops##Offset + paravirtState.ops.memberOffset("" #x )) \
+  else if(type == paravirtState->ops##Offset + paravirtState->ops.memberOffset("" #x )) \
   {                                                         \
       ret = paravirt_patch_insns(ibuf, len, start_##ops##_##x, end_##ops##_##x);    \
   } 

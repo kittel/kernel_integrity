@@ -14,6 +14,7 @@ class KernelManager{
 
 	public:
 		KernelManager();
+		virtual ~KernelManager(){};
 		
 		void setKernelDir(std::string dirName);
 

@@ -195,9 +195,11 @@ ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type,
 	if(type == ElfFile::ELFPROGRAMTYPEKERNEL){
 		return new ElfKernelLoader64(this);
 	}else if(type == ElfFile::ELFPROGRAMTYPEMODULE){
-		return new ElfModuleLoader64(this, name, parent);
+		return new ElfModuleLoader64(this, 
+				name, parent);
 	}else if(type == ElfFile::ELFPROGRAMTYPEEXEC){
-		return new ElfProcessLoader64(this, name);
+		return new ElfProcessLoader64(this, 
+				parent, name);
 		//TODO: name doesn't get handled properly
 	}
 	std::cout << "No usable ELFPROGRAMTYPE defined." << std::endl;

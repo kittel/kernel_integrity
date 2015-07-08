@@ -27,12 +27,14 @@ class ElfLoader{
 	friend class ProcessValidator;  
 
 	public:
-		ElfLoader(ElfFile* elffile);
 		virtual ~ElfLoader();
 
 		virtual std::string getName() = 0;
+		ParavirtState* getPVState();
 
 	protected:
+		ElfLoader(ElfFile* elffile, ParavirtState* para);
+		
 		ElfFile* elffile;           // Wrapped ElfFile, provides to file and seg
 		Instance* debugInstance;    // Wrapped debug instance of the file
 		
@@ -55,7 +57,7 @@ class ElfLoader{
 		const unsigned char* const* ideal_nops;
 		void  add_nops(void *insns, uint8_t len);
 
-		ParavirtState paravirtState; 
+		ParavirtState* paravirtState; 
 
 		uint8_t paravirt_patch_nop(void);
 		uint8_t paravirt_patch_ignore(unsigned len);

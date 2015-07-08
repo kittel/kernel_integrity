@@ -6,7 +6,10 @@
 
 class ElfProcessLoader : public ElfLoader {
 	public:
-		ElfProcessLoader(ElfFile* elffile, std::string name);
+		ElfProcessLoader(ElfFile* elffile, 
+				KernelManager *parent,
+				std::string name
+				);
 		virtual ~ElfProcessLoader();
 		virtual ElfLoader* getExecForAddress(uint64_t address);
 		virtual uint8_t* getImageForAddress(uint64_t addr, uint32_t offset);

@@ -113,6 +113,8 @@ DEF_NATIVE(, mov64, "mov %rdi, %rax");
 class ParavirtState{
 
     public:
+		static ParavirtState* getInstance();
+
         ParavirtState(bool hasParavirt = true); //For ordinary use
         virtual ~ParavirtState();
 
@@ -136,6 +138,8 @@ class ParavirtState{
         uint32_t pv_mmu_opsOffset;
 
     private:
+
+		static ParavirtState* instance;
 };
 
 
