@@ -135,7 +135,7 @@ const char * helpString = R"EOF(
 
 	-u, --checkUserspace=<referenceDir>
 		Check userspace process for integrity. Use binaries in <referenceDir>
-	   	as trusted reference.
+		as trusted reference.
 
 	-p, --pid=<pid>
 		Check <pid> for integrity

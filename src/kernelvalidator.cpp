@@ -89,9 +89,9 @@ uint64_t KernelValidator::validatePages(){
 			for (auto stack : this->stackAddresses){
 				std::vector<uint8_t> pageInMem = 
 	    	                 vmi->readVectorFromVA(stack.first, 0x2000);
-				//this->validateStackPage(pageInMem.data(), 
-				//		stack.first, 
-				//		stack.second);
+				this->validateStackPage(pageInMem.data(), 
+						stack.first, 
+						stack.second);
 			}
 		}
 
@@ -101,7 +101,7 @@ uint64_t KernelValidator::validatePages(){
 			if ((page.second->vaddr & 0xff0000000000) == 0x8800000000000){
 				continue;
 			}
-			//this->validatePage(page.second);
+			this->validatePage(page.second);
 		}
 
 		std::cout << COLOR_GREEN << COLOR_BOLD << 
@@ -217,6 +217,11 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 		uint64_t offset = retAddr.second - 
 			(uint64_t) elfloader->textSegment.memindex;
 
+		std::vector<uint8_t> pageInMem = 
+		             vmi->readVectorFromVA(
+							(uint64_t) elfloader->textSegment.memindex,
+							offset + 0x40);
+
 		uint64_t callAddr = 
 			isReturnAddress(elfloader->textSegmentContent.data(), 
 		        offset,
@@ -263,9 +268,9 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 			(oldRetFuncName == "__schedule_kernel" &&
 				retFuncName == "kthread_kernel") ||
 			(oldRetFuncName == "kthread_kernel" &&
-				retFuncName == "do_exit") // ||
-			//(oldRetFuncName == "do_exit" &&
-			//	retFuncName == "ret_from_fork") 
+				retFuncName == "do_exit") ||
+			(oldRetFuncName == "do_exit" &&
+				retFuncName == "ret_from_fork") 
 				){
 			oldRetFunc = retFunc;
 			oldRetFuncName = retFuncName;
@@ -295,6 +300,7 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 					element++){
 				if (element->second == oldRetFunc){
 					oldRetFunc = retFunc;
+					oldRetFuncName = retFuncName;
 					found = true;
 					break;
 				}
@@ -303,10 +309,11 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 		}
 
 		std::cout << std::hex << 
-			"callAddr:      " << callAddr << std::endl <<
-			"retFunc:       " << retFunc << std::endl <<
-			"oldRetFunc:    " << oldRetFunc << std::endl <<
-			std::dec << std::endl;
+			"callAddr:      " << callAddr << " " << 
+			kernelLoader->getSymbolName(callAddr) << std::endl <<
+			"retFunc:       " << retFunc << " " << retFuncName << std::endl <<
+			"oldRetFunc:    " << oldRetFunc << " " << oldRetFuncName << 
+			std::endl << std::dec << std::endl;
 
 		std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
 			"Unvalidated return address: 0x" << retAddr.second << 
