@@ -32,7 +32,7 @@ KernelManager::KernelManager():
 	{
 }
 
-void KernelManager::setKernelDir(std::string dirName){
+void KernelManager::setKernelDir(const std::string &dirName){
 	this->dirName = dirName;
 }
 
@@ -58,9 +58,9 @@ ElfLoader *KernelManager::loadModule(std::string moduleName){
 		return NULL;
 	}
 	ElfFile *file = ElfFile::loadElfFile(filename);
-	auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE, 
-			                     moduleName, 
-								 this);
+	auto module = file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE,
+	                             moduleName,
+	                             this);
 	
 	moduleMapMutex.lock();
 	moduleMap[moduleName] = module;
@@ -69,14 +69,40 @@ ElfLoader *KernelManager::loadModule(std::string moduleName){
 	return moduleMap[moduleName];
 }
 
+void KernelManager::loadModuleThread(std::list<std::string> &modList,
+		std::mutex &modMutex){
+
+	while(true){
+		modMutex.lock();
+		if(modList.empty()){
+			modMutex.unlock();
+			return;
+		}
+		std::string mod = modList.front();
+		modList.pop_front();
+		modMutex.unlock();
+		this->loadModule(mod);
+	}
+
+}
+
 void KernelManager::loadAllModules(){
+
+	uint32_t concurentThreadsSupported = std::thread::hardware_concurrency();
+
+	std::cout << concurentThreadsSupported << " Threads supported" << std::endl;
+
 	std::list<std::string> moduleNames = this->getKernelModules();
+	std::mutex modMutex;
 
 	std::vector<std::thread*> threads;
 
-	for (auto curStr : moduleNames ){
-		std::thread* t;
-	   	t = new std::thread(&KernelManager::loadModule, this, curStr);
+	for (uint32_t i = 0 ; i < concurentThreadsSupported ; i++ ) {
+		std::thread* t = 
+			new std::thread(&KernelManager::loadModuleThread,
+					this,
+					std::ref(moduleNames),
+					std::ref(modMutex));//,
 		threads.push_back(t);
 	}
 
@@ -84,6 +110,7 @@ void KernelManager::loadAllModules(){
 		thread->join();
 		delete(thread);
 	}
+
 	Array::cleanArrays();
 	Function::cleanFunctions();
 }
@@ -154,7 +181,7 @@ void KernelManager::loadKernelModules(){
 	}
 }
 
-uint64_t KernelManager::getSystemMapAddress(std::string name, bool priv){
+uint64_t KernelManager::getSystemMapAddress(const std::string &name, bool priv){
 	auto symbol = this->symbolMap.find(name);
 	if(symbol != this->symbolMap.end()){
 		return symbol->second;
@@ -167,14 +194,15 @@ uint64_t KernelManager::getSystemMapAddress(std::string name, bool priv){
 	}
 	return 0;
 }
-void KernelManager::addSymbolAddress(std::string name, uint64_t address){
-	while(this->moduleSymbolMap.find(name) != this->moduleSymbolMap.end()){
-		name = name.append("_");
+void KernelManager::addSymbolAddress(const std::string &name, uint64_t address){
+	std::string newName = name;
+	while(this->moduleSymbolMap.find(newName) != this->moduleSymbolMap.end()){
+		newName = newName.append("_");
 	}
-	this->moduleSymbolMap[name] = address;
+	this->moduleSymbolMap[newName] = address;
 }
 
-uint64_t KernelManager::getSymbolAddress(std::string name){
+uint64_t KernelManager::getSymbolAddress(const std::string &name){
 	auto symbol = this->moduleSymbolMap.find(name);
 	if(symbol != this->moduleSymbolMap.end()){
 		return symbol->second;
@@ -216,14 +244,15 @@ void KernelManager::dumpSymbols(){
 }
 
 
-void KernelManager::addFunctionAddress(std::string name, uint64_t address){
-	while(this->functionSymbolMap.find(name) != this->functionSymbolMap.end()){
-		name = name.append("_");
+void KernelManager::addFunctionAddress(const std::string &name, uint64_t address){
+	std::string newName = name;
+	while(this->functionSymbolMap.find(newName) != this->functionSymbolMap.end()){
+		newName = newName.append("_");
 	}
-	this->functionSymbolMap[name] = address;
+	this->functionSymbolMap[newName] = address;
 }
 
-uint64_t KernelManager::getFunctionAddress(std::string name){
+uint64_t KernelManager::getFunctionAddress(const std::string &name){
 	auto function = this->functionSymbolMap.find(name);
 	if(function != this->functionSymbolMap.end()){
 		return function->second;

@@ -13,7 +13,11 @@
 
 void signalHandler( int signum ){
 	UNUSED(signum);
-	KernelValidator::getInstance()->setOptions(false, false, false);  
+	KernelValidator* instance = 
+		KernelValidator::getInstance();
+	if(instance){
+		instance->setOptions(false, false, false);
+	}
 }
 
 

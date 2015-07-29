@@ -50,7 +50,7 @@ KernelValidator::KernelValidator(std::string dirName,
 }
 
 KernelValidator::~KernelValidator(){
-
+	KernelValidator::instance = NULL;
 }
 
 void KernelValidator::setOptions(bool lm, bool cv, bool pe){
