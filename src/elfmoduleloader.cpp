@@ -55,9 +55,9 @@ void ElfModuleLoader::loadDependencies(void) {
 }
 
 void ElfModuleLoader::initText(void) {
-	std::cout << COLOR_GREEN
-	             "Loading dependencies for module " << this->modName;
-	std::cout << COLOR_NORM << std::endl;
+//	std::cout << COLOR_GREEN
+//	             "Loading dependencies for module " << this->modName;
+//	std::cout << COLOR_NORM << std::endl;
 
 	this->loadDependencies();
 

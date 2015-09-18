@@ -152,7 +152,10 @@ void KernelValidator::validatePage(page_info_t * page){
 void KernelValidator::validateStackPage(uint8_t *memory,
 				uint64_t stackBottom, uint64_t stackEnd){
 
-	std::cout << std::endl << COLOR_BOLD << COLOR_GREEN <<
+	std::stringstream ss;
+	bool stackInteresting = false;
+	
+	ss << std::endl << COLOR_BOLD << COLOR_GREEN <<
 		"Checking stack at: " << 
 		std::hex << stackBottom << std::dec << 
 		COLOR_NORM << COLOR_BOLD_OFF <<
@@ -192,7 +195,8 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 			(uint64_t) elfloader->textSegment.memindex;
 		
 		if(offset > elfloader->textSegmentContent.size()){
-			std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
+			stackInteresting = true;
+			ss << std::hex << COLOR_RED << COLOR_BOLD <<
 			   	"Found possible malicious pointer: 0x" << *longPtr << 
 				" ( @ 0x" << i - 4 + stackBottom << " )" << 
 				" Pointing to code after initialized content" <<
@@ -228,7 +232,8 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 			    (uint64_t) elfloader->textSegment.memindex);
 
 		if (!callAddr){
-			std::cout << std::hex << COLOR_RED << COLOR_BOLD <<
+			stackInteresting = true;
+			ss << std::hex << COLOR_RED << COLOR_BOLD <<
 			   	"Found possible malicious pointer: 0x" << retAddr.second << 
 				" ( @ 0x" << retAddr.first << " )" << std::endl << 
 				" Pointing to module: " << elfloader->getName() <<
@@ -240,7 +245,7 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 		
 		std::string retFuncName = kernelLoader->getSymbolName(retFunc);
 
-		std::cout << std::hex << COLOR_GREEN << COLOR_BOLD <<
+		ss << std::hex << COLOR_GREEN << COLOR_BOLD <<
 			"return address: 0x" << retAddr.second << 
 			" ( @ 0x" << retAddr.first << " )" << 
 			std::endl << "\t-> " << 
@@ -308,14 +313,15 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 			if(found) continue;
 		}
 
-		std::cout << std::hex << 
+		stackInteresting = true;
+		ss << std::hex << 
 			"callAddr:      " << callAddr << " " << 
 			kernelLoader->getSymbolName(callAddr) << std::endl <<
 			"retFunc:       " << retFunc << " " << retFuncName << std::endl <<
 			"oldRetFunc:    " << oldRetFunc << " " << oldRetFuncName << 
 			std::endl << std::dec << std::endl;
 
-		std::cout << std::hex << COLOR_BLUE << COLOR_BOLD <<
+		ss << std::hex << COLOR_BLUE << COLOR_BOLD <<
 			"Unvalidated return address: 0x" << retAddr.second << 
 			" ( @ 0x" << retAddr.first << " )" << 
 			std::endl << "\t-> " << 
@@ -327,6 +333,9 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 		oldRetFunc = retFunc;
 		oldRetFuncName = retFuncName;
     }
+	if ( stackInteresting ) {
+		std::cout << ss.rdbuf();
+	}
 }
 
 bool KernelValidator::isValidJmpLabel( 

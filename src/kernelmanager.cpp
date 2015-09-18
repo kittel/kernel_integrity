@@ -90,11 +90,8 @@ void KernelManager::loadAllModules(){
 
 	uint32_t concurentThreadsSupported = std::thread::hardware_concurrency();
 
-	std::cout << concurentThreadsSupported << " Threads supported" << std::endl;
-
 	std::list<std::string> moduleNames = this->getKernelModules();
 	std::mutex modMutex;
-
 	std::vector<std::thread*> threads;
 
 	for (uint32_t i = 0 ; i < concurentThreadsSupported ; i++ ) {

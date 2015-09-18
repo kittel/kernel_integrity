@@ -334,10 +334,10 @@ void ElfLoader::applyAltinstr(){
         memcpy(instr, insnbuf, a->instrlen);
     }
 
-	std::cout << COLOR_CYAN << 
-	             "Applied " << count << " / " << 
-				 count_all << " Altinstructions" << 
-				 COLOR_NORM << std::endl;
+//	std::cout << COLOR_CYAN << 
+//	             "Applied " << count << " / " << 
+//				 count_all << " Altinstructions" << 
+//				 COLOR_NORM << std::endl;
 }
 
 void ElfLoader::applyParainstr(){
@@ -390,10 +390,10 @@ void ElfLoader::applyParainstr(){
         add_nops(insnbuf + used, p->len - used);      //add_nops
         memcpy(instrInElf, insnbuf, p->len);   //memcpy
     }
-	std::cout << COLOR_CYAN << 
-	             "Applied " << count << 
-				 " Paravirt instructions" << 
-				 COLOR_NORM << std::endl;
+//	std::cout << COLOR_CYAN << 
+//	             "Applied " << count << 
+//				 " Paravirt instructions" << 
+//				 COLOR_NORM << std::endl;
 }
 
 void ElfLoader::applySmpLocks(){
@@ -445,11 +445,11 @@ void ElfLoader::applySmpLocks(){
 		    }
 		}
     }
-	std::cout << COLOR_CYAN << 
-	             "Applied " << count << 
-				 " SMP instructions" << 
-				 COLOR_NORM << 
-				 std::endl;
+//	std::cout << COLOR_CYAN << 
+//	             "Applied " << count << 
+//				 " SMP instructions" << 
+//				 COLOR_NORM << 
+//				 std::endl;
 }
 
 void ElfLoader::applyMcount(SegmentInfo &info){
@@ -470,11 +470,11 @@ void ElfLoader::applyMcount(SegmentInfo &info){
 					       ((uint64_t) (*i) - 
 							(uint64_t) this->textSegment.memindex)), 5);
     }
-	std::cout << COLOR_CYAN << 
-	             "Applied " << count << 
-				 " Mcount instructions" << 
-				 COLOR_NORM << 
-				 std::endl;
+//	std::cout << COLOR_CYAN << 
+//	             "Applied " << count << 
+//				 " Mcount instructions" << 
+//				 COLOR_NORM << 
+//				 std::endl;
 }
 
 void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
@@ -570,11 +570,11 @@ void ElfLoader::applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries){
             }
         }
     }
-	std::cout << COLOR_CYAN << 
-	             "Applied " << count << 
-				 " JMP entries" << 
-				 COLOR_NORM << 
-				 std::endl;
+//	std::cout << COLOR_CYAN << 
+//	             "Applied " << count << 
+//				 " JMP entries" << 
+//				 COLOR_NORM << 
+//				 std::endl;
 }
 
 void ElfLoader::parseElfFile(){
