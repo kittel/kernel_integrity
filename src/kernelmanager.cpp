@@ -15,6 +15,8 @@
 
 #include "elffile.h"
 
+#include "elfprocessloader.h"
+
 #include "libdwarfparser/variable.h"
 #include "libdwarfparser/function.h"
 #include "libdwarfparser/array.h"
@@ -27,14 +29,23 @@ namespace fs = boost::filesystem;
 
 KernelManager::KernelManager():
 	moduleMapMutex(), moduleMap(), 
-	dirName(), moduleInstanceMap(), symbolMap(),
+	kernelDirName(), moduleInstanceMap(), symbolMap(),
 	privSymbolMap(), moduleSymbolMap(), functionSymbolMap()
 	{
 }
 
-void KernelManager::setKernelDir(const std::string &dirName){
-	this->dirName = dirName;
+void KernelManager::setVMIInstance(VMIInstance *vmi){
+	this->vmi = vmi;
 }
+
+void KernelManager::setKernelDir(const std::string &dirName){
+	this->kernelDirName = dirName;
+}
+
+void KernelManager::setLibraryDir(const std::string &dirName){
+	this->libDirName = dirName;
+}
+
 
 ElfLoader *KernelManager::loadModule(std::string moduleName){
 	std::replace(moduleName.begin(), moduleName.end(), '-', '_');
@@ -99,7 +110,7 @@ void KernelManager::loadAllModules(){
 			new std::thread(&KernelManager::loadModuleThread,
 					this,
 					std::ref(moduleNames),
-					std::ref(modMutex));//,
+					std::ref(modMutex));
 		threads.push_back(t);
 	}
 
@@ -126,7 +137,7 @@ std::string KernelManager::findModuleFile(std::string modName){
 	    start_pos += 5;
 	}
 	std::regex regex = std::regex(modName);
-	for( fs::recursive_directory_iterator end, dir(this->dirName);
+	for( fs::recursive_directory_iterator end, dir(this->kernelDirName);
 			dir != end; dir++){
 		if(fs::extension(*dir) == ".ko"){
 			if (std::string((*dir).path().string()).find("debian") != 
@@ -139,7 +150,6 @@ std::string KernelManager::findModuleFile(std::string modName){
 		}
 	}
 	return "";
-
 }
 
 std::list<std::string> KernelManager::getKernelModules(){
@@ -285,7 +295,7 @@ void KernelManager::updateRevMaps(){
 }
 
 void KernelManager::parseSystemMap(){
-	std::string sysMapFileName = this->dirName;
+	std::string sysMapFileName = this->kernelDirName;
 	sysMapFileName.append("/System.map");
 	std::string line;
 	std::ifstream sysMapFile (sysMapFileName);
@@ -309,4 +319,96 @@ void KernelManager::parseSystemMap(){
 		std::cout << "Unable to open file" << std::endl;
 		return;
     }
+}
+
+ElfLoader *KernelManager::loadLibrary(std::string libraryName){
+	
+//	moduleMapMutex.lock();
+//	// Check if module is already loaded
+	if (this->libraryMap.find(libraryName) != this->libraryMap.end()){
+		// This might be NULL! Think about
+//		moduleMapMutex.unlock();
+//		while (moduleMap[moduleName] == NULL){
+//			std::this_thread::yield();
+//		}
+		return this->libraryMap[libraryName];
+	}
+//	moduleMap[moduleName] = NULL;
+//	moduleMapMutex.unlock();
+	
+	std::string filename = findLibraryFile(libraryName);
+	if(filename.empty()){
+		std::cout << libraryName << ": Library File not found" << std::endl;
+		return NULL;
+	}
+	//Create ELF Object
+	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
+	auto library = dynamic_cast<ElfProcessLoader64 *>
+               (libraryFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC,
+	                               libraryName, this));
+	//this->execLoader->supplyVDSO(dynamic_cast<ElfProcessLoader64*>(this->vdsoLoader));
+	library->parseElfFile();
+	
+//	moduleMapMutex.lock();
+	std::cout << "library loaded: " << libraryName << std::endl;
+	this->libraryMap[libraryName] = library;
+//	moduleMapMutex.unlock();
+//	
+	return library;
+}
+
+ElfProcessLoader* KernelManager::findLibByName(std::string name){ 
+	if(this->libraryMap.find(name) == this->libraryMap.end()){
+		return NULL;
+	}
+	return dynamic_cast<ElfProcessLoader*>(libraryMap[name]);
+}
+
+std::string KernelManager::findLibraryFile(std::string libName){
+	std::regex regex = std::regex(libName);
+	for( fs::recursive_directory_iterator end, dir(this->libDirName);
+		dir != end; dir++){
+		if (std::regex_match((*dir).path().filename().string(), regex)){
+			return (*dir).path().native();
+		}
+	}
+	return "";
+}
+
+ElfLoader* KernelManager::loadVDSO(){
+	// Symbols in Kernel that point to the vdso page
+	// ... the size is currently unknown
+	// TODO Find out the correct archirecture of the binary.
+	//
+	// vdso_image_64
+	// vdso_image_x32
+	// vdso_image_32_int80
+	// vdso_image_32_syscall
+	// vdso_image_32_sysenter
+	
+	std::string vdsoString = std::string("[vdso]");
+	if (this->libraryMap.find(vdsoString) != this->libraryMap.end()){
+		return this->libraryMap[vdsoString];
+	}
+
+	auto vdsoVar = Variable::findVariableByName("vdso_image_64");
+	assert(vdsoVar);
+
+	auto vdsoImage = vdsoVar->getInstance();
+	
+	assert(vmi);
+	auto vdso = vmi->readVectorFromVA(
+	             vdsoImage.memberByName("data").getRawValue<uint64_t>(false),
+	             vdsoImage.memberByName("size").getValue<uint64_t>());
+
+	// Load VDSO page
+	ElfFile* vdsoFile = ElfFile::loadElfFileFromBuffer(vdso.data(), vdso.size());
+
+	auto vdsoLoader = dynamic_cast<ElfProcessLoader64*>
+	           (vdsoFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC,
+	           "[vdso]", this));
+	vdsoLoader->parseElfFile();
+
+	this->libraryMap[vdsoString] = vdsoLoader;
+	return vdsoLoader;
 }

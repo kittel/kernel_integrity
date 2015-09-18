@@ -20,13 +20,18 @@ class ElfFile32 : public ElfFile {
 		ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent);
 		virtual ~ElfFile32();
 
-		SegmentInfo findSegmentWithName(std::string sectionName);
-		SegmentInfo findSegmentByID(uint32_t sectionID);
+		int getNrOfSections();
+
+		SectionInfo findSectionWithName(std::string sectionName);
+		SectionInfo findSectionByID(uint32_t sectionID);
 		bool isCodeAddress(uint64_t address);
 		bool isDataAddress(uint64_t address);
-		std::string segmentName(int sectionID);
-		uint8_t *segmentAddress(int sectionID);
-		uint64_t segmentAlign(int sectionID);
+		std::string sectionName(int sectionID);
+		uint8_t *sectionAddress(int sectionID);
+		uint64_t sectionAlign(int sectionID);
+
+		SegmentInfo findCodeSegment();
+		SegmentInfo findDataSegment();
 
 		std::string symbolName(uint32_t index);
 
@@ -38,6 +43,10 @@ class ElfFile32 : public ElfFile {
 
 		bool isRelocatable();
 		void applyRelocations(ElfModuleLoader *loader);
+		virtual bool isDynamic();
+		std::vector<std::string> getDependencies();
+
+		virtual bool isExecutable();
 	protected:
 };
 

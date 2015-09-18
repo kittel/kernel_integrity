@@ -11,10 +11,13 @@
 #include <sstream>
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
+#include <fstream>
+#include <iostream>
 
-#define	COLOR_RESET         "\033[0m"  
-#define	COLOR_NORM          "\033[39m"  
+#define	COLOR_RESET         "\033[0m"
+#define	COLOR_NORM          "\033[39m"
 #define	COLOR_GRAY          "\033[30m"
 #define	COLOR_RED           "\033[31m"
 #define	COLOR_GREEN         "\033[32m"
@@ -125,10 +128,37 @@ inline std::string& toSTDstring(const char *input){
 
 /* Reduce given path to filename */
 inline std::string getNameFromPath(std::string path){
-	std::string ret = path.substr(path.rfind("/", std::string::npos),
+	std::string ret = path.substr(path.rfind("/", std::string::npos) + 1,
 									std::string::npos);
-	ret.erase(std::begin(ret));
 	return ret;
 }
 
+inline void dumpToFile(std::string filename, std::vector<uint8_t> content){
+	std::ofstream outfile (filename, std::ofstream::binary);
+	outfile.write((char*) content.data(), content.size());
+	outfile.close();
+}
+
+inline uint32_t appendDataToVector(const void *data, uint32_t len,
+                                   std::vector<uint8_t> *target){
+	uint8_t *input = (uint8_t*) data;
+	target->insert(target->end(), input, (input + len));
+	return len;
+}
+
+inline bool fexists(std::string filename)
+{
+	std::ifstream ifile(filename);
+	return ifile;
+}
+
+#define contained(value, left, right) (value >= left && value <= right)
+
+template<typename T>
+inline bool betweenRange(T value, std::vector<std::pair<T, T>> r){
+	for( auto elem : r ){
+		if(contained(value, elem.first, elem.second)) return true;
+	}
+	return false;
+}
 #endif /* _HELPERS_H_ */

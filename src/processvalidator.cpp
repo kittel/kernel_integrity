@@ -13,55 +13,50 @@
 #include <processvalidator.h>
 
 // TODO: retrieve paths from command line parameters
-ProcessValidator::ProcessValidator(const std::string dir, VMIInstance* vmi, int32_t pid,
-std::string vdsoPath="/home/phate/ws14/bachelorarbeit/test_suite/images/vdso_memimage",
-std::string libPath="/home/phate/ws14/bachelorarbeit/test_suite/images/libs",
-std::string kernPath="/home/phate/ws14/bachelorarbeit/test_suite/images/vmlinux-debug"):
-                                   vmi(vmi), pid(pid), tm(vmi, kernPath),
-								   vdsoPath(vdsoPath){
+ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
+	const std::string binaryName, VMIInstance* vmi, int32_t pid):
+		vmi(vmi), kl(kl), pid(pid), tm(){
 
-	std::cout << "ProcessValidator got dir: " << dir << std::endl;
-	std::cout << "Trying to load executable and vdso in ProcessValidator..." << std::endl;
+	std::cout << "ProcessValidator got: " << binaryName << std::endl;
 
-	//Load trusted executable for checking
-	this->loadExec(vdsoPath);
-	this->loadExec(dir);
-	this->lastLoader = this->execLoader;
-
-	if(this->execLoader->isDynamic()){
-		this->vdsoLoader->updateMemIndex(this->dynVDSOAddr, SEG_NR_TEXT);
-	}
-	else{
-		this->vdsoLoader->updateMemIndex(this->statVDSOAddr, SEG_NR_TEXT);
-	}
-
-
-	if(this->execLoader->isDynamic()){
-		std::cout << "Trying to init libraries from path '" << libPath
-		<< " ... " << std::endl;
-
-
-		// Load trusted libraries for linking with execLoader
-		this->initSuppliedLibraries(libPath.c_str());
-
-		// Provide initSuppliedLibraries to all involved ElfProcessLoaders
-
-		std::cout << "Supplying libraries to all loaders ..." << std::endl;
-
-		this->execLoader->supplyLibraries(&(this->suppliedLibraries));
-		// vdsoLoader has no deps!
-
-		for(auto it = this->suppliedLibraries.begin();
-				it != this->suppliedLibraries.end(); it++){
-			(*it)->supplyLibraries(&(this->suppliedLibraries));
-		}
-	}
-
-	// get memindex information
+	this->loadExec(binaryName);
+	
 	std::cout << "Linking VMAs to corresponding Loaders..." << std::endl;
 	this->mappedVMAs = tm.getVMAInfo(pid);
 	this->buildMaps(this->mappedVMAs);
 	this->printVMAs();
+
+
+	std::vector<std::pair<uint64_t, uint64_t>> range;
+	for (auto line : this->mappedVMAs){
+		range.push_back(std::pair<uint64_t,uint64_t>(line.start, line.end));
+	}
+
+	for (auto line : this->mappedVMAs){
+		uint64_t counter = 0;
+		auto content = vmi->readVectorFromVA(line.start,
+		                                    line.end - line.start,
+		                                    pid);
+		uint8_t* data = content.data();
+		for(uint32_t i = 0 ; i < content.size() - 7; i++){
+			uint64_t* value = (uint64_t*) data + i;
+			//if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
+			//	continue;
+			//}
+			if (betweenRange(*value, range)) counter++;
+		}
+
+		std::cout << "Found " << counter << " pointers in section:" << std::endl;
+		line.print();
+	}
+
+
+	exit(0);
+
+	//Load trusted executable for checking
+	this->lastLoader = this->execLoader;
+
+	// get memindex information
 
 	// adjust the memindex of every library execLoader needs
 	std::cout << "Updating memindexes of all libraries..." << std::endl;
@@ -72,26 +67,7 @@ std::string kernPath="/home/phate/ws14/bachelorarbeit/test_suite/images/vmlinux-
 	this->processLoadRel();
 }
 
-ProcessValidator::~ProcessValidator(){
-	//TODO free TaskManager?
-}
-
-// TODO maybe optimize by using map instead of vector
-/* Lookup a supplied Library by its name. Returns NULL, if non-existant */
-ElfProcessLoader64* ProcessValidator::getLibByName(std::string name){ 
-	for(auto it = this->suppliedLibraries.begin();
-				it != this->suppliedLibraries.end(); it++){
-		if(((*it)->getName()).find(name, 0) != std::string::npos){
-			return (*it);
-		}
-	}
-	if(this->execLoader->getName().find(name) == std::string::npos){
-		std::cout << "error:(getLibByName) Couldn't find lib " << name
-		<< " in suppliedLibs..." << std::endl;
-	}
-
-	return NULL;
-}
+ProcessValidator::~ProcessValidator(){}
 
 /* Process load-time relocations of all libraries, which are mapped to the
  * virtual address space of our main process. The following steps have to be
@@ -106,19 +82,19 @@ ElfProcessLoader64* ProcessValidator::getLibByName(std::string name){
 void ProcessValidator::processLoadRel(){
 
 	// retrieve mapped libraries in the right order
-	std::vector<ElfProcessLoader64*> mappedLibs = this->getMappedLibs();
+	std::set<ElfProcessLoader*> mappedLibs = this->getMappedLibs();
 
 	// for every mapped library
-	for(auto it = std::begin(mappedLibs); it != std::end(mappedLibs); it++){
+	for(auto it : mappedLibs){
 
 		//initialize provided symbols based on updated memindexes
-		(*it)->initProvidedSymbols();
+		it->initProvidedSymbols();
 
 		// announce provided symbols
-		this->announceSyms((*it));
+		this->announceSyms(it);
 
 		// process own relocations
-		(*it)->applyLoadRel(&this->relSymMap);
+		it->applyLoadRel(&this->relSymMap);
 	}
 	return;
 }
@@ -130,32 +106,25 @@ void ProcessValidator::processLoadRel(){
  * => Reverse iterate through the mappedVMAs and find the corresponding loader,
  *    gives the loaders in the correct processing order.
  */
-std::vector<ElfProcessLoader64*> ProcessValidator::getMappedLibs(){
+std::set<ElfProcessLoader*> ProcessValidator::getMappedLibs(){
 
-	std::vector<ElfProcessLoader64*> ret;
-	ElfProcessLoader64* l;
-	bool exists = false;
+	std::set<ElfProcessLoader*> ret;
+	ElfProcessLoader* l;
 
-	for(auto it = (this->mappedVMAs).rbegin(); it != (this->mappedVMAs).rend();
-		it++){
+	for(auto it : this->mappedVMAs){
 
 		try{
-			l = this->vmaToLoaderMap.at((*it));
+			l = this->vmaToLoaderMap.at(&it);
 		} catch (const std::out_of_range& oor){
 #ifdef VERBOSE
-			std::cout << "Couldn't find " << (*it)->name << " at "
-			<< (void*)(*it)->start
+			std::cout << "Couldn't find " << it.name << " at "
+			<< (void*)it.start
 			<< " in vmaToLoaderMap database. Skipping..." << std::endl;
 #endif
 			continue;
 		}
 
-		if(std::find(ret.begin(), ret.end(), l) == ret.end()) exists = false;
-		else exists = true;
-
-		if(!exists){
-			ret.push_back(l);
-		}
+		ret.insert(l);
 	}
 	return ret;
 }
@@ -166,7 +135,7 @@ std::vector<ElfProcessLoader64*> ProcessValidator::getMappedLibs(){
  *  - if( symbol not yet in map || symbol in map(WEAK) and exported symbol(GLOBAL)
  *      - add to map
  */
-void ProcessValidator::announceSyms(ElfProcessLoader64* lib){
+void ProcessValidator::announceSyms(ElfProcessLoader* lib){
 
 	std::vector<RelSym*> syms = lib->getProvidedSyms();
 	RelSym* match = NULL;
@@ -209,92 +178,96 @@ void ProcessValidator::announceSyms(ElfProcessLoader64* lib){
 
 
 /* Initialize vmaToLoaderMap and addrToLoaderMap  */
-void ProcessValidator::buildMaps(std::vector<VMAInfo*> vec){
+void ProcessValidator::buildMaps(std::vector<VMAInfo> vec){
 
+	return;
 	std::cout << "Trying to build Maps..." << std::endl;
-
-	ElfProcessLoader64 *lib = NULL;
+	//ElfProcessLoader *lib = NULL;
 
 	// for every vma try to find a corresponding Loader
-	for(auto it = std::begin(vec); it != std::end(vec); it++){
-
-		// if main binary
-		if((getNameFromPath(this->execLoader->getName())
-			.compare((*it)->name)) == 0){
-			vmaToLoaderMap.insert(
-				std::pair<VMAInfo*, ElfProcessLoader64*>((*it), this->execLoader));
-			addrToLoaderMap.insert(
-				std::pair<uint64_t, ElfProcessLoader64*>((*it)->start, 
-															this->execLoader));
-			lib = this->execLoader;
-#ifdef DEBUG
-			std::cout << "Added " << (*it)->name << " to Maps."
-			<< std::endl;
-#endif
-			continue;
-		}
-
-		// if anon mapping
-		if((*it)->ino == 0){
-			if((*it)->start == this->vdsoLoader->getTextStart()){
-				// add the vdso to the addr->loader map
-#ifdef DEBUG
-				std::cout << "Found VDSO mapping." << std::endl;
-#endif
-				addrToLoaderMap.insert(
-				std::pair<uint64_t, ElfProcessLoader64*>(this->vdsoLoader->getTextStart(),
-												this->vdsoLoader));
-			}
-			// if this is a regular anon mapping -> associate with last lib
-			// the mapping will most certainly be the heap of the last lib
-			else{
-				// if this is the stack of our main binary
-				if((*it)->start >= this->stdStackTop
-					&& (*it)->start <= this->stdStackBot){
-#ifdef DEBUG
-					std::cout << "Found stack of the main binary." << std::endl;
-#endif
-					addrToLoaderMap.insert(
-					std::pair<uint64_t, ElfProcessLoader64*>((*it)->start,
-															this->execLoader));
-				}
-				else{
-					std::string name = getNameFromPath(lib->getName());
-#ifdef DEBUG
-					std::cout << "Found heap of " << name << std::endl;
-#endif
-					addrToLoaderMap.insert(
-						std::pair<uint64_t, ElfProcessLoader64*>((*it)->start, lib));
-					name.append(" <heap>");
-					SegmentInfo* heap =
-						new SegmentInfo(name, 0, 0, (*it)->start,
-										((*it)->end - (*it)->start));
-					lib->setHeapSegment(heap);
-				}
-			}
-			continue;
-		}
-
-		// if usual library
-		lib = this->getLibByName((*it)->name);
-		if(lib == NULL){
-#ifdef DEBUG
-			std::cout << "error:(buildMaps) Couldn't find corresponding"
-			<< " library for VMA [" << (*it)->name << "]" << std::endl;
-#endif
-			// TODO make sure all libs are here
-			// lib mustn't be NULL for dereferencing in output above
-			lib = this->execLoader;
-		}
-		vmaToLoaderMap.insert(
-			std::pair<VMAInfo*, ElfProcessLoader64*>((*it), lib));
-		addrToLoaderMap.insert(
-			std::pair<uint64_t, ElfProcessLoader64*>((*it)->start, lib));
-#ifdef DEBUG
-		std::cout << "Added " << (*it)->name << " to Maps."
-		<< std::endl;
-#endif
+	for(auto it : vec){
+		continue;
 	}
+
+//		// if main binary
+//		if((getNameFromPath(this->execLoader->getName())
+//			.compare((*it)->name)) == 0){
+//			vmaToLoaderMap.insert(
+//				std::pair<VMAInfo*, ElfProcessLoader*>((*it), this->execLoader));
+//			addrToLoaderMap.insert(
+//				std::pair<uint64_t, ElfProcessLoader*>((*it)->start, 
+//															this->execLoader));
+//			lib = this->execLoader;
+//#ifdef DEBUG
+//			std::cout << "Added " << (*it)->name << " to Maps."
+//			<< std::endl;
+//#endif
+//			continue;
+//		}
+
+//		// if anon mapping
+//		if(it->ino == 0){
+//			//Is this the vdso page?
+//			if(it->start == this->vdsoLoader->getTextStart()){
+//				// add the vdso to the addr->loader map
+//#ifdef DEBUG
+//				std::cout << "Found VDSO mapping." << std::endl;
+//#endif
+//				addrToLoaderMap.insert(
+//				std::pair<uint64_t, ElfProcessLoader*>(this->vdsoLoader->getTextStart(),
+//												this->vdsoLoader));
+//			}
+//			// if this is a regular anon mapping -> associate with last lib
+//			// the mapping will most certainly be the heap of the last lib
+//			else{
+//				// if this is the stack of our main binary
+//				if( it->start >= this->stdStackTop &&
+//					it->start <= this->stdStackBot){
+//#ifdef DEBUG
+//					std::cout << "Found stack of the main binary." << std::endl;
+//#endif
+//					addrToLoaderMap.insert(
+//					std::pair<uint64_t, ElfProcessLoader*>(it->start,
+//															this->execLoader));
+//				}
+//				else{
+//					std::string name = getNameFromPath(lib->getName());
+//#ifdef DEBUG
+//					std::cout << "Found heap of " << name << std::endl;
+//#endif
+//					addrToLoaderMap.insert(
+//						std::pair<uint64_t, ElfProcessLoader*>(it->start, lib));
+//					name.append(" <heap>");
+//					SectionInfo* heap =
+//						new SectionInfo(name, 0, 0, it->start,
+//										(it->end - it->start));
+//					lib->setHeapSegment(heap);
+//				}
+//			}
+//			continue;
+//		}
+//
+//		// if usual library
+//		lib = kl->findLibByName(it->name);
+//		if(lib == NULL){
+//			assert(lib);
+//#ifdef DEBUG
+//			std::cout << "error:(buildMaps) Couldn't find corresponding"
+//			<< " library for VMA [" << it->name << "]" << std::endl;
+//#endif
+//			// TODO make sure all libs are here
+//			// lib mustn't be NULL for dereferencing in output above
+//			lib = this->execLoader;
+//		}
+//		vmaToLoaderMap.insert(
+//			std::pair<VMAInfo*, ElfProcessLoader*>(it, lib));
+//		addrToLoaderMap.insert(
+//			std::pair<uint64_t, ElfProcessLoader*>(it->start, lib));
+//#ifdef DEBUG
+//		std::cout << "Added " << it->name << " to Maps."
+//		<< std::endl;
+//#endif
+//	}
 }
 
 
@@ -304,23 +277,22 @@ void ProcessValidator::printVMAs(){
 	std::cout << "Currently mapped VMAs:" << std::endl;
 
 	int i = 0;
-	for(auto it = std::begin(this->mappedVMAs);
-			it != std::end(this->mappedVMAs); it++){
+	for(auto it : this->mappedVMAs){
 		std::string name;
-		if((*it)->name.compare("") == 0){
+		if(it.name.compare("") == 0){
 			name = "<anonymous>";
 		}
-		else if((*it)->start == this->vdsoLoader->getTextStart()) name = "<vdso>";
 		else{
-			name = (*it)->name;
+			name = it.name;
 		}
 		std::cout << "[" << std::right << std::setfill(' ') << std::setw(3)
-		<< std::dec << i << "] "
-		<< std::left << std::setw(30) << name << std::hex << std::setfill('0')
-		<< "0x" << std::right << std::setw(16) << (*it)->start << " - " 
-		<< "0x" << std::right << std::setw(16) << (*it)->end << "  "
-		<< "0x" << std::right << std::setw(10) << ((*it)->off*0x1000)
-		<< std::setfill(' ') << std::endl;
+			<< std::dec << i << "] "
+			<< std::left << std::setw(30) << name <<
+			std::hex << std::setfill('0')
+			<< "0x" << std::right << std::setw(12) << it.start << " - " 
+			<< "0x" << std::right << std::setw(12) << it.end << "  "
+			<< "0x" << std::right << std::setw(10) << it.off*0x1000
+			<< std::setfill(' ') << std::endl;
 		i++;
 	}
 	return;
@@ -334,7 +306,7 @@ void ProcessValidator::updateMemindexes(){
 	std::string mapping;
 
 	input = getNameFromPath(this->execLoader->getName());
-	mapping = (*std::begin(this->mappedVMAs))->name;
+	mapping = (*std::begin(this->mappedVMAs)).name;
 	if(input.compare(mapping) != 0){
 		std::cout << "Name of input binary and vma mapping differs! Aborting!"
 		<< std::endl
@@ -343,7 +315,7 @@ void ProcessValidator::updateMemindexes(){
 	}
 
 
-	ElfProcessLoader64 *lib = 0;
+	ElfProcessLoader *lib = 0;
 	uint64_t lastInode = 0;
 	uint64_t lastOffset = (uint64_t)-1; // set to greates possible value
 //	bool isDataSet = false; // is dataSegment->memindex already set for curLoader
@@ -356,39 +328,38 @@ void ProcessValidator::updateMemindexes(){
 	 * corresponds to its textSegment, while the mapping with the dataSegBaseOff
 	 * of an inode corresponds to its dataSegment.
 	 */
-	for(auto it = std::begin(this->mappedVMAs);
-				it != std::end(this->mappedVMAs); it++){
+	for(auto it : this->mappedVMAs){
 #ifdef DEBUG
-		std::cout << "Processing entry with start addr " << (void*)(*it)->start
-		<< " and inode " << std::dec << (*it)->ino << std::endl;
+		std::cout << "Processing entry with start addr " << (void*)it.start
+		<< " and inode " << std::dec << it.ino << std::endl;
 #endif
 		// if the current iterator belongs to the father process
-		if(getNameFromPath(this->execLoader->getName()).compare((*it)->name) == 0){
+		if(getNameFromPath(this->execLoader->getName()).compare(it.name) == 0){
 			// update textSegment?
 			// update dataSegment? -> atm only works for PDC
 			lib = this->execLoader;
-			lastInode = (*it)->ino;
+			lastInode = it.ino;
 			continue;
 		}
 		// if the current iterator belongs to the vdso
-		else if(this->vdsoLoader->getTextStart() == (*it)->start){
+		else if(this->vdsoLoader->getTextStart() == it.start){
 			continue;
 		}
 		// if the current iterator is a regular library or anon mapping
 		else{
 			// if anon mapping
-			if((*it)->ino == 0) continue;
+			if(it.ino == 0) continue;
 			else{
 				// if in vm-area of a new loader (inode nrs differ)
-				if(lastInode != (*it)->ino){
+				if(lastInode != it.ino){
 					lastOffset = (uint64_t)-1;
 
 					// lib++
 					try{
-						lib = this->vmaToLoaderMap.at(*it);
+						lib = this->vmaToLoaderMap.at(&it);
 					} catch (const std::out_of_range& oor){
 						std::cout << "Couldn't find mapping starting at "
-						<< (void*)(*it)->start
+						<< (void*)it.start
 						<< " in library database. Skipping..." << std::endl;
 						continue;
 					}
@@ -398,126 +369,33 @@ void ProcessValidator::updateMemindexes(){
 
 					// if the textSegment isn't already set TODO move this back?
 					if(!isTextSet){
-						if(lib->isTextOffset((*it)->off * this->stdPageSize)){
-							lib->updateMemIndex((*it)->start, SEG_NR_TEXT);
+						if(lib->isTextOffset(it.off * this->stdPageSize)){
+							lib->updateMemIndex(it.start, SEG_NR_TEXT);
 							isTextSet = true;
 						}
 					}
 
-					lastInode = (*it)->ino;
+					lastInode = it.ino;
 				}
 				// if still inside same inode area
 				else{
 					// if dataSegment is not already set
 					//if(!isDataSet){
 					// if current offset is a data offset and smaller as all before
-					if(((*it)->off * this->stdPageSize) < lastOffset){
+					if((it.off * this->stdPageSize) < lastOffset){
 						// if the current address is the first data address
-						if(lib->isDataOffset((*it)->off * this->stdPageSize)){
-							lib->updateMemIndex((*it)->start, SEG_NR_DATA);
-							lastOffset = (*it)->off * this->stdPageSize;
+						if(lib->isDataOffset(it.off * this->stdPageSize)){
+							lib->updateMemIndex(it.start, SEG_NR_DATA);
+							lastOffset = it.off * this->stdPageSize;
 //							isDataSet = true;
 						}
 					}
-					lastInode = (*it)->ino;
+					lastInode = it.ino;
 					continue;
 				}
 			}
 		}
 	}
-}
-
-
-void ProcessValidator::printSuppliedLibraries(){
-	// for every involved Loader, print the names of all suppliedLibraries
-
-	std::cout << "Main loader " << this->execLoader->getName() << " has Libraries:"
-	<< std::endl;
-
-	for(auto et = (this->execLoader->getLibraries())->begin();
-				et != (this->execLoader->getLibraries())->end(); et++){
-		std::cout << " ==> " << (*et)->getName() << std::endl;
-	}
-
-	for(auto it = this->suppliedLibraries.begin();
-			it != this->suppliedLibraries.end(); it++){
-		std::cout << std::endl;
-		std::cout << "Library " << (*it)->getName() << " has suppLibs:"
-		<< std::endl;
-
-		for(auto at = ((*it)->getLibraries())->begin();
-				at != ((*it)->getLibraries())->end(); at++){
-			std::cout << " ==> " << (*at)->getName() << std::endl;
-		}
-	}
-}
-
-void ProcessValidator::printProcessImage(){
-	//this->vdsoLoader->printImage();
-	//this->execLoader->printImage();
-	std::cout << "Printing all libs :" << std::endl;
-	for(auto it = this->suppliedLibraries.begin();
-		it != this->suppliedLibraries.end(); it++){
-		(*it)->printImage();
-		std::cout << std::endl << std::endl;
-	}
-}
-
-
-/* Load all given whitelisted libraries from libraryPath into the Vector */
-void ProcessValidator::initSuppliedLibraries(const char *path){
-
-	struct dirent *entry;
-	DIR *dp;
-
-	// Traverse given directory
-	dp = opendir(path);
-	if (dp == NULL) {
-			std::cout <<"error:(initSuppliedLibraries) Path does not exist"
-			<< " or could not be read." << std::endl;
-		return;
-	}
-
-	ElfFile64 *libFile = NULL;
-	ElfProcessLoader64 *ins = NULL;
-	std::string entryPath;
-
-	while ((entry = readdir(dp))){
-		if(strncmp(entry->d_name, ".", 1) != 0
-
-			&& strncmp(entry->d_name, "..", 2) != 0){
-
-#ifdef DEBUG
-			std::cout << "Trying to create ElfFile64 from " << entry->d_name
-			<< " ... " << std::endl;
-#endif
-			entryPath.append(path);
-			entryPath.push_back('/');
-			entryPath.append(entry->d_name);
-
-			libFile = dynamic_cast<ElfFile64*>(ElfFile::loadElfFile(entryPath));
-
-			if(libFile == NULL){
-				// if lib couldn't be loaded, try to load next
-				std::cout << "error:(initSuppliedLibraries) Couldn't mmap "
-				<< entry->d_name << ". Continuing..." << std::endl;
-				continue;
-			}
-
-			ins = dynamic_cast<ElfProcessLoader64 *>
-                   (libFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, entryPath, NULL));
-			ins->supplyVDSO(dynamic_cast<ElfProcessLoader64*>(this->vdsoLoader));
-			ins->parseElfFile();
-			ins->setIsLib(true);
-
-			this->suppliedLibraries.push_back(ins);
-
-			entryPath = "";
-		}
-	}
-
-	closedir(dp);
-	return;
 }
 
 /* If not specified otherwise, reads the first page from heap */
@@ -728,10 +606,10 @@ int ProcessValidator::checkEnvironment(std::map<std::string, std::string> inputM
  * By providing a backup loader, this function guarantees to return a valid
  * loader, if no entry in the database is found.
  */
-ElfProcessLoader64* ProcessValidator::getLoaderForAddress(uint64_t addr,
-														ElfProcessLoader64* backup){
+ElfProcessLoader* ProcessValidator::getLoaderForAddress(uint64_t addr,
+                                                        ElfProcessLoader* backup){
 
-	ElfProcessLoader64 *ret = NULL;
+	ElfProcessLoader *ret = NULL;
 	try{
 		ret = this->addrToLoaderMap.at(addr);
 	} catch (const std::out_of_range& oor){
@@ -744,13 +622,13 @@ ElfProcessLoader64* ProcessValidator::getLoaderForAddress(uint64_t addr,
 	return ret;
 }
 
-/* Find a corresponding SegmentInfo for the given vaddr */
-SegmentInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr){
+/* Find a corresponding SectionInfo for the given vaddr */
+SectionInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr){
 
-	SegmentInfo *ret;
+	SectionInfo *ret;
 
 	// find a corresponding loader for the given vaddr
-	ElfProcessLoader64* loader = this->getLoaderForAddress(vaddr, this->lastLoader);
+	ElfProcessLoader* loader = this->getLoaderForAddress(vaddr, this->lastLoader);
 	this->lastLoader = loader;
 	ret = loader->getSegmentForAddress(vaddr);
 	return ret;
@@ -767,7 +645,7 @@ SegmentInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr){
  */
 int ProcessValidator::evalLazy(uint64_t start, uint64_t addr){
 
-	ElfProcessLoader64* loader = 0;
+	ElfProcessLoader* loader = 0;
 
 	try{
 		loader = this->addrToLoaderMap.at(start);
@@ -795,7 +673,7 @@ int ProcessValidator::_validatePage(page_info_t *page, int32_t pid){
 		return 0;
 	}
 
-	SegmentInfo *targetSegment = this->getSegmentForAddress(page->vaddr);
+	SectionInfo *targetSegment = this->getSegmentForAddress(page->vaddr);
 
 	if(targetSegment == NULL){
 		std::cout << "Located in heap." << std::endl;
@@ -1004,39 +882,16 @@ int ProcessValidator::validatePage(page_info_t *page, int32_t pid){
 //	return 0;
 }
 
-int ProcessValidator::loadExec(std::string path){
-#ifdef DEBUG
-		std::cout << "loadExec got path: " << path << std::endl;
-#endif
-
+int ProcessValidator::loadExec(const std::string path){
+	
 	//Create ELF Object
 	ElfFile *execFile = ElfFile::loadElfFile(path);
-#ifdef DEBUG
-	std::cout << "ElfFile loaded." << std::endl;
-#endif
 
-	if(path.find("vdso_memimage") != std::string::npos){
-#ifdef DEBUG
-			std::cout << "debug: parsing vdso" << std::endl;
-#endif
-		this->vdsoLoader = dynamic_cast<ElfProcessLoader64*>
-                   (execFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, path, NULL));
-		this->vdsoLoader->supplyVDSO(dynamic_cast<ElfProcessLoader64*>(this->vdsoLoader));
-		this->vdsoLoader->parseElfFile();
-		this->vdsoLoader->setIsLib(true);
-	}
-	else{
-#ifdef DEBUG
-			std::cout << "debug: parsing normal exec" << std::endl;
-#endif
-		this->execLoader = dynamic_cast<ElfProcessLoader64 *>
-                   (execFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, path, NULL));
-		this->execLoader->supplyVDSO(dynamic_cast<ElfProcessLoader64*>(this->vdsoLoader));
-		this->execLoader->parseElfFile();
-	}
-#ifdef DEBUG
-	std::cout << "Created execLoader." << std::endl;
-#endif
+	std::string name = path.substr(path.rfind("/", std::string::npos) + 1,
+	                               std::string::npos);
+	this->execLoader = dynamic_cast<ElfProcessLoader64 *>
+               (execFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, name, kl));
+	this->execLoader->parseElfFile();
 
 	return 0;
 }

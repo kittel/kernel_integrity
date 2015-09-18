@@ -11,16 +11,16 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-SegmentInfo::SegmentInfo(): segName(), segID(0), index(0), memindex(0), size(0){}
-SegmentInfo::SegmentInfo(uint8_t *i, unsigned int s):
+SectionInfo::SectionInfo(): segName(), segID(0), index(0), memindex(0), size(0){}
+SectionInfo::SectionInfo(uint8_t *i, unsigned int s):
 				segName(), segID(), index(i), memindex(0), size(s){}
-SegmentInfo::SegmentInfo(std::string segName, uint32_t segID, uint8_t *i, 
+SectionInfo::SectionInfo(std::string segName, uint32_t segID, uint8_t *i, 
 					uint64_t a, uint32_t s):
 				segName(segName), segID(segID), index(i), 
 				memindex((uint8_t*) a), size(s){}
-SegmentInfo::~SegmentInfo(){}
+SectionInfo::~SectionInfo(){}
 
-bool SegmentInfo::containsElfAddress(uint64_t address){
+bool SectionInfo::containsElfAddress(uint64_t address){
 	uint64_t addr = (uint64_t) this->index;
 	if (address >= addr &&
 		address <= addr + this->size){
@@ -29,7 +29,7 @@ bool SegmentInfo::containsElfAddress(uint64_t address){
 	return false;
 }
 
-bool SegmentInfo::containsMemAddress(uint64_t address){
+bool SectionInfo::containsMemAddress(uint64_t address){
 	uint64_t addr = (int64_t) this->memindex;
 	if (address >= addr &&
 		address <= addr + this->size){
@@ -37,6 +37,35 @@ bool SegmentInfo::containsMemAddress(uint64_t address){
 	}
 	return false;
 }
+
+SegmentInfo::SegmentInfo():
+	type(0),
+	flags(0),
+	offset(0),
+	vaddr(0),
+	paddr(0),
+	filesz(0),
+	memsz(0),
+	align(0){}
+
+SegmentInfo::SegmentInfo(uint32_t p_type,
+                         uint32_t p_flags,
+                         uint64_t p_offset,
+                         uint8_t* p_vaddr,
+                         uint8_t* p_paddr,
+                         uint64_t p_filesz,
+                         uint64_t p_memsz,
+                         uint64_t p_align):
+	type  (p_type),
+	flags (p_flags),
+	offset(p_offset),
+	vaddr (p_vaddr),
+	paddr (p_paddr),
+	filesz(p_filesz),
+	memsz (p_memsz),
+	align (p_align){}
+
+SegmentInfo::~SegmentInfo(){}
 
 ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type,
 				 ElfProgramType programType):
@@ -63,14 +92,21 @@ ElfFile::~ElfFile(){
 }
 
 ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
-
-	ElfFile * elfFile = 0;
-
 	FILE* fd = 0;
+	fd = fopen(filename.c_str(), "rb");
+
+	if(!fd){
+		std::cout << COLOR_RED << COLOR_BOLD <<
+		    "File not found: " << filename <<
+		    COLOR_NORM << std::endl;
+		exit(0);
+	}
+
+	ElfFile* elfFile = 0;
+
 	size_t fileSize = 0;
 	uint8_t* fileContent = 0;
 
-	fd = fopen(filename.c_str(), "rb");
     if (fd != NULL) {
         /* Go to the end of the file. */
         if (fseek(fd, 0L, SEEK_END) == 0) {
@@ -81,10 +117,12 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
             fileContent = (uint8_t*) mmap(0, fileSize,
 					PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(fd), 0);
             if (fileContent == MAP_FAILED) {
+				std::cout << "mmap failed" << std::endl;
                 throw ElfException("MMAP failed!!!\n");
             }
         }
     }else{
+		std::cout << "cannot load file" << std::endl;
 		throw ElfException("Cannot load file");
 	}
 
@@ -98,6 +136,30 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
     	elfFile = new ElfFile64(fd, fileSize, fileContent);
     }
     elfFile->fd = fd;
+    elfFile->fileSize = fileSize;
+    elfFile->fileContent = fileContent;
+
+    return elfFile;
+}
+
+ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) throw(){
+
+	ElfFile* elfFile = 0;
+
+	size_t fileSize = size;
+	uint8_t* fileContent = buf;
+	FILE* fd = fmemopen(fileContent, fileSize, "rb");
+
+    if(fileContent[4] == ELFCLASS32)
+    {
+        elfFile = new ElfFile32(fd, fileSize, fileContent);
+    }
+    else if(fileContent[4] == ELFCLASS64)
+    {
+    	elfFile = new ElfFile64(fd, fileSize, fileContent);
+    }
+    elfFile->fd = fd;
+	
     elfFile->fileSize = fileSize;
     elfFile->fileContent = fileContent;
 
@@ -138,7 +200,7 @@ void ElfFile::printSymbols(){
         {
             symbolName = this->symbolName(sym->st_name);
 			if(sym->st_shndx < SHN_LORESERVE){
-				sectionName =  this->segmentName(sym->st_shndx);
+				sectionName =  this->sectionName(sym->st_shndx);
 			}else{
 				switch(sym->st_shndx){
 					case SHN_UNDEF:
@@ -188,24 +250,6 @@ uint8_t* ElfFile::getFileContent(){
 size_t ElfFile::getFileSize(){
 	return this->fileSize;
 }
-
-ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type,
-		                       std::string name,
-                               KernelManager* parent){
-	if(type == ElfFile::ELFPROGRAMTYPEKERNEL){
-		return new ElfKernelLoader64(this);
-	}else if(type == ElfFile::ELFPROGRAMTYPEMODULE){
-		return new ElfModuleLoader64(this, 
-				name, parent);
-	}else if(type == ElfFile::ELFPROGRAMTYPEEXEC){
-		return new ElfProcessLoader64(this, 
-				parent, name);
-		//TODO: name doesn't get handled properly
-	}
-	std::cout << "No usable ELFPROGRAMTYPE defined." << std::endl;
-	return NULL;
-}
-
 
 std::string ElfFile::getFilename(){
 	return this->filename;

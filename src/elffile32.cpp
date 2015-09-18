@@ -18,12 +18,16 @@ ElfFile32::ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent):
 
 ElfFile32::~ElfFile32(){}
 
-SegmentInfo ElfFile32::findSegmentWithName(std::string sectionName){
+int ElfFile32::getNrOfSections(){
+	throw NotImplementedException();
+}
+
+SectionInfo ElfFile32::findSectionWithName(std::string sectionName){
 	UNUSED(sectionName);
 	throw NotImplementedException();
 }
 
-SegmentInfo ElfFile32::findSegmentByID(uint32_t sectionID){
+SectionInfo ElfFile32::findSectionByID(uint32_t sectionID){
 	UNUSED(sectionID);
 	throw NotImplementedException();
 }
@@ -38,18 +42,26 @@ bool ElfFile32::isDataAddress(uint64_t address){
 	throw NotImplementedException();
 }
 
-std::string ElfFile32::segmentName(int sectionID){
+std::string ElfFile32::sectionName(int sectionID){
 	UNUSED(sectionID);
 	throw NotImplementedException();
 }
 
-uint8_t *ElfFile32::segmentAddress(int sectionID){
+uint8_t *ElfFile32::sectionAddress(int sectionID){
 	UNUSED(sectionID);
 	throw NotImplementedException();
 }
 
-uint64_t ElfFile32::segmentAlign(int sectionID){
+uint64_t ElfFile32::sectionAlign(int sectionID){
 	UNUSED(sectionID);
+	throw NotImplementedException();
+}
+
+SegmentInfo ElfFile32::findCodeSegment(){
+	throw NotImplementedException();
+}
+
+SegmentInfo ElfFile32::findDataSegment(){
 	throw NotImplementedException();
 }
 
@@ -84,6 +96,24 @@ ElfLoader* ElfFile32::parseElf(ElfFile::ElfProgramType type,
 
 bool ElfFile32::isRelocatable(){
 	assert(false);
+	throw NotImplementedException();
 	return false;
 //	return (elf32Ehdr->e_type == ET_REL);
 }
+
+bool ElfFile32::isDynamic(){
+	assert(false);
+	throw NotImplementedException();
+	return false;
+}
+
+bool ElfFile32::isExecutable(){
+	assert(false);
+	throw NotImplementedException();
+	return false;
+}
+std::vector<std::string> ElfFile32::getDependencies(){
+	assert(false);
+	throw NotImplementedException();
+}
+

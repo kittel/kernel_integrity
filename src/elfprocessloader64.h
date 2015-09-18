@@ -18,21 +18,6 @@
 
 #endif //ASLROFFTYPE_M
 
-// The beauty of forward declarations
-class ElfProcessLoader64;
-
-/* This class represents a symbol a loader may export for relocation */
-class RelSym{
-	public:
-			std::string name;           // name of the symbol
-			uint64_t value;             // final vaddr after loading
-			uint8_t info;               // corresponding type and sym in parent
-			uint32_t shndx;             // linked section index in parent
-			ElfProcessLoader64* parent; // lib in which this sym is defined
-
-	RelSym(std::string, uint64_t, uint8_t, uint32_t, ElfProcessLoader64*);
-	~RelSym();
-};
 
 
 /*
@@ -47,7 +32,7 @@ class ElfProcessLoader64 : public ElfProcessLoader{
  *  protected:
  *      ElfFile                 *elffile;
  *      Instance                debugInstance;
- *      SegmentInfo             textSegment;
+ *      SectionInfo             textSegment;
  *-------------------------------------------------------
  *  containing the following members:
  *      std::string segName;    // name of the segment, init with first sec name
@@ -69,36 +54,11 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 	friend class ProcessValidator;
 
 	private:
-		std::string execName;
 		bool bindLazy;
-		bool isDynamicExec; // if exec : linking type of this exec
-                            // if vdso : linking type of calling exec
-		bool isInLibs;
-		bool isRelocatable;
-		std::string vdsoPath;       // path to whitelisted vdso
-		std::vector<ElfProcessLoader64*> *suppliedLibraries; // whitelisted libraries
-		ElfProcessLoader64 *memImageVDSO; // whitelisted VDSO image
+
 		uint64_t vdsoAddr; // if exec : Starting vaddr of the VDSO Image
                            // if vdso : 0 [the vdso doesn't care where it is at]
-		std::vector<std::string> depNames; // names of direct dependencies
 					
-		uint64_t dataSegBaseAddr; // vmemAddress of dataSegment beginning (PHT)
-		uint64_t textSegBaseAddr; // dito
-		uint64_t dataSegBaseOff;  // in file offset of dataSegment (PHT)
-		uint64_t textSegBaseOff;  // dito
-		uint8_t dataSegPHTid;     // PHTid of first entry in dataSeg
-		uint8_t textSegPHTid;     // dito
-		uint8_t dataSegSHTid;     // SHT id ...
-		uint8_t textSegSHTid;     // dito
-		uint32_t pageSize;        // std pageSize (0x1000 on current x86-64)
-
-		SegmentInfo dataSegment;  // handler for dataSegment (after init)
-		SegmentInfo heapSegment;  // handler for optional heap segment
-		std::vector<uint8_t> dataSegmentContent;   // actual dataSegment data
-		std::vector<uint8_t> heapSegmentContent;
-		uint32_t dataSegmentLength;                // size of the processImage
-		uint32_t heapSegmentLength;
-
 		std::vector<RelSym*> providedSyms; // symbols provided by this loader
 		std::map<std::string, uint32_t> neededSyms; // first:name, second:symtabID
 
@@ -114,62 +74,42 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 				);
 		virtual ~ElfProcessLoader64();
 		virtual void printImage();
-		virtual std::string getName();
-        virtual uint64_t getVDSOAddr();
+
 		virtual uint64_t getTextStart();
 		virtual uint64_t getDataStart();
 		virtual uint64_t getDataOff();
 		virtual uint64_t getTextOff();
-		virtual uint64_t getHeapStart();
         virtual uint32_t getTextSize();
 		virtual uint32_t getDataSize();
 
 		virtual std::vector<RelSym*> getProvidedSyms();
-		virtual std::vector<ElfProcessLoader64*> *getLibraries();
-
-		virtual void parseElfFile();// Initialize the complete image
-		virtual void initIsRelocatable();
-		virtual void initDepNames();
-		virtual std::vector<std::string> getDepNames(); // get Names of needed libraries
 
 	protected:
-		virtual void supplyVDSO(ElfProcessLoader64 *vdso);
-		virtual void supplyLibraries(std::vector<ElfProcessLoader64*> *libs);
-
 		virtual void initText();    // Initialize the first memory segment
 		virtual void initData();    // Initialize the second memory segment
-        virtual void initIsDynamic(); //check if the binary is dynamically linked
 
         //Add all sections between [startAddr,endAddr) to the target image
-        virtual void addSectionsToSeg(ElfFile64 *elf, int nrSecHeaders,
-                                      int prevMemAddr, int prevSecSize,
-                                      uint64_t startAddr, uint64_t endAddr,
-                                      SegmentInfo *handler,
-                                      std::vector<uint8_t> *target,
-                                      uint32_t *targetLength);
+//        virtual void addSectionsToSeg(int nrSecHeaders,
+//                                      int prevMemAddr, int prevSecSize,
+//                                      uint64_t startAddr, uint64_t endAddr,
+//                                      SectionInfo *handler,
+//                                      std::vector<uint8_t> *target,
+//                                      uint32_t *targetLength);
 
 
 		virtual bool isCodeAddress(uint64_t addr);
 		virtual bool isDataAddress(uint64_t addr);
 		virtual bool isTextOffset(uint64_t off);
 		virtual bool isDataOffset(uint64_t off);
-		virtual bool isInLibraries(ElfProcessLoader64 *lib);
-		virtual bool isDynamic();
 
-        virtual uint32_t appendSegToImage(SegmentInfo *segment,
+        virtual uint32_t appendSegToImage(SectionInfo *segment,
                                           std::vector<uint8_t> *target,
                                           uint32_t offset);
 		virtual uint32_t appendVecToImage(std::vector<uint8_t> *src,
                                           std::vector<uint8_t> *target);
-        virtual uint32_t appendDataToImage(const void *data,
-                                           uint32_t len,
-                                           std::vector<uint8_t> *target);
 
-		virtual ElfProcessLoader64* getExecForAddress(uint64_t);
-		virtual SegmentInfo* getSegmentForAddress(uint64_t addr);
-
-		virtual std::vector<Elf64_Rel> getRelEntries();
-		virtual std::vector<Elf64_Rela> getRelaEntries();
+		std::vector<Elf64_Rel>  getRelEntries();
+		std::vector<Elf64_Rela> getRelaEntries();
 
 		virtual void initProvidedSymbols();
 
@@ -186,10 +126,13 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 						std::unordered_map<std::string, RelSym*> *map);
 		virtual void writeRelValue(uint64_t locAddr, uint64_t symAddr);
         virtual void updateMemIndex(uint64_t addr, uint8_t segNr);
-		virtual void setHeapSegment(SegmentInfo* heap);
-		virtual void setIsLib(bool isLib);
+		virtual void setHeapSegment(SectionInfo* heap);
 
 		virtual uint64_t getOffASLR(uint8_t type); //TODO
+
+		void appendEhdr();
+		void appendPhdr();
+
 };
 
 

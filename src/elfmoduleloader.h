@@ -13,8 +13,8 @@ class ElfModuleLoader : public ElfLoader {
 		virtual void applyRelocationsOnSection(uint32_t relSectionID) = 0;
 		std::string getName();
 	protected:
-		void updateSegmentInfoMemAddress(SegmentInfo &info);
-		uint8_t * findMemAddressOfSegment(SegmentInfo &info);
+		void updateSectionInfoMemAddress(SectionInfo &info);
+		uint8_t * findMemAddressOfSegment(SectionInfo &info);
 		
 		virtual void initText();
 		virtual void initData();

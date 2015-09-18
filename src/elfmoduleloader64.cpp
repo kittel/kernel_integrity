@@ -19,22 +19,22 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 	ElfFile64 *elf= dynamic_cast<ElfFile64 *>(this->elffile);
 	assert(elf);
 
-	SegmentInfo relSectionInfo = 
-		        this->elffile->findSegmentByID(relSectionID);
+	SectionInfo relSectionInfo = 
+		        this->elffile->findSectionByID(relSectionID);
 	
     Elf32_Word sectionID = elf->elf64Shdr[relSectionID].sh_info;
-	std::string sectionName = this->elffile->segmentName(sectionID);
+	std::string sectionName = this->elffile->sectionName(sectionID);
 
-	SegmentInfo sectionInfo = 
-		        this->elffile->findSegmentByID(sectionID);
-	this->updateSegmentInfoMemAddress(sectionInfo);
+	SectionInfo sectionInfo = 
+		        this->elffile->findSectionByID(sectionID);
+	this->updateSectionInfoMemAddress(sectionInfo);
 	Elf64_Rela *rel = (Elf64_Rela *) relSectionInfo.index;
 
     Elf64_Sym *symBase = (Elf64_Sym *) this->elffile->
-	                     segmentAddress(this->elffile->symindex);
+	                     sectionAddress(this->elffile->symindex);
 
-	SegmentInfo percpuDataSegment = 
-	    this->elffile->findSegmentWithName(".data..percpu");
+	SectionInfo percpuDataSegment = 
+	    this->elffile->findSectionWithName(".data..percpu");
 	Instance currentModule = this->parent->
 	                               getKernelModuleInstance(this->modName);
 	
@@ -42,19 +42,13 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
 
 #ifdef PRINTDEBUG
     bool doPrint = false;
-<<<<<<< HEAD
     if(this->getName().compare("nfs") == 0
 			&& sectionName.compare(".text") == 0
 			) doPrint = true;
-=======
-    //if(this->getName().compare("floppy") == 0
-	//		&& sectionName.compare(".text") == 0
-	//		) doPrint = true;
->>>>>>> initial commit ready for merging
     //if(doPrint) std::cout << "\n\nSection To Relocate: " << sectionName << std::endl;
 #endif
 	
-	SegmentInfo symRelSectionInfo;
+	SectionInfo symRelSectionInfo;
 	
     for (uint32_t i = 0; i < relSectionInfo.size / sizeof(*rel); i++) {
 
@@ -139,8 +133,8 @@ void ElfModuleLoader64::applyRelocationsOnSection(uint32_t relSectionID){
             {
 				if (symRelSectionInfo.segID != sym->st_shndx){
 					symRelSectionInfo = 
-					    this->elffile->findSegmentByID(sym->st_shndx);
-					this->updateSegmentInfoMemAddress(symRelSectionInfo);
+					    this->elffile->findSectionByID(sym->st_shndx);
+					this->updateSectionInfoMemAddress(symRelSectionInfo);
 				}
                 locOfRelSectionInElf = (void *) symRelSectionInfo.index;
                 locOfRelSectionInMem = (void *) symRelSectionInfo.memindex;
@@ -269,7 +263,7 @@ uint64_t ElfModuleLoader64::relocateShnUndef(std::string symbolName){
 
 void ElfModuleLoader64::addSymbols(){
 
-    SegmentInfo symInfo = this->elffile->findSegmentByID(this->elffile->symindex);
+    SectionInfo symInfo = this->elffile->findSectionByID(this->elffile->symindex);
 
     uint32_t symSize = symInfo.size;
     Elf64_Sym *symBase = (Elf64_Sym *) symInfo.index;

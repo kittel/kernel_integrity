@@ -8,8 +8,10 @@
 #include <mutex>
 
 #include "libdwarfparser/instance.h"
+#include "libvmiwrapper/libvmiwrapper.h"
 
 class ElfLoader;
+class ElfProcessLoader;
 
 class KernelManager{
 
@@ -18,6 +20,10 @@ class KernelManager{
 		virtual ~KernelManager(){};
 		
 		void setKernelDir(const std::string &dirName);
+		void setLibraryDir(const std::string &dirName);
+
+		VMIInstance *vmi;
+		void setVMIInstance(VMIInstance *vmi);
 
 		void loadKernelModules();
 		std::list<std::string> getKernelModules();
@@ -51,15 +57,27 @@ class KernelManager{
 		bool isFunction(uint64_t address);
 
 		void updateRevMaps();
+		
+		// Functions related to userspace
+		ElfLoader *loadLibrary(std::string libraryName);
+
+		std::string findLibraryFile(std::string libName);
+		ElfProcessLoader* findLibByName(std::string name);
+
+		ElfLoader *loadVDSO();
 
 	protected:
 		std::mutex moduleMapMutex;
 		typedef std::map<std::string, ElfLoader*> ModuleMap;
 		ModuleMap moduleMap;
 		
+		typedef std::map<std::string, ElfLoader*> LibraryMap;
+		LibraryMap libraryMap;
+		
 
 	private:
-		std::string dirName;
+		std::string kernelDirName;
+		std::string libDirName;
 		
 		typedef std::map<std::string, Instance> ModuleInstanceMap;
 		ModuleInstanceMap moduleInstanceMap;

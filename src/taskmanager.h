@@ -10,8 +10,6 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-typedef int pid_t;
-
 /* This class contains the extracted information of an address space's VMAs
  *
  * @start : start address of the VMA in the virtual address space of the task
@@ -29,6 +27,8 @@ class VMAInfo{
 		VMAInfo(uint64_t start, uint64_t end, uint64_t ino, uint64_t off,
 				std::string name);
 		~VMAInfo();
+
+		void print();
 };
 
 /*
@@ -44,10 +44,10 @@ class VMAInfo{
 class TaskManager{
 
 	public:
-		TaskManager(VMIInstance *vmi, std::string kernPath);
+		TaskManager();
 		~TaskManager();
 
-		std::vector<VMAInfo*> getVMAInfo(pid_t pid);
+		std::vector<VMAInfo> getVMAInfo(pid_t pid);
 
 	protected:
 		typedef std::map<std::string, Instance*> TaskMap;
@@ -55,17 +55,9 @@ class TaskManager{
 
 	private:
 		Instance initTask;
-		std::vector<Instance*> vma_vec;
 
-//		Instance nextInstance(Instance *instance, std::string member, std::string type);
-	
-		Instance getInitTaskStruct();
 		Instance getMMStruct(Instance *task);
-		std::vector<Instance> getVMAs(Instance *mm);
-		std::vector<Instance> getMappingForPID(pid_t pid);
 		Instance getTaskForPID(pid_t pid);
 		Instance nextTask(Instance &task);
-	
-		VMIInstance *vmi;
 };
 #endif //TASKMANAGER_H

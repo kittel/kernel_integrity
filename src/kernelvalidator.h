@@ -11,9 +11,9 @@
 
 class KernelValidator {
 	public:
-		KernelValidator(std::string dirName,
-			        	VMIInstance* vmi,
-						std::string targetsFile);
+		KernelValidator(ElfKernelLoader* kernelLoader,
+		                VMIInstance* vmi,
+		                std::string targetsFile);
 		virtual ~KernelValidator();
 
 
@@ -23,6 +23,7 @@ class KernelValidator {
 		static KernelValidator* getInstance();
 		ElfKernelLoader* getKernelLoader(){ return this->kernelLoader;}
 
+		static ElfKernelLoader* loadKernel(std::string dirName);
 	protected:
 
 	private:
@@ -54,7 +55,6 @@ class KernelValidator {
 		void displayChange(uint8_t* memory, uint8_t* reference, 
 		                   int32_t offset, int32_t size);
 
-		void loadKernel(std::string dirName);
 
 		uint64_t findCodePtrs(page_info_t* page, uint8_t* pageInMem);
 		uint64_t isReturnAddress(uint8_t* ptr, uint32_t offset, uint64_t index);

@@ -4,49 +4,93 @@
 #include "elfloader.h"
 //#include "processmanager.h"
 
+#include <unordered_map>
+
+// The beauty of forward declarations
+class ElfProcessLoader;
+class ElfKernelLoader;
+
+/* This class represents a symbol a loader may export for relocation */
+class RelSym{
+	public:
+			std::string name;           // name of the symbol
+			uint64_t value;             // final vaddr after loading
+			uint8_t info;               // corresponding type and sym in parent
+			uint32_t shndx;             // linked section index in parent
+			ElfProcessLoader* parent;   // lib in which this sym is defined
+
+	RelSym(std::string, uint64_t, uint8_t, uint32_t, ElfProcessLoader*);
+	~RelSym();
+};
+
+
 class ElfProcessLoader : public ElfLoader {
+	
+	friend class ProcessValidator;
+	
 	public:
 		ElfProcessLoader(ElfFile* elffile, 
-				KernelManager *parent,
-				std::string name
-				);
-		virtual ~ElfProcessLoader();
-		virtual ElfLoader* getExecForAddress(uint64_t address);
-		virtual uint8_t* getImageForAddress(uint64_t addr, uint32_t offset);
-		virtual SegmentInfo* getSegmentForAddress(uint64_t addr);
-		std::string getName();
-		virtual uint64_t getHeapStart();
-		virtual void printImage();
-		virtual uint64_t getStartAddr();
-		virtual void supplyVDSO(ElfProcessLoader *vdso);
-		virtual void supplyLibraries(std::vector<ElfProcessLoader*> *libs);
+		        KernelManager *parent,
+		        std::string name
+		        );
 
+		virtual ~ElfProcessLoader();
+		
+		virtual void parseElfFile();// Initialize the complete image
+
+		virtual std::string getName();
+		
 	protected:
 		std::string execName;
+		KernelManager *kernel;
 
-		 ElfFile* getLibraryWithName(std::string name);
+		void loadDependencies();
+
+		SegmentInfo textSegmentInfo;
+		SegmentInfo dataSegmentInfo;
+
+		SectionInfo heapSection;  // handler for optional heap segment
+
+		std::vector<uint8_t> dataSectionContent;   // actual dataSegment data
+		std::vector<uint8_t> heapSectionContent;
+
+		ElfFile* getLibraryWithName(std::string name);
 //		virtual std::vector<uint8_t>* buildSegfromLib(ElfFile *lib);
 
-//		virtual void initSuppliedLibraries(std::string name);
-//		virtual void initProcessImage();
+		virtual void initProvidedSymbols() = 0;
 
-		virtual void initText();
-		virtual void initData();
+		void initText();
+		void initData();
+
+		virtual void applyLoadRel(std::unordered_map<std::string, RelSym*> *map) = 0;
+		virtual std::vector<RelSym*> getProvidedSyms() = 0;
+		virtual void setHeapSegment(SectionInfo* heap) = 0;
+
+		uint64_t getHeapStart();
+
+		virtual uint64_t getTextStart() = 0;
+		virtual uint64_t getDataStart() = 0;
+		virtual uint64_t getDataOff() = 0;
+		virtual uint64_t getTextOff() = 0;
+        virtual uint32_t getTextSize() = 0;
+		virtual uint32_t getDataSize() = 0;
+
+		ElfProcessLoader* getExecForAddress(uint64_t);
+		SectionInfo* getSegmentForAddress(uint64_t addr);
+
+		virtual bool isTextOffset(uint64_t off) = 0;
+		virtual bool isDataOffset(uint64_t off) = 0;
+        virtual void updateMemIndex(uint64_t addr, uint8_t segNr) = 0;
+
+		virtual int evalLazy(uint64_t addr,
+		                     std::unordered_map<std::string, RelSym*> *map) = 0;
+
+		virtual void appendEhdr() = 0;
+		virtual void appendPhdr() = 0;
+
+
+		virtual void updateSectionInfoMemAddress(SectionInfo &info);
 		virtual void addSymbols();
-//		virtual void parseElfFile();
-
-		virtual void updateSegmentInfoMemAddress(SegmentInfo &info);
-//		virtual bool isCodeAddress(uint64_t addr);
-		virtual bool isDataAddress(uint64_t addr);
-		virtual uint8_t * findMemAddressOfSegment(std::string segName);
-//		virtual void loadDependencies();
-
-//		virtual void applyLoadTimeRelocs();
-//		virtual void applyRunTimeReloc(std::string symname);
-//		virtual void applyRunTimeRelocs();
-//		virtual uint64_t getOffASLR(uint8_t type);
-//		virtual void applyDynamicChanges();
-		
 };
 
 //#include "elfprocessloader32.h"

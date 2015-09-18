@@ -13,7 +13,7 @@ ElfKernelLoader64::~ElfKernelLoader64(){}
 
 void ElfKernelLoader64::addSymbols(){
 
-    SegmentInfo symInfo = this->elffile->findSegmentByID(this->elffile->symindex);
+    SectionInfo symInfo = this->elffile->findSectionByID(this->elffile->symindex);
 	KernelManager* parent = dynamic_cast<KernelManager*>(this);
 
     uint32_t symSize = symInfo.size;

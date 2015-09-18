@@ -12,19 +12,19 @@
 #include <sys/mman.h>
 
 #include <map>
+#include <vector>
 
 class ElfLoader;
 class ElfModuleLoader;
-
 class KernelManager;
 
-class SegmentInfo{
+class SectionInfo{
 
 	public:
-		SegmentInfo();
-    	SegmentInfo(std::string segName, uint32_t segID, uint8_t * i, 
+		SectionInfo();
+		SectionInfo(std::string segName, uint32_t segID, uint8_t * i, 
 				uint64_t a, uint32_t s);
-		virtual ~SegmentInfo();
+		virtual ~SectionInfo();
 
 		std::string segName;    // name of the segment, init with first sec name
 		uint32_t    segID;      // section ID in SHT
@@ -37,7 +37,32 @@ class SegmentInfo{
 		bool containsMemAddress(uint64_t address);
 
 	private:
-    	SegmentInfo(uint8_t * i, uint32_t s);
+		SectionInfo(uint8_t * i, uint32_t s);
+};
+
+class SegmentInfo{
+	public:
+		SegmentInfo();
+		SegmentInfo(
+			uint32_t   p_type,
+			uint32_t   p_flags,
+			uint64_t   p_offset,
+			uint8_t*   p_vaddr,
+			uint8_t*   p_paddr,
+			uint64_t   p_filesz,
+			uint64_t   p_memsz,
+			uint64_t   p_align);
+
+		virtual ~SegmentInfo();
+
+		uint32_t type;
+		uint32_t flags;
+		uint64_t offset;
+		uint8_t* vaddr;
+		uint8_t* paddr;
+		uint64_t filesz;
+		uint64_t memsz;
+		uint64_t align;
 };
 
 
@@ -60,16 +85,21 @@ class ElfFile{
 
 		virtual ~ElfFile();
 
-		virtual SegmentInfo findSegmentWithName(std::string sectionName) = 0;
-		virtual SegmentInfo findSegmentByID(uint32_t sectionID) = 0;
+		virtual int getNrOfSections() = 0;
+
+		virtual SectionInfo findSectionWithName(std::string sectionName) = 0;
+		virtual SectionInfo findSectionByID(uint32_t sectionID) = 0;
 		virtual bool isCodeAddress(uint64_t address) = 0;
 		virtual bool isDataAddress(uint64_t address) = 0;
-		virtual std::string segmentName(int sectionID) = 0;
+		virtual std::string sectionName(int sectionID) = 0;
+
+		virtual SegmentInfo findCodeSegment() = 0;
+		virtual SegmentInfo findDataSegment() = 0;
 
 		virtual uint64_t findAddressOfVariable(std::string symbolName) = 0;
 
-		virtual uint8_t *segmentAddress(int sectionID) = 0;
-		virtual uint64_t segmentAlign(int sectionID) = 0;
+		virtual uint8_t *sectionAddress(int sectionID) = 0;
+		virtual uint64_t sectionAlign(int sectionID) = 0;
 
 		virtual std::string symbolName(uint32_t index) = 0;
 
@@ -84,6 +114,7 @@ class ElfFile{
 		
 		int getFD();
 
+		static ElfFile* loadElfFileFromBuffer(uint8_t* buf, size_t size) throw();
 		static ElfFile* loadElfFile(std::string filename) throw();
 		virtual ElfLoader* parseElf(ElfFile::ElfProgramType type,
 		                            std::string name = "",
@@ -91,6 +122,10 @@ class ElfFile{
 
 		virtual bool isRelocatable() = 0;
 		virtual void applyRelocations(ElfModuleLoader *loader) = 0;
+		virtual bool isDynamic() = 0;
+		virtual bool isExecutable() = 0;
+
+		virtual std::vector<std::string> getDependencies() = 0;
 
 		uint32_t shstrindex;
     	uint32_t symindex;

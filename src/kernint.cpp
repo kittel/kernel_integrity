@@ -30,7 +30,7 @@ void validateKernel(KernelValidator* val){
 
 	const auto d_actual = 
 		std::chrono::duration_cast<std::chrono::milliseconds>
-							(time_stop - time_start).count();
+		                          (time_stop - time_start).count();
 
 	std::cout << "Executed " << iterations << " iterations in " <<
 		d_actual << " ms ( " << 
@@ -59,9 +59,9 @@ void validateUserspace(ProcessValidator* val, VMIInstance* vmi, uint32_t pid){
 	// if LD_BIND_NOW = "" -> lazyBinding is off
 	// if LD_BIND_NOW = "nope" or LD_BIND_NOW is nonexistant -> lazyBinding is on
 	std::map<std::string, std::string> configEnv = {
-												{"LD_LIBRARY_PATH", ""},
-												{"LD_PRELOAD", ""},
-												{"LD_BIND_NOW", "nope"}};
+	                                            {"LD_LIBRARY_PATH", ""},
+	                                            {"LD_PRELOAD", ""},
+	                                            {"LD_BIND_NOW", "nope"}};
 	errors += val->checkEnvironment(configEnv);
 
 	// abort if starting state couldn't be verified
@@ -137,15 +137,12 @@ const char * helpString = R"EOF(
 	-t, --targetsFile=<targets>
 		Use call targets in <targets> for stackvalidation.
 
-	-u, --checkUserspace=<referenceDir>
-		Check userspace process for integrity. Use binaries in <referenceDir>
+	-u, --checkUserspace=<binaryName>
+		Check userspace process for integrity. Load binary <binaryName>
 		as trusted reference.
 
 	-p, --pid=<pid>
 		Check <pid> for integrity
-
-	-v, --vdsoPath=<vdsoPath>
-		Use <vdsoPath> for the integrity validation process.
 
 	-l, --libraryPath=<libraryPath>
 		Use <libraryPath> to load trusted libraries.
@@ -171,9 +168,8 @@ int main (int argc, char **argv)
 	bool pointerExamination = true;
 	std::string targetsFile;
 
-	std::string vdsoPath;
 	std::string libraryDir;
-	std::string referencePath;
+	std::string binaryName;
 	uint32_t pid = 0;
 	
 	int c;
@@ -196,12 +192,11 @@ int main (int argc, char **argv)
 
 		{"checkUserspace",        required_argument, 0, 'u'},
 		{"pid",                   required_argument, 0, 'p'},
-		{"vsdoPath",              required_argument, 0, 'v'},
 		{"libraryPath",           required_argument, 0, 'b'},
 		{0,                       0,                 0,  0 }
 	};
 
-	while ((c = getopt_long(argc, argv, ":hg:lk:cet:u:p:v:b:",
+	while ((c = getopt_long(argc, argv, ":hg:lk:cet:u:p:b:",
 					long_options, &option_index)) != -1)
 		switch (c)
 		{
@@ -246,16 +241,13 @@ int main (int argc, char **argv)
 				break;
 
 			case 'u':
-				referencePath.assign(optarg);
+				binaryName.assign(optarg);
 				break;
 
 			case 'b':
 				libraryDir.assign(optarg);
 				break;
 
-			case 'v':
-				vdsoPath.assign(optarg);
-				break;
 			case '?':
 				if (isprint (optopt))
 					fprintf (stderr, "Unknown option `-%c'.\n", optopt);
@@ -281,19 +273,60 @@ int main (int argc, char **argv)
 	
 	vmi = new VMIInstance(vmPath, hypflag | VMI_INIT_COMPLETE);
 	
-	if(!kerndir.empty()){
-		std::cout << "Starting Kernel Validation" << std::endl;
-		KernelValidator *val = new KernelValidator(kerndir, vmi, targetsFile);
+	if(kerndir.empty()){
+		assert(false);
+	}
 
+	if (kerndir.empty() || !fexists(kerndir)) {
+		std::cout << COLOR_RED << COLOR_BOLD <<
+			"Wrong Path given for Kernel Directory: " <<
+			kerndir << COLOR_RESET << std::endl;
+		exit(0);
+	}
+
+	if(!binaryName.empty() && pid != 0){
+		if (!fexists(binaryName)) {
+			std::cout << COLOR_RED << COLOR_BOLD <<
+				"Binary does not exist: " <<
+				binaryName << COLOR_RESET << std::endl;
+			exit(0);
+		}
+		if (!fexists(libraryDir)) {
+			std::cout << COLOR_RED << COLOR_BOLD <<
+				"Library Dir does not exist: " <<
+				libraryDir << COLOR_RESET << std::endl;
+			exit(0);
+		}
+	}
+	
+	std::cout << COLOR_GREEN << "Loading Kernel" << COLOR_NORM << std::endl;
+	ElfKernelLoader* kl = KernelValidator::loadKernel(kerndir);
+	kl->setVMIInstance(vmi);
+	
+	if(false /* option to validate kernel */){
+
+		if (!fexists(targetsFile)) {
+			std::cout << COLOR_RED << COLOR_BOLD <<
+				"Wrong Path given for Targets File: " <<
+				targetsFile << COLOR_RESET << std::endl;
+			exit(0);
+		}
+		
+		KernelValidator *val = new KernelValidator(kl, vmi, targetsFile);
 		val->setOptions(loopMode, codeValidation, pointerExamination);
-
+		std::cout << "Starting Kernel Validation" << std::endl;
 		validateKernel(val);
-	} else if(!referencePath.empty()){
+	}
+	
+	if(!binaryName.empty() && pid != 0){
+		
+		// Ensure that all arguments make sense at this point
 		std::cout << "Starting Process Validation..." << std::endl;
-		ProcessValidator *val = new ProcessValidator(referencePath, vmi, pid,
-                                                 vdsoPath, libraryDir,
-                                                 kerndir);
-		validateUserspace(val, vmi, pid);
+		kl->setLibraryDir(libraryDir);
+		ProcessValidator *val = new ProcessValidator(kl, binaryName, vmi,
+		                                         pid);
+		UNUSED(val);
+		//validateUserspace(val, vmi, pid);
 	}
 }
 

@@ -16,15 +16,16 @@
 
 #include <kernelvalidator.h>
 
-KernelValidator::KernelValidator(std::string dirName, 
+KernelValidator::KernelValidator(ElfKernelLoader* kernelLoader,
 		VMIInstance* vmi,
 		std::string targetsFile):
-	vmi(vmi), kernelLoader(),
+	vmi(vmi), kernelLoader(kernelLoader),
 	stackAddresses(){
-	this->loadKernel(dirName);
+
 	this->kernelLoader->loadAllModules();
 	this->kernelLoader->updateRevMaps();
 	this->kernelLoader->dumpSymbols();
+	this->kernelLoader->setVMIInstance(vmi);
 
 	if(targetsFile.compare("") != 0){
 		// Read targets of calls
@@ -65,15 +66,19 @@ KernelValidator* KernelValidator::getInstance(){
 	return KernelValidator::instance;
 }
 
-void KernelValidator::loadKernel(std::string dirName){
+ElfKernelLoader* KernelValidator::loadKernel(std::string dirName){
 	std::string kernelName = dirName;
 	kernelName.append("/vmlinux");
     ElfFile *kernelFile = ElfFile::loadElfFile(kernelName);
-    kernelLoader = dynamic_cast<ElfKernelLoader *>(
-			kernelFile->parseElf(ElfFile::ELFPROGRAMTYPEKERNEL));
+    
+	ElfKernelLoader* kernelLoader;
+	kernelLoader = dynamic_cast<ElfKernelLoader *>(
+	  kernelFile->parseElf(ElfFile::ELFPROGRAMTYPEKERNEL));
 	kernelLoader->setKernelDir(dirName);
 	kernelLoader->parseSystemMap();
 	kernelLoader->parseElfFile();
+
+	return kernelLoader;
 }
 
 uint64_t KernelValidator::validatePages(){
@@ -419,7 +424,7 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 				memcmp(loadedPage + i - 2, elf->ideal_nops[5], 5) == 0 &&
 				memcmp(pageInMem.data() + i - 2, elf->ideal_nops[9], 5) == 0)
 		{
-			i = i+5;
+			i += 5;
 			continue;
 		}
 		
@@ -431,9 +436,15 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 			continue;
 		}
 
+		if (memcmp(loadedPage + i, "\x0f\x1f\x44\x00\x00", 5) == 0 &&
+			memcmp(pageInMem.data() + i, "\x66\x66\x66\x66\x90", 5) == 0){
+			i += 5;
+			continue;
+		}
+
 		if(isValidJmpLabel(pageInMem.data(), 
 					unkCodeAddress, i, elf)){
-			i = i+5;
+			i += 5;
 			continue;
 		}
 	
@@ -608,13 +619,13 @@ void KernelValidator::validateDataPage(page_info_t * page, ElfLoader* elf){
 	
 	uint8_t* loadedPage;
 
-	uint64_t roDataOffset = ((uint64_t) elf->roDataSegment.memindex & 0xffffffffffff);
+	uint64_t roDataOffset = ((uint64_t) elf->roDataSection.memindex & 0xffffffffffff);
 
 	if (page->vaddr >= roDataOffset &&
-		page->vaddr < roDataOffset + elf->roDataSegment.size){
+		page->vaddr < roDataOffset + elf->roDataSection.size){
 
 		loadedPage = elf->roData.data() + (page->vaddr - 
-				((uint64_t) kernelLoader->roDataSegment.memindex & 
+				((uint64_t) kernelLoader->roDataSection.memindex & 
 				     0xffffffffffff));
 
 		if(memcmp(pageInMem.data(), loadedPage, page->size) != 0){
@@ -738,8 +749,8 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page,
 		                           uint8_t* pageInMem){
 	uint64_t codePtrs = 0;
 	
-	SegmentInfo exTable = 
-		kernelLoader->elffile->findSegmentWithName("__ex_table");
+	SectionInfo exTable = 
+		kernelLoader->elffile->findSectionWithName("__ex_table");
 
 		
 	if(this->stackAddresses.find(page->vaddr & 0xffffffffe000) !=

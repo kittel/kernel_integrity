@@ -19,9 +19,8 @@ class ElfKernelLoader : public ElfLoader, public KernelManager {
 		std::string getName();
 	protected:
 
-		SegmentInfo vvarSegment;
-		SegmentInfo dataNosaveSegment;
-		SegmentInfo rodataSegment;
+		SectionInfo vvarSegment;
+		SectionInfo dataNosaveSegment;
 		
 	    uint64_t fentryAddress;
 	    uint64_t genericUnrolledAddress;
@@ -33,7 +32,7 @@ class ElfKernelLoader : public ElfLoader, public KernelManager {
 
 		int apply_relocate();
 
-		void updateSegmentInfoMemAddress(SegmentInfo &info);
+		void updateSectionInfoMemAddress(SectionInfo &info);
 		
 		virtual void initText();
 		virtual void initData();

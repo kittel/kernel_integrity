@@ -46,7 +46,6 @@ ElfKernelLoader::ElfKernelLoader(ElfFile* elffile):
 	KernelManager(),
 	vvarSegment(),
 	dataNosaveSegment(),
-	rodataSegment(),
 	fentryAddress(0),
 	genericUnrolledAddress(0)
 	{}
@@ -57,8 +56,8 @@ void ElfKernelLoader::initText(void) {
 
 	ElfFile64* elffile = dynamic_cast<ElfFile64*>(this->elffile);
 
-	this->textSegment = elffile->findSegmentWithName(".text");
-	this->updateSegmentInfoMemAddress(this->textSegment);
+	this->textSegment = elffile->findSectionWithName(".text");
+	this->updateSectionInfoMemAddress(this->textSegment);
 	
 	this->fentryAddress = this->elffile->findAddressOfVariable("__fentry__");
 	this->genericUnrolledAddress = this->
@@ -74,14 +73,14 @@ void ElfKernelLoader::initText(void) {
 			this->textSegment.index + this->textSegment.size);
 
 
-	SegmentInfo info = elffile->findSegmentWithName(".notes");
+	SectionInfo info = elffile->findSectionWithName(".notes");
 	uint64_t offset = (uint64_t) info.index - (uint64_t) this->textSegment.index;
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 			offset - this->textSegmentContent.size(), 0);
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 			info.index, info.index + info.size);
 
-	info = elffile->findSegmentWithName("__ex_table");
+	info = elffile->findSectionWithName("__ex_table");
 	offset = (uint64_t) info.index - (uint64_t) this->textSegment.index;
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 				offset - this->textSegmentContent.size(), 0);
@@ -90,7 +89,7 @@ void ElfKernelLoader::initText(void) {
 
 
 	//Apply Ftrace changes
-	info = elffile->findSegmentWithName(".init.text");
+	info = elffile->findSectionWithName(".init.text");
 	uint64_t initTextOffset = -(uint64_t) info.memindex + (uint64_t) info.index;
 
 	info.index = (uint8_t *) elffile->findAddressOfVariable("__start_mcount_loc") + initTextOffset;
@@ -99,13 +98,13 @@ void ElfKernelLoader::initText(void) {
 
 	//TODO! also enable this some time later
 	//Apply Tracepoint changes
-	//    SegmentInfo rodata = findElfSegmentWithName(fileContent, ".rodata");
+	//    SectionInfo rodata = findElfSegmentWithName(fileContent, ".rodata");
 	//    qint64 rodataOffset = - (quint64)rodata.address + (quint64)rodata.index;
 	//    info.index = (char *)findElfAddressOfVariable(fileContent, context, "__start___tracepoints_ptrs") + rodataOffset;
 	//    info.size = (char *)findElfAddressOfVariable(fileContent, context, "__stop___tracepoints_ptrs") + rodataOffset - info.index ;
 	//    applyTracepoints(info, rodata, context, textSegmentContent);
 
-	info = elffile->findSegmentWithName(".data");
+	info = elffile->findSectionWithName(".data");
 	int64_t dataOffset = -(uint64_t) info.memindex + (uint64_t) info.index;
 	uint64_t jumpStart = elffile->findAddressOfVariable("__start___jump_table");
 	uint64_t jumpStop = elffile->findAddressOfVariable("__stop___jump_table");
@@ -133,11 +132,11 @@ void ElfKernelLoader::initText(void) {
 
 void ElfKernelLoader::initData(void){
 
-	this->dataSegment = elffile->findSegmentWithName(".data");
-	this->vvarSegment = elffile->findSegmentWithName(".vvar");
-	this->dataNosaveSegment = elffile->findSegmentWithName(".data_nosave");
-	this->bssSegment = elffile->findSegmentWithName(".bss");
-	this->roDataSegment = elffile->findSegmentWithName(".rodata");
+	this->dataSection = elffile->findSectionWithName(".data");
+	this->vvarSegment = elffile->findSectionWithName(".vvar");
+	this->dataNosaveSegment = elffile->findSectionWithName(".data_nosave");
+	this->bssSection = elffile->findSectionWithName(".bss");
+	this->roDataSection = elffile->findSectionWithName(".rodata");
 
 	this->idt_tableAddress = this->getSystemMapAddress("idt_table");
 	this->nmi_idt_tableAddress = this->getSystemMapAddress("nmi_idt_table");
@@ -147,21 +146,22 @@ void ElfKernelLoader::initData(void){
 
 
 	// initialize roData Segment
-	SegmentInfo info = elffile->findSegmentWithName("__modver");
+	SectionInfo info = elffile->findSectionWithName("__modver");
 	assert(info.index);
 	this->roData.insert(this->roData.end(),
-			roDataSegment.index, info.index + info.size);
+			roDataSection.index, info.index + info.size);
    
     this->roData.insert(this->roData.end(),
 			0x200000 - (this->roData.size() % 0x200000), 0);
 	
-	this->roDataSegment.size = this->roData.size();
+	this->roDataSection.size = this->roData.size();
 }
 
-void ElfKernelLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
+void ElfKernelLoader::updateSectionInfoMemAddress(SectionInfo &info){
 	UNUSED(info);
 }
 
 bool ElfKernelLoader::isDataAddress(uint64_t addr){
 	return this->elffile->isDataAddress(addr | 0xffff000000000000);
 }
+

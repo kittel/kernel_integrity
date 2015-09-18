@@ -20,7 +20,7 @@ std::string ElfModuleLoader::getName(){
 }
 
 void ElfModuleLoader::loadDependencies(void) {
-	SegmentInfo miS = elffile->findSegmentWithName(".modinfo");
+	SectionInfo miS = elffile->findSectionWithName(".modinfo");
 
 	//parse .modinfo and load dependencies
 	char *modinfo = (char*) miS.index;
@@ -67,8 +67,8 @@ void ElfModuleLoader::initText(void) {
 
 	this->elffile->applyRelocations(this);
 	
-	this->textSegment = this->elffile->findSegmentWithName(".text");
-	this->updateSegmentInfoMemAddress(this->textSegment);
+	this->textSegment = this->elffile->findSectionWithName(".text");
+	this->updateSectionInfoMemAddress(this->textSegment);
 
     //applyJumpEntries();
 
@@ -89,7 +89,7 @@ void ElfModuleLoader::initText(void) {
     Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
     for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
     {
-		std::string sectionName = this->elffile->segmentName(i);
+		std::string sectionName = this->elffile->sectionName(i);
         if (sectionName.compare(".text") == 0 ||
             sectionName.compare(".init.text") == 0){
 			continue;
@@ -108,8 +108,8 @@ void ElfModuleLoader::initText(void) {
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 			fill, 0);
 
-	SegmentInfo info = this->elffile->findSegmentWithName("__mcount_loc");
-	this->updateSegmentInfoMemAddress(info);
+	SectionInfo info = this->elffile->findSectionWithName("__mcount_loc");
+	this->updateSectionInfoMemAddress(info);
     applyMcount(info);
 
 	//TODO resume here
@@ -124,8 +124,8 @@ void ElfModuleLoader::initText(void) {
     //Initialize the symTable in the context for later reference
 	this->addSymbols();
 
-//    context.rodataSegment = this->findElfSegmentWithName(context.fileContent, QString(".note.gnu.build-id"));
-//    context.rodataSegment.address = (this->findMemAddressOfSegment(context, QString(".note.gnu.build-id")));
+//    context.rodataSection = this->findElfSegmentWithName(context.fileContent, QString(".note.gnu.build-id"));
+//    context.rodataSection.address = (this->findMemAddressOfSegment(context, QString(".note.gnu.build-id")));
 //
 //    context.rodataContent.clear();
 //    
@@ -160,12 +160,12 @@ void ElfModuleLoader::initText(void) {
 }
 
 void ElfModuleLoader::initData(void) {
-	this->dataSegment = this->elffile->findSegmentWithName(".data");
-	this->updateSegmentInfoMemAddress(this->dataSegment);
-	this->bssSegment = elffile->findSegmentWithName(".bss");
-	this->updateSegmentInfoMemAddress(this->bssSegment);
-	this->roDataSegment = elffile->findSegmentWithName(".note.gnu.build-id");
-	this->updateSegmentInfoMemAddress(this->roDataSegment);
+	this->dataSection = this->elffile->findSectionWithName(".data");
+	this->updateSectionInfoMemAddress(this->dataSection);
+	this->bssSection = elffile->findSectionWithName(".bss");
+	this->updateSectionInfoMemAddress(this->bssSection);
+	this->roDataSection = elffile->findSectionWithName(".note.gnu.build-id");
+	this->updateSectionInfoMemAddress(this->roDataSection);
 
 	// initialize roData Segment
 	ElfFile64* elf64 = dynamic_cast<ElfFile64*>(this->elffile);
@@ -178,7 +178,7 @@ void ElfModuleLoader::initData(void) {
              (elf64Shdr[i].sh_flags == SHF_ALLOC && 
 			  elf64Shdr[i].sh_type == SHT_NOTE))
         {
-			std::string sectionName = this->elffile->segmentName(i);
+			std::string sectionName = this->elffile->sectionName(i);
             if(sectionName.compare(".modinfo") == 0 ||
                    sectionName.compare("__versions") == 0 ||
                    sectionName.substr(0,5).compare(".init") == 0 ) continue;
@@ -192,10 +192,10 @@ void ElfModuleLoader::initData(void) {
 						elf64Shdr[i].sh_offset + elf64Shdr[i].sh_size);
         }
     }
-	this->roDataSegment.size = this->roData.size();
+	this->roDataSection.size = this->roData.size();
 }
 
-uint8_t *ElfModuleLoader::findMemAddressOfSegment(SegmentInfo &info){
+uint8_t *ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info){
 
 	std::string segName = info.segName;
 	Instance module;
@@ -205,7 +205,7 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(SegmentInfo &info){
 	//If the searching for the .bss section
     //This section is right after the modules struct
 	if(segName.compare(".bss") == 0){
-		uint64_t align = this->elffile->segmentAlign(info.segID);
+		uint64_t align = this->elffile->sectionAlign(info.segID);
 	
 		uint64_t offset = currentModule.size() % align;
 		(offset == 0)
@@ -238,12 +238,12 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(SegmentInfo &info){
 }
 
 /* Update the target virtual address of the segment */
-void ElfModuleLoader::updateSegmentInfoMemAddress(SegmentInfo &info){
+void ElfModuleLoader::updateSectionInfoMemAddress(SectionInfo &info){
 	info.memindex = this->findMemAddressOfSegment(info);
 }
 
 bool ElfModuleLoader::isDataAddress(uint64_t addr){
 	addr = addr | 0xffff000000000000;
-	return (this->dataSegment.containsMemAddress(addr) ||
-	        this->bssSegment.containsMemAddress(addr));
+	return (this->dataSection.containsMemAddress(addr) ||
+	        this->bssSection.containsMemAddress(addr));
 }

@@ -16,7 +16,6 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-
 ElfLoader::ElfLoader(ElfFile* elffile, ParavirtState* para):
 	elffile(elffile),
 	debugInstance(),
@@ -27,9 +26,9 @@ ElfLoader::ElfLoader(ElfFile* elffile, ParavirtState* para):
 	jumpEntries(),
 	jumpDestinations(),
 	smpOffsets(),
-	dataSegment(),
-	bssSegment(),
-	roDataSegment(),
+	dataSection(),
+	bssSection(),
+	roDataSection(),
 	paravirtState(para){
 
 	//get the current cpu architecture to adapt nops
@@ -265,17 +264,17 @@ void ElfLoader::applyAltinstr(){
     uint8_t *replacement;
     unsigned char insnbuf[255-1];
 
-	SegmentInfo altinst = this->elffile->findSegmentWithName(".altinstructions");
+	SectionInfo altinst = this->elffile->findSectionWithName(".altinstructions");
 	if (!altinst.index) return;
 
-    SegmentInfo altinstreplace;
+    SectionInfo altinstreplace;
 	altinstreplace = this->elffile->
-			findSegmentWithName(".altinstr_replacement");
+			findSectionWithName(".altinstr_replacement");
 
     struct alt_instr *start = (struct alt_instr*) altinst.index;
     struct alt_instr *end = (struct alt_instr*) (altinst.index + altinst.size);
 
-	this->updateSegmentInfoMemAddress(altinstreplace);
+	this->updateSectionInfoMemAddress(altinstreplace);
 	
 	//Find boot_cpu_data in kernel
 	Variable *boot_cpu_data_var = Variable::findVariableByName("boot_cpu_data");
@@ -342,7 +341,7 @@ void ElfLoader::applyAltinstr(){
 
 void ElfLoader::applyParainstr(){
 	uint64_t count = 0;
-	SegmentInfo info = this->elffile->findSegmentWithName(".parainstructions");
+	SectionInfo info = this->elffile->findSectionWithName(".parainstructions");
 	if (!info.index) return;
     
     //TODO add paravirt entries
@@ -397,9 +396,9 @@ void ElfLoader::applyParainstr(){
 }
 
 void ElfLoader::applySmpLocks(){
-	SegmentInfo info = this->elffile->findSegmentWithName(".smp_locks");
+	SectionInfo info = this->elffile->findSectionWithName(".smp_locks");
 	if (!info.index) return;
-	this->updateSegmentInfoMemAddress(info);
+	this->updateSectionInfoMemAddress(info);
 
     unsigned char lock = 0;
 	uint64_t count = 0;
@@ -452,7 +451,7 @@ void ElfLoader::applySmpLocks(){
 //				 std::endl;
 }
 
-void ElfLoader::applyMcount(SegmentInfo &info){
+void ElfLoader::applyMcount(SectionInfo &info){
     //See ftrace_init_module in kernel/trace/ftrace.c
 
 	uint64_t count = 0;
