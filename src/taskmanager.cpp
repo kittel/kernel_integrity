@@ -1,20 +1,30 @@
 #include "taskmanager.h"
 
-
-VMAInfo::VMAInfo(uint64_t start, 
-				 uint64_t end, 
-				 uint64_t ino, 
+VMAInfo::VMAInfo(uint64_t start,
+				 uint64_t end,
+				 uint64_t ino,
 				 uint64_t off,
+				 uint64_t flags,
 				 std::string name):
-	start(start), end(end), ino(ino), off(off), name(name){}
+	start(start),
+	end(end),
+	ino(ino),
+	off(off),
+	flags(flags),
+	name(name){}
 
 VMAInfo::~VMAInfo(){}
 
 void VMAInfo::print(){
 	std::string _name;
 	(name.empty()) ? _name = std::string("<anonymous>") : _name = name;
-	std::cout << "VMAInfo:" << std::hex << std::endl <<
+	std::cout << std::hex <<
 		"0x" << start << " - 0x" << end << "   " << ino << "   " << name <<
+		" " <<
+		((flags & VM_READ) ? 'r' : '-') <<
+		((flags & VM_WRITE) ? 'w' : '-') <<
+		((flags & VM_EXEC) ? 'x' : '-') <<
+		((flags & VM_MAYSHARE) ? 's' : 'p') <<
 		std::endl;
 	return;
 }
@@ -82,6 +92,7 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid){
 	uint64_t curStart = 0;
 	uint64_t curEnd = 0;
 	uint64_t ino = 0;
+	uint64_t flags = 0;
 	std::string name;
 	uint64_t fileOff = 0;
 
@@ -100,6 +111,7 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid){
 		// TODO change to memberByName("", false).getRawValue<std::string>(true)
 		curStart = cur.memberByName("vm_start").getValue<uint64_t>();
 		curEnd   = cur.memberByName("vm_end").getValue<uint64_t>();
+		flags    = cur.memberByName("vm_flags").getValue<uint64_t>();
 		
 		if(!cur.memberByName("vm_file", true, true).isNULL()){
 			fileOff = cur.memberByName("vm_pgoff").getValue<uint64_t>();
@@ -157,7 +169,7 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid){
 			}
 		}
 		prevName = name;
-		vec.push_back(VMAInfo(curStart, curEnd, ino, fileOff, name));
+		vec.push_back(VMAInfo(curStart, curEnd, ino, fileOff, flags, name));
 		cur = cur.memberByName("vm_next", true, true);
 	}
 	return vec;

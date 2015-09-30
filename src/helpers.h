@@ -4,7 +4,7 @@
 #define UNUSED(expr) do { (void)(expr); } while (0)
 #define DELETE(expr) do { if(expr){ delete expr; expr = 0; }; } while (0)
 
-#define CHECKFLAGS(byte, flags)    ((byte & flags) == flags)
+#define CHECKFLAGS(byte, flags)    !!((byte & flags) == flags)
 #define CONTAINS(min, size, what)  (min <= what && min + size >= what)
 
 #include <string>

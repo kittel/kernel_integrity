@@ -27,12 +27,18 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 	this->printVMAs();
 
 
-	std::vector<std::pair<uint64_t, uint64_t>> range;
-	for (auto line : this->mappedVMAs){
-		range.push_back(std::pair<uint64_t,uint64_t>(line.start, line.end));
+	std::vector<VMAInfo> range;
+	for (auto section : this->mappedVMAs){
+		if(CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)){
+			range.push_back(section);
+		}
 	}
 
 	for (auto line : this->mappedVMAs){
+		if(line.flags & VMAInfo::VM_EXEC ||
+		    !(line.flags & VMAInfo::VM_WRITE)){
+			continue;
+		}
 		uint64_t counter = 0;
 		auto content = vmi->readVectorFromVA(line.start,
 		                                    line.end - line.start,
@@ -43,10 +49,18 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 			//if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
 			//	continue;
 			//}
-			if (betweenRange(*value, range)) counter++;
+			for(auto section : range){
+				if((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))){
+					if (contained(*value, section.start, section.end)) {
+						counter++;
+					//std::cout << "Found ptr to: " << section->name << std::endl;
+					}
+				}
+			}
 		}
 
-		std::cout << "Found " << counter << " pointers in section:" << std::endl;
+		std::cout << "Found " << COLOR_RED << COLOR_BOLD << 
+		    counter << COLOR_RESET << " pointers in section:" << std::endl;
 		line.print();
 	}
 

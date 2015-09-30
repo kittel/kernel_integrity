@@ -21,14 +21,33 @@
  */
 class VMAInfo{
 	public:
-		uint64_t start, end, ino, off;
+		uint64_t start;
+		uint64_t end;
+		uint64_t ino;
+		uint64_t off;
+		uint64_t flags;
 		std::string name;
 
-		VMAInfo(uint64_t start, uint64_t end, uint64_t ino, uint64_t off,
-				std::string name);
+		VMAInfo(uint64_t start,
+		        uint64_t end,
+		        uint64_t ino,
+		        uint64_t off,
+		        uint64_t flags,
+		        std::string name);
 		~VMAInfo();
 
 		void print();
+
+		enum {
+			VM_READ     = 0x00000001,
+			VM_WRITE    = 0x00000002,
+			VM_EXEC     = 0x00000004,
+			VM_SHARED   = 0x00000008,
+			VM_MAYREAD  = 0x00000010,
+			VM_MAYWRITE = 0x00000020,
+			VM_MAYEXEC  = 0x00000040,
+			VM_MAYSHARE = 0x00000080
+		};
 };
 
 /*
