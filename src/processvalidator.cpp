@@ -24,17 +24,16 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 	std::cout << "Linking VMAs to corresponding Loaders..." << std::endl;
 	this->mappedVMAs = tm.getVMAInfo(pid);
 	this->buildMaps(this->mappedVMAs);
-	this->printVMAs();
 
 
 	std::vector<VMAInfo> range;
-	for (auto section : this->mappedVMAs){
+	for (auto& section : this->mappedVMAs){
 		if(CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)){
 			range.push_back(section);
 		}
 	}
 
-	for (auto line : this->mappedVMAs){
+	for (auto& line : this->mappedVMAs){
 		if(line.flags & VMAInfo::VM_EXEC ||
 		    !(line.flags & VMAInfo::VM_WRITE)){
 			continue;
@@ -49,7 +48,7 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 			//if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
 			//	continue;
 			//}
-			for(auto section : range){
+			for(auto& section : range){
 				if((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))){
 					if (contained(*value, section.start, section.end)) {
 						counter++;
@@ -99,7 +98,7 @@ void ProcessValidator::processLoadRel(){
 	std::set<ElfProcessLoader*> mappedLibs = this->getMappedLibs();
 
 	// for every mapped library
-	for(auto it : mappedLibs){
+	for(auto& it : mappedLibs){
 
 		//initialize provided symbols based on updated memindexes
 		it->initProvidedSymbols();
@@ -125,7 +124,7 @@ std::set<ElfProcessLoader*> ProcessValidator::getMappedLibs(){
 	std::set<ElfProcessLoader*> ret;
 	ElfProcessLoader* l;
 
-	for(auto it : this->mappedVMAs){
+	for(auto& it : this->mappedVMAs){
 
 		try{
 			l = this->vmaToLoaderMap.at(&it);
@@ -154,20 +153,20 @@ void ProcessValidator::announceSyms(ElfProcessLoader* lib){
 	std::vector<RelSym*> syms = lib->getProvidedSyms();
 	RelSym* match = NULL;
 
-	for(auto it = std::begin(syms); it != std::end(syms); it++){
+	for(auto& it :syms){
 
 		try{
-			match = this->relSymMap.at((*it)->name);
+			match = this->relSymMap.at(it->name);
 		} catch (const std::out_of_range& oor){
 			// symbol not yet in map -> add
 #ifdef VERBOSE
 			std::cout << "Adding " << std::setw(40) << std::setfill(' ')
-			<< std::left << (*it)->name << "@["
-			<< getNameFromPath((*it)->parent->getName()) << "] to relSymMap. "
-			<< "[" << (void*)(*it)->value << "]"
+			<< std::left << it->name << "@["
+			<< getNameFromPath(it->parent->getName()) << "] to relSymMap. "
+			<< "[" << (void*)it->value << "]"
 			<< std::endl;
 #endif
-			this->relSymMap[(*it)->name] = (*it);
+			this->relSymMap[it->name] = it;
 			continue;
 		}
 
@@ -175,14 +174,14 @@ void ProcessValidator::announceSyms(ElfProcessLoader* lib){
 		if(match != NULL){
 			// if mapped symbol is WEAK and cur symbol is GLOBAL -> overwrite
 			if(ELF64_ST_BIND(match->info) == STB_WEAK
-				&& ELF64_ST_BIND((*it)->info) == STB_GLOBAL){
+				&& ELF64_ST_BIND(it->info) == STB_GLOBAL){
 #ifdef VERBOSE
 				std::cout << "Overwriting [WEAK] '" << match->name
 				<< "' from " << getNameFromPath(match->parent->getName())
 				<< " with [GLOBAL] instance from "
-				<< getNameFromPath((*it)->parent->getName()) << "." << std::endl;
+				<< getNameFromPath(it->parent->getName()) << "." << std::endl;
 #endif
-				this->relSymMap[(*it)->name] = (*it);
+				this->relSymMap[it->name] = it;
 			}
 			match = NULL;
 		}
@@ -199,7 +198,7 @@ void ProcessValidator::buildMaps(std::vector<VMAInfo> vec){
 	//ElfProcessLoader *lib = NULL;
 
 	// for every vma try to find a corresponding Loader
-	for(auto it : vec){
+	for(auto& it : vec){
 		continue;
 	}
 
@@ -291,7 +290,7 @@ void ProcessValidator::printVMAs(){
 	std::cout << "Currently mapped VMAs:" << std::endl;
 
 	int i = 0;
-	for(auto it : this->mappedVMAs){
+	for(auto& it : this->mappedVMAs){
 		std::string name;
 		if(it.name.compare("") == 0){
 			name = "<anonymous>";
@@ -342,7 +341,7 @@ void ProcessValidator::updateMemindexes(){
 	 * corresponds to its textSegment, while the mapping with the dataSegBaseOff
 	 * of an inode corresponds to its dataSegment.
 	 */
-	for(auto it : this->mappedVMAs){
+	for(auto& it : this->mappedVMAs){
 #ifdef DEBUG
 		std::cout << "Processing entry with start addr " << (void*)it.start
 		<< " and inode " << std::dec << it.ino << std::endl;
@@ -543,22 +542,22 @@ void ProcessValidator::getProcessEnvironment(VMIInstance *vmi, int32_t pid, uint
 	int len;
 
 	// remove everything non-variable
-	for(auto it = temp.begin(); it != temp.end(); it++){
+	for(auto& it : temp){
 		// if no '=' is in the current string, ignore it.
-		len = (*it).find('=');
-		if(((*it).find('=') != std::string::npos)
-			&& ((*it)[0] >= 65)
-			&& ((*it)[0] <= 90)){
+		len = it.find('=');
+		if((it.find('=') != std::string::npos)
+			&& (it[0] >= 65)
+			&& (it[0] <= 90)){
 			this->envMap.insert(std::pair<std::string, std::string>(
-								(*it).substr(0, len),
-								(*it).substr(len+1, std::string::npos)));
+								it.substr(0, len),
+								it.substr(len+1, std::string::npos)));
 		}
 	}
 
 
 #ifdef DEBUG
 	std::cout << "debug: (getProcessEnvironment) Parsed env-vars. Content:" << std::endl;
-	for ( auto var : this->envMap){
+	for ( auto& var : this->envMap){
 		std::cout << var.first << "\t" << var.second << std::endl;
 	}
 
@@ -572,7 +571,7 @@ int ProcessValidator::checkEnvironment(std::map<std::string, std::string> inputM
 
 
 	// check all input settings
-	for(auto inputPair : inputMap){
+	for(auto& inputPair : inputMap){
 		try{
 			// get env value for current input key
 			value = this->envMap.at(inputPair.first);
@@ -763,7 +762,7 @@ int ProcessValidator::_validatePage(page_info_t *page, int32_t pid){
 
     std::cout << "Content of the page in memory:" << std::endl;
     printHexDump(&pageInMem);
-/*	for(auto it = std::begin(pageInMem); it != std::end(pageInMem); it++){
+/*	for(auto& it = std::begin(pageInMem); it != std::end(pageInMem); it++){
 		printf("%c", *it);
 	}
 */

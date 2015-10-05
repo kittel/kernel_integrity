@@ -12,7 +12,7 @@ ElfLoader* ElfKernelLoader::getModuleForCodeAddress(uint64_t address){
 		return this;
 	}
 
-	for( auto modulePair : moduleMap){
+	for( auto& modulePair : moduleMap){
 		ElfLoader* module = dynamic_cast<ElfLoader*>(modulePair.second);
 		if (module->isCodeAddress(address)){
 			return module;
@@ -28,7 +28,7 @@ ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address){
 		return this;
 	}
 
-	for( auto modulePair : moduleMap){
+	for( auto& modulePair : moduleMap){
 		ElfLoader* module = dynamic_cast<ElfLoader*>(modulePair.second);
 		if (module->isCodeAddress(address) || module->isDataAddress(address)){
 			return module;

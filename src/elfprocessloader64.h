@@ -132,6 +132,7 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 
 		void appendEhdr();
 		void appendPhdr();
+		void appendText();
 
 };
 

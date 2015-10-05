@@ -25,7 +25,7 @@ ElfProcessLoader::~ElfProcessLoader(){}
 void ElfProcessLoader::loadDependencies(){
 	auto dependencies = this->elffile->getDependencies();
 
-	for( auto dep : dependencies){
+	for( auto& dep : dependencies){
 		kernel->loadLibrary(dep);
 	}
 }

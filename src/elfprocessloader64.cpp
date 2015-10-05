@@ -174,7 +174,7 @@ void ElfProcessLoader64::printImage(){
 	printHexDump(&(this->dataSectionContent));	
 
 /*
-	for(auto it = std::begin(textSegmentContent); it != std::end(textSegmentContent); it++){
+	for(auto& it = std::begin(textSegmentContent); it != std::end(textSegmentContent); it++){
 		printf("%c", *it);
 	}
 */
@@ -280,6 +280,11 @@ void ElfProcessLoader64::appendPhdr(){
                                                   &(this->textSegmentContent));
 }
 
+void ElfProcessLoader64::appendText(){
+	ElfFile64* elf = dynamic_cast<ElfFile64*>(this->elffile);
+	UNUSED(elf);
+}
+
 /*
  * This method initializes the first big memory segment, which is loaded into
  * the process image. This segment is executable and often referred to as the
@@ -331,6 +336,7 @@ void ElfProcessLoader64::initText(){ // TODO currently only works for PDC
 
 	this->appendEhdr();
 	this->appendPhdr();
+	this->appendText();
 
 	return;
 
@@ -686,32 +692,32 @@ int ElfProcessLoader64::evalLazy(uint64_t addr,
 	<< debug << " segment " << (void*)off << std::endl;
 #endif
 	// find corresponding rel/rela entry
-	for(auto it = this->rel.begin(); it != this->rel.end(); it++){
+	for(auto& it : this->rel){
 
 		// only recognize JUMP_SLOT entries
-		if(ELF64_R_TYPE((*it).r_info) != R_X86_64_JUMP_SLOT) continue;
+		if(ELF64_R_TYPE(it.r_info) != R_X86_64_JUMP_SLOT) continue;
 #ifdef DEBUG
-		std::cout << "debug:(evalLazy) rel.r_offset: " << (void*)(*it).r_offset
+		std::cout << "debug:(evalLazy) rel.r_offset: " << (void*)it.r_offset
 		<< ", relOff: " << (void*)relOff << std::endl;;
 #endif
 		// if this is the right entry
-		if((*it).r_offset == relOff){// || (*it).r_offset == (relOff - 1)){
-			this->relocate(&(*it), map);
+		if(it.r_offset == relOff){// || it.r_offset == (relOff - 1)){
+			this->relocate(&it, map);
 			return 0;
 		}
 	}
 
-	for(auto at = this->rela.begin(); at != this->rela.end(); at++){
+	for(auto& at : this->rela){
 
 		// only recognize JUMP_SLOT entries
-		if(ELF64_R_TYPE((*at).r_info) != R_X86_64_JUMP_SLOT) continue;
+		if(ELF64_R_TYPE(at.r_info) != R_X86_64_JUMP_SLOT) continue;
 #ifdef DEBUG
-		std::cout << "debug:(evalLazy) rel.r_offset: " << (void*)(*at).r_offset
+		std::cout << "debug:(evalLazy) rel.r_offset: " << (void*)at.r_offset
 		<< ", relOff: " << (void*)relOff << std::endl;
 #endif
 		// if this is the right entry (including random matching but skipped previous byte)
-		if((*at).r_offset == relOff){// || (*at).r_offset == (relOff - 1)){
-			this->relocate(&(*at), map);
+		if(at.r_offset == relOff){// || at.r_offset == (relOff - 1)){
+			this->relocate(&at, map);
 			return 0;
 		}
 	}
@@ -748,7 +754,7 @@ void ElfProcessLoader64::applyLoadRel(std::unordered_map<std::string, RelSym*> *
 	if(!rel.empty()){
 		std::cout << std::dec << rel.size() << " entries in .rel vector."
 		<< std::endl;
-		for(auto it = std::begin(rel); it != std::end(rel); it++){
+		for(auto& it : rel){
 			// don't process PLT relocs if bindLazy is set
 #ifdef DEBUG
 			std::cout << "Rel: [Addr]=" << (void*)it->r_offset
@@ -756,19 +762,19 @@ void ElfProcessLoader64::applyLoadRel(std::unordered_map<std::string, RelSym*> *
 			<< ", [SymbolIdx]=" << ELF64_R_SYM(it->r_info) << std::endl;
 #endif
 			if(this->bindLazy
-				&& (ELF64_R_TYPE((*it).r_info) == R_X86_64_JUMP_SLOT)){
+				&& (ELF64_R_TYPE(it.r_info) == R_X86_64_JUMP_SLOT)){
 				continue;
 			}
 			// abort if the current symbol is already defined in this lib
-			if(dynsym[ELF64_R_SYM((*it).r_info)].st_shndx != SHN_UNDEF) continue;
-			this->relocate(&(*it), map);
+			if(dynsym[ELF64_R_SYM(it.r_info)].st_shndx != SHN_UNDEF) continue;
+			this->relocate(&it, map);
 		}
 	} else { std::cout << "No .rel entries!" << std::endl; }
 
 	if(!rela.empty()){
 		std::cout << std::dec << rela.size() << " entries in .rela vector."
 		<< std::endl;
-		for(auto at = std::begin(rela); at != std::end(rela); at++){
+		for(auto& at : rela){
 			// don't process PLT relocs if bindLazy is set
 #ifdef DEBUG
 			std::cout << "Rela: [Addr]=" << (void*)at->r_offset
@@ -776,11 +782,11 @@ void ElfProcessLoader64::applyLoadRel(std::unordered_map<std::string, RelSym*> *
 			<< ", [SymbolIdx]=" << ELF64_R_SYM(at->r_info) << std::endl;
 #endif
 			if(this->bindLazy
-				&& (ELF64_R_TYPE((*at).r_info) == R_X86_64_JUMP_SLOT)){
+				&& (ELF64_R_TYPE(at.r_info) == R_X86_64_JUMP_SLOT)){
 				continue;
 			}
 
-			this->relocate(&(*at), map);
+			this->relocate(&at, map);
 		}
 	} else { std::cout << "No .rela entries!" << std::endl; }
 }

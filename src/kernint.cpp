@@ -86,7 +86,7 @@ void validateUserspace(ProcessValidator* val, VMIInstance* vmi, uint32_t pid){
 	// check gathered pages
 	std::cout << "Starting page validation ..." << std::endl;
 
-	for ( auto page : executablePageMap){
+	for ( auto& page : executablePageMap){
 	errors += val->validatePage(page.second, pid);
 	}
 
@@ -303,7 +303,7 @@ int main (int argc, char **argv)
 	ElfKernelLoader* kl = KernelValidator::loadKernel(kerndir);
 	kl->setVMIInstance(vmi);
 	
-	if(false /* option to validate kernel */){
+	if(true /* option to validate kernel */){
 
 		if (!fexists(targetsFile)) {
 			std::cout << COLOR_RED << COLOR_BOLD <<

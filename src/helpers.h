@@ -61,7 +61,7 @@ inline std::string toString(uint8_t * string){
 	return std::string((const char*) string);
 }
 
-inline void printHexDump(std::vector<uint8_t> *bytes){
+inline void printHexDump(const std::vector<uint8_t> *bytes){
 	using namespace std;
 
 	unsigned long address = 0;
@@ -127,7 +127,7 @@ inline std::string& toSTDstring(const char *input){
 }
 
 /* Reduce given path to filename */
-inline std::string getNameFromPath(std::string path){
+inline std::string getNameFromPath(const std::string path){
 	std::string ret = path.substr(path.rfind("/", std::string::npos) + 1,
 									std::string::npos);
 	return ret;
@@ -146,7 +146,7 @@ inline uint32_t appendDataToVector(const void *data, uint32_t len,
 	return len;
 }
 
-inline bool fexists(std::string filename)
+inline bool fexists(const std::string filename)
 {
 	std::ifstream ifile(filename);
 	return ifile;
@@ -156,7 +156,7 @@ inline bool fexists(std::string filename)
 
 template<typename T>
 inline bool betweenRange(T value, std::vector<std::pair<T, T>> r){
-	for( auto elem : r ){
+	for( auto& elem : r ){
 		if(contained(value, elem.first, elem.second)) return true;
 	}
 	return false;

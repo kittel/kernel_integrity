@@ -91,7 +91,7 @@ uint64_t KernelValidator::validatePages(){
 		if(this->options.pointerExamination){
 			//Validate all Stacks
 			this->updateStackAddresses();
-			for (auto stack : this->stackAddresses){
+			for (auto& stack : this->stackAddresses){
 				std::vector<uint8_t> pageInMem = 
 	    	                 vmi->readVectorFromVA(stack.first, 0x2000);
 				this->validateStackPage(pageInMem.data(), 
@@ -102,7 +102,7 @@ uint64_t KernelValidator::validatePages(){
 
 		PageMap executablePageMap = vmi->getKernelPages();
 
-		for ( auto page : executablePageMap){
+		for ( auto& page : executablePageMap){
 			if ((page.second->vaddr & 0xff0000000000) == 0x8800000000000){
 				continue;
 			}
@@ -218,7 +218,7 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 	std::string oldRetFuncName;
 
 	
-    for ( auto &retAddr : returnAddresses ){
+    for ( auto& retAddr : returnAddresses ){
 		
 		ElfLoader* elfloader = 
 			kernelLoader->getModuleForAddress(retAddr.second);
@@ -305,7 +305,7 @@ void KernelValidator::validateStackPage(uint8_t *memory,
 			auto boundaries = 
 				this->callTargets.equal_range(addressOfCall);
 			bool found = false;
-			for( auto element = boundaries.first;
+			for( auto& element = boundaries.first;
 					element != boundaries.second;
 					element++){
 				if (element->second == oldRetFunc){

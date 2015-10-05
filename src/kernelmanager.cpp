@@ -157,7 +157,7 @@ std::list<std::string> KernelManager::getKernelModules(){
 		this->loadKernelModules();
 	}
 	std::list<std::string> strList;
-	for(auto mod: this->moduleInstanceMap){
+	for(auto& mod: this->moduleInstanceMap){
 	    strList.push_back(mod.first);
 	}
 	return strList;
@@ -243,7 +243,7 @@ uint64_t KernelManager::getContainingSymbol(uint64_t address){
 
 void KernelManager::dumpSymbols(){
 	//std::ofstream outfile ("/home/kittel/linux-symbols-3.16.txt",std::ofstream::binary);
-	//for(auto symbol : this->moduleSymbolRevMap ){
+	//for(auto& symbol : this->moduleSymbolRevMap ){
 	//	outfile << std::hex << symbol.first << std::dec << 
 	//		" " << symbol.second << std::endl;
 	//}
@@ -286,10 +286,10 @@ void KernelManager::updateRevMaps(){
 	this->moduleSymbolRevMap.clear();
 	this->functionSymbolRevMap.clear();
 
-	for( auto i : this->moduleSymbolMap){
+	for( auto& i : this->moduleSymbolMap){
 		this->moduleSymbolRevMap[i.second] = i.first;
 	}
-	for( auto i : this->functionSymbolMap){
+	for( auto& i : this->functionSymbolMap){
 		this->functionSymbolRevMap[i.second] = i.first;
 	}
 }
