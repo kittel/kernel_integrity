@@ -37,9 +37,9 @@
 #define X86_FEATURE_UP          (3*32+ 9) /* smp kernel running on up */
 
 /* Simple instruction patching code. */
-#define DEF_NATIVE(ops, name, code) 					\
-    extern const char start_##ops##_##name[], end_##ops##_##name[];	\
-    asm("start_" #ops "_" #name ": " code "; end_" #ops "_" #name ":")
+#define DEF_NATIVE(ops, name, code)                                     \
+	extern const char start_##ops##_##name[], end_##ops##_##name[]; \
+	asm("start_" #ops "_" #name ": " code "; end_" #ops "_" #name ":")
 
 #define tostr(x) #x
 
@@ -51,41 +51,41 @@ extern const unsigned char * const k8_nops[];
 extern const char ud2a[];
 
 struct alt_instr {
-    int32_t  instr_offset;       /* original instruction */
-    int32_t  repl_offset;        /* offset to replacement instruction */
-    uint16_t cpuid;              /* cpuid bit set for replacement */
-    uint8_t  instrlen;           /* length of original instruction */
-    uint8_t  replacementlen;     /* length of new instruction, <= instrlen */
+	int32_t  instr_offset;       /* original instruction */
+	int32_t  repl_offset;        /* offset to replacement instruction */
+	uint16_t cpuid;              /* cpuid bit set for replacement */
+	uint8_t  instrlen;           /* length of original instruction */
+	uint8_t  replacementlen;     /* length of new instruction, <= instrlen */
 };
 
 struct paravirt_patch_site {
-    uint8_t *instr;              /* original instructions */
-    uint8_t instrtype;           /* type of this instruction */
-    uint8_t len;                 /* length of original instruction */
-    uint16_t clobbers;           /* what registers you may clobber */
+	uint8_t *instr;              /* original instructions */
+	uint8_t instrtype;           /* type of this instruction */
+	uint8_t len;                 /* length of original instruction */
+	uint16_t clobbers;           /* what registers you may clobber */
 };
 
 struct static_key {
-    uint32_t enabled;
+	uint32_t enabled;
 };
 
 struct jump_entry {
-    uint64_t code;
-    uint64_t target;
-    uint64_t key;
+	uint64_t code;
+	uint64_t target;
+	uint64_t key;
 };
 
 struct tracepoint_func {
-    void *func;
-    void *data;
+	void *func;
+	void *data;
 };
 
 struct tracepoint {
-    const char *name;               /* Tracepoint name */
-    struct static_key key;
-    void (*regfunc)(void);
-    void (*unregfunc)(void);
-    struct tracepoint_func *funcs;
+	const char *name;               /* Tracepoint name */
+	struct static_key key;
+	void (*regfunc)(void);
+	void (*unregfunc)(void);
+	struct tracepoint_func *funcs;
 };
 
 DEF_NATIVE(pv_irq_ops, irq_disable, "cli");
@@ -110,37 +110,33 @@ DEF_NATIVE(, mov64, "mov %rdi, %rax");
 
 #include "libdwarfparser/instance.h"
 
-class ParavirtState{
+class ParavirtState {
+public:
+	static ParavirtState *getInstance();
 
-    public:
-		static ParavirtState* getInstance();
+	ParavirtState(bool hasParavirt = true);  // For ordinary use
+	virtual ~ParavirtState();
 
-        ParavirtState(bool hasParavirt = true); //For ordinary use
-        virtual ~ParavirtState();
+	void updateState();
 
-        void updateState();
+	Instance pv_init_ops;
+	Instance pv_time_ops;
+	Instance pv_cpu_ops;
+	Instance pv_irq_ops;
+	Instance pv_apic_ops;
+	Instance pv_mmu_ops;
+	Instance pv_lock_ops;
 
+	uint64_t nopFuncAddress;
+	uint64_t ident32NopFuncAddress;
+	uint64_t ident64NopFuncAddress;
 
-        Instance pv_init_ops;   
-        Instance pv_time_ops;
-        Instance pv_cpu_ops;
-        Instance pv_irq_ops;
-        Instance pv_apic_ops;
-        Instance pv_mmu_ops;
-        Instance pv_lock_ops;
+	uint32_t pv_irq_opsOffset;
+	uint32_t pv_cpu_opsOffset;
+	uint32_t pv_mmu_opsOffset;
 
-        uint64_t nopFuncAddress;
-        uint64_t ident32NopFuncAddress;
-        uint64_t ident64NopFuncAddress;
-        
-        uint32_t pv_irq_opsOffset;
-        uint32_t pv_cpu_opsOffset;
-        uint32_t pv_mmu_opsOffset;
-
-    private:
-
-		static ParavirtState* instance;
+private:
+	static ParavirtState *instance;
 };
-
 
 #endif  /* KERNELHEADERS_H */

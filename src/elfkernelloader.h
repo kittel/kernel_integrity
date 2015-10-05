@@ -8,39 +8,36 @@
 class ElfKernelLoader : public ElfLoader, public KernelManager {
 	friend class KernelValidator;
 
-	public:
-		ElfKernelLoader(ElfFile* elffile);
-		ElfKernelLoader(ElfFile* elffile, std::string dirName);
-		virtual ~ElfKernelLoader();
+public:
+	ElfKernelLoader(ElfFile* elffile);
+	ElfKernelLoader(ElfFile* elffile, std::string dirName);
+	virtual ~ElfKernelLoader();
 
-		ElfLoader* getModuleForAddress(uint64_t address);
-		ElfLoader* getModuleForCodeAddress(uint64_t address);
+	ElfLoader* getModuleForAddress(uint64_t address);
+	ElfLoader* getModuleForCodeAddress(uint64_t address);
 
-		std::string getName();
-	protected:
+	std::string getName();
 
-		SectionInfo vvarSegment;
-		SectionInfo dataNosaveSegment;
-		
-	    uint64_t fentryAddress;
-	    uint64_t genericUnrolledAddress;
+protected:
+	SectionInfo vvarSegment;
+	SectionInfo dataNosaveSegment;
 
-		uint64_t idt_tableAddress;
-		uint64_t nmi_idt_tableAddress;
-		uint64_t sinittextAddress;
-		uint64_t irq_entries_startAddress;
+	uint64_t fentryAddress;
+	uint64_t genericUnrolledAddress;
 
-		int apply_relocate();
+	uint64_t idt_tableAddress;
+	uint64_t nmi_idt_tableAddress;
+	uint64_t sinittextAddress;
+	uint64_t irq_entries_startAddress;
 
-		void updateSectionInfoMemAddress(SectionInfo &info);
-		
-		virtual void initText();
-		virtual void initData();
-		
-		bool isDataAddress(uint64_t addr);
+	int apply_relocate();
 
-	private:
+	void updateSectionInfoMemAddress(SectionInfo &info);
 
+	virtual void initText();
+	virtual void initData();
+
+	bool isDataAddress(uint64_t addr);
 };
 
 #include "elfkernelloader32.h"

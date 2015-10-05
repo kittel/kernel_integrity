@@ -4,12 +4,11 @@
 #include "elfmoduleloader.h"
 
 class ElfModuleLoader32 : public ElfModuleLoader{
-	public:
-		ElfModuleLoader32(ElfFile32* elffile, 
-		        std::string name = "", 
-		        KernelManager* parent = 0);
-		virtual ~ElfModuleLoader32();
-	protected:
+public:
+	ElfModuleLoader32(ElfFile32* elffile,
+	                  std::string name="",
+	                  KernelManager* parent=nullptr);
+	virtual ~ElfModuleLoader32();
 };
 
 #endif  /* ELFMODULELOADER32_H */

@@ -12,18 +12,28 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 
 SectionInfo::SectionInfo(): segName(), segID(0), index(0), memindex(0), size(0){}
-SectionInfo::SectionInfo(uint8_t *i, unsigned int s):
-				segName(), segID(), index(i), memindex(0), size(s){}
-SectionInfo::SectionInfo(std::string segName, uint32_t segID, uint8_t *i, 
-					uint64_t a, uint32_t s):
-				segName(segName), segID(segID), index(i), 
-				memindex((uint8_t*) a), size(s){}
-SectionInfo::~SectionInfo(){}
+SectionInfo::SectionInfo(uint8_t *i, unsigned int s)
+	:
+	segName(),
+	segID(),
+	index(i),
+	memindex(0),
+	size(s) {}
+
+SectionInfo::SectionInfo(std::string segName, uint32_t segID, uint8_t *i, uint64_t a, uint32_t s)
+	:
+	segName(segName),
+	segID(segID),
+	index(i),
+	memindex((uint8_t*) a),
+	size(s) {}
+
+SectionInfo::~SectionInfo() {}
 
 bool SectionInfo::containsElfAddress(uint64_t address){
 	uint64_t addr = (uint64_t) this->index;
 	if (address >= addr &&
-		address <= addr + this->size){
+	    address <= addr + this->size){
 		return true;
 	}
 	return false;
@@ -32,13 +42,14 @@ bool SectionInfo::containsElfAddress(uint64_t address){
 bool SectionInfo::containsMemAddress(uint64_t address){
 	uint64_t addr = (int64_t) this->memindex;
 	if (address >= addr &&
-		address <= addr + this->size){
+	    address <= addr + this->size){
 		return true;
 	}
 	return false;
 }
 
-SegmentInfo::SegmentInfo():
+SegmentInfo::SegmentInfo()
+	:
 	type(0),
 	flags(0),
 	offset(0),
@@ -46,7 +57,7 @@ SegmentInfo::SegmentInfo():
 	paddr(0),
 	filesz(0),
 	memsz(0),
-	align(0){}
+	align(0) {}
 
 SegmentInfo::SegmentInfo(uint32_t p_type,
                          uint32_t p_flags,
@@ -63,20 +74,27 @@ SegmentInfo::SegmentInfo(uint32_t p_type,
 	paddr (p_paddr),
 	filesz(p_filesz),
 	memsz (p_memsz),
-	align (p_align){}
+	align (p_align) {}
 
-SegmentInfo::~SegmentInfo(){}
+SegmentInfo::~SegmentInfo() {}
 
 ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type,
-				 ElfProgramType programType):
-	shstrindex(0), symindex(0), strindex(0),
-	fd(fd), fileSize(fileSize), fileContent(fileContent), 
-	type(type), programType(programType),
-	filename(""), symbolNameMap(){
-	
-	try{
+                 ElfProgramType programType)
+	:
+	shstrindex(0),
+	symindex(0),
+	strindex(0),
+	fd(fd),
+	fileSize(fileSize),
+	fileContent(fileContent),
+	type(type),
+	programType(programType),
+	filename(""),
+	symbolNameMap() {
+
+	try {
 		DwarfParser::parseDwarfFromFD(this->getFD());
-	}catch(DwarfException &e){
+	} catch(DwarfException &e) {
 		std::cout << e.what() << std::endl;
 	}
 #ifdef DEBUG
@@ -85,10 +103,10 @@ ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type,
 }
 
 ElfFile::~ElfFile(){
-    if(this->fileContent != NULL){
-        munmap(this->fileContent, this->fileSize);
-    }
-    fclose(this->fd);
+	if(this->fileContent != nullptr){
+		munmap(this->fileContent, this->fileSize);
+	}
+	fclose(this->fd);
 }
 
 ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
@@ -97,8 +115,8 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 
 	if(!fd){
 		std::cout << COLOR_RED << COLOR_BOLD <<
-		    "File not found: " << filename <<
-		    COLOR_NORM << std::endl;
+		"File not found: " << filename <<
+		COLOR_NORM << std::endl;
 		exit(0);
 	}
 
@@ -107,42 +125,40 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 	size_t fileSize = 0;
 	uint8_t* fileContent = 0;
 
-    if (fd != NULL) {
-        /* Go to the end of the file. */
-        if (fseek(fd, 0L, SEEK_END) == 0) {
-            /* Get the size of the file. */
-            fileSize = ftell(fd);
+	if (fd != nullptr) {
+		/* Go to the end of the file. */
+		if (fseek(fd, 0L, SEEK_END) == 0) {
+			/* Get the size of the file. */
+			fileSize = ftell(fd);
 
-            //MMAP the file to memory
-            fileContent = (uint8_t*) mmap(0, fileSize,
-					PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(fd), 0);
-            if (fileContent == MAP_FAILED) {
+			//MMAP the file to memory
+			fileContent = (uint8_t*) mmap(0, fileSize,
+			                              PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(fd), 0);
+			if (fileContent == MAP_FAILED) {
 				std::cout << "mmap failed" << std::endl;
-                throw ElfException("MMAP failed!!!\n");
-            }
-        }
-    }else{
+				throw ElfException("MMAP failed!!!\n");
+			}
+		}
+	} else {
 		std::cout << "cannot load file" << std::endl;
 		throw ElfException("Cannot load file");
 	}
 
 
-    if(fileContent[4] == ELFCLASS32)
-    {
-        elfFile = new ElfFile32(fd, fileSize, fileContent);
-    }
-    else if(fileContent[4] == ELFCLASS64)
-    {
-    	elfFile = new ElfFile64(fd, fileSize, fileContent);
-    }
-    elfFile->fd = fd;
-    elfFile->fileSize = fileSize;
-    elfFile->fileContent = fileContent;
+	if(fileContent[4] == ELFCLASS32) {
+		elfFile = new ElfFile32(fd, fileSize, fileContent);
+	}
+	else if(fileContent[4] == ELFCLASS64) {
+		elfFile = new ElfFile64(fd, fileSize, fileContent);
+	}
+	elfFile->fd = fd;
+	elfFile->fileSize = fileSize;
+	elfFile->fileContent = fileContent;
 
-    return elfFile;
+	return elfFile;
 }
 
-ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) throw(){
+ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) throw() {
 
 	ElfFile* elfFile = 0;
 
@@ -150,97 +166,94 @@ ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) throw(){
 	uint8_t* fileContent = buf;
 	FILE* fd = fmemopen(fileContent, fileSize, "rb");
 
-    if(fileContent[4] == ELFCLASS32)
-    {
-        elfFile = new ElfFile32(fd, fileSize, fileContent);
-    }
-    else if(fileContent[4] == ELFCLASS64)
-    {
-    	elfFile = new ElfFile64(fd, fileSize, fileContent);
-    }
-    elfFile->fd = fd;
-	
-    elfFile->fileSize = fileSize;
-    elfFile->fileContent = fileContent;
+	if(fileContent[4] == ELFCLASS32)
+	{
+		elfFile = new ElfFile32(fd, fileSize, fileContent);
+	}
+	else if(fileContent[4] == ELFCLASS64)
+	{
+		elfFile = new ElfFile64(fd, fileSize, fileContent);
+	}
+	elfFile->fd = fd;
 
-    return elfFile;
+	elfFile->fileSize = fileSize;
+	elfFile->fileContent = fileContent;
+
+	return elfFile;
 }
 
-ElfFile::ElfType ElfFile::getType(){ return this->type; }
+ElfFile::ElfType ElfFile::getType() { return this->type; }
 
-ElfFile::ElfProgramType ElfFile::getProgramType(){ return this->programType;}
+ElfFile::ElfProgramType ElfFile::getProgramType() { return this->programType;}
 
-int ElfFile::getFD(){ return fileno(this->fd); }
+int ElfFile::getFD() { return fileno(this->fd); }
 
 void ElfFile::printSymbols(){
 	uint8_t *elfEhdr = this->fileContent;
 
-	if(elfEhdr[4] == ELFCLASS32)
-	{
+	if (elfEhdr[4] == ELFCLASS32) {
 		//TODO
 	}
-	else if(elfEhdr[4] == ELFCLASS64)
-	{
+	else if (elfEhdr[4] == ELFCLASS64) {
 		Elf64_Ehdr * elf64Ehdr;
 		Elf64_Shdr * elf64Shdr;
 
 		elf64Ehdr = (Elf64_Ehdr *) elfEhdr;
 		elf64Shdr = (Elf64_Shdr *) (elfEhdr + elf64Ehdr->e_shoff);
 
-        uint32_t symSize = elf64Shdr[this->symindex].sh_size;
-        Elf64_Sym *symBase = 
-		     (Elf64_Sym *) (elfEhdr + elf64Shdr[this->symindex].sh_offset);
+		uint32_t symSize = elf64Shdr[this->symindex].sh_size;
+		Elf64_Sym *symBase = (Elf64_Sym *) (elfEhdr + elf64Shdr[this->symindex].sh_offset);
 
 		std::string symbolName;
 		std::string sectionName;
 
 		for(Elf64_Sym * sym = symBase;
-				sym < (Elf64_Sym *) (((char*) symBase) + symSize) ;
-				sym++)
-        {
-            symbolName = this->symbolName(sym->st_name);
-			if(sym->st_shndx < SHN_LORESERVE){
+		    sym < (Elf64_Sym *) (((char*) symBase) + symSize) ;
+		    sym++) {
+
+			symbolName = this->symbolName(sym->st_name);
+			if (sym->st_shndx < SHN_LORESERVE) {
 				sectionName =  this->sectionName(sym->st_shndx);
-			}else{
+			} else {
 				switch(sym->st_shndx){
-					case SHN_UNDEF:
-						sectionName = "*UND*";
-						break;
-					case SHN_LORESERVE:
-						sectionName = "*LORESERVE*";
-						break;
-					case SHN_AFTER:
-						sectionName = "*AFTER*";
-						break;
-					case SHN_HIPROC:
-						sectionName = "*HIPROC*";
-						break;
-					case SHN_LOOS:
-						sectionName = "*LOOS*";
-						break;
-					case SHN_HIOS:
-						sectionName = "*HIOS*";
-						break;
-					case SHN_ABS:
-						sectionName = "*ABS*";
-						break;
-					case SHN_COMMON:
-						sectionName = "*COMMON*";
-						break;
-					case SHN_HIRESERVE:
-						sectionName = "*HIRESERVE*";
-						break;
+				case SHN_UNDEF:
+					sectionName = "*UND*";
+					break;
+				case SHN_LORESERVE:
+					sectionName = "*LORESERVE*";
+					break;
+				case SHN_AFTER:
+					sectionName = "*AFTER*";
+					break;
+				case SHN_HIPROC:
+					sectionName = "*HIPROC*";
+					break;
+				case SHN_LOOS:
+					sectionName = "*LOOS*";
+					break;
+				case SHN_HIOS:
+					sectionName = "*HIOS*";
+					break;
+				case SHN_ABS:
+					sectionName = "*ABS*";
+					break;
+				case SHN_COMMON:
+					sectionName = "*COMMON*";
+					break;
+				case SHN_HIRESERVE:
+					sectionName = "*HIRESERVE*";
+					break;
 				}
 			}
 
-			if(ELF64_ST_TYPE(sym->st_info) == STT_FUNC ||
-					ELF64_ST_TYPE(sym->st_info) == STT_OBJECT){
+			if (ELF64_ST_TYPE(sym->st_info) == STT_FUNC ||
+			    ELF64_ST_TYPE(sym->st_info) == STT_OBJECT) {
 				std::cout << "Symbol: " << std::hex << sym->st_value << std::dec
 				          << " " << sectionName << " : " << symbolName
-						  << " ( " << sym->st_size << " ) " << std::endl;
+				          << " ( " << sym->st_size << " ) " << std::endl;
 			}
-        }
-    }
+		}
+	}
 }
 
 uint8_t* ElfFile::getFileContent(){
