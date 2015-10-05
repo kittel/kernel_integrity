@@ -149,7 +149,7 @@ inline uint32_t appendDataToVector(const void *data, uint32_t len,
 inline bool fexists(const std::string filename)
 {
 	std::ifstream ifile(filename);
-	return ifile;
+	return ifile.good();
 }
 
 #define contained(value, left, right) (value >= left && value <= right)
