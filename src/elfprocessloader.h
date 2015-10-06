@@ -51,8 +51,8 @@ class ElfProcessLoader : public ElfLoader {
 
 		SectionInfo heapSection;  // handler for optional heap segment
 
-		std::vector<uint8_t> dataSectionContent;   // actual dataSegment data
-		std::vector<uint8_t> heapSectionContent;
+		std::vector<uint8_t> dataSegmentContent;   // actual dataSegment data
+		std::vector<uint8_t> heapSegmentContent;
 
 		ElfFile* getLibraryWithName(std::string name);
 //		virtual std::vector<uint8_t>* buildSegfromLib(ElfFile *lib);
@@ -78,16 +78,16 @@ class ElfProcessLoader : public ElfLoader {
 		ElfProcessLoader* getExecForAddress(uint64_t);
 		SectionInfo* getSegmentForAddress(uint64_t addr);
 
-		virtual bool isTextOffset(uint64_t off) = 0;
-		virtual bool isDataOffset(uint64_t off) = 0;
-        virtual void updateMemIndex(uint64_t addr, uint8_t segNr) = 0;
+		virtual bool isCodeAddress(uint64_t addr);
+		virtual bool isDataAddress(uint64_t addr);
+		virtual bool isTextOffset(uint64_t off);
+		virtual bool isDataOffset(uint64_t off);
+
+
+		virtual void updateMemIndex(uint64_t addr, uint8_t segNr) = 0;
 
 		virtual int evalLazy(uint64_t addr,
 		                     std::unordered_map<std::string, RelSym*> *map) = 0;
-
-		virtual void appendEhdr() = 0;
-		virtual void appendPhdr() = 0;
-
 
 		virtual void updateSectionInfoMemAddress(SectionInfo &info);
 		virtual void addSymbols();

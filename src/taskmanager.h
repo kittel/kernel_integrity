@@ -66,6 +66,7 @@ class TaskManager{
 		TaskManager();
 		~TaskManager();
 
+		Instance getTaskForPID(pid_t pid);
 		std::vector<VMAInfo> getVMAInfo(pid_t pid);
 
 	protected:
@@ -76,7 +77,7 @@ class TaskManager{
 		Instance initTask;
 
 		Instance getMMStruct(Instance *task);
-		Instance getTaskForPID(pid_t pid);
 		Instance nextTask(Instance &task);
+		std::string getPathFromDentry(Instance& dentry);
 };
 #endif //TASKMANAGER_H

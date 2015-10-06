@@ -49,7 +49,6 @@ class ElfProcessLoader64 : public ElfProcessLoader{
  *-------------------------------------------------------
  *
  *      std::vector<uint8_t>    textSegmentContent; // actual textSegment data 
- *      uint32_t                textSegmentLength;  // size of the processImage 
  */
 	friend class ProcessValidator;
 
@@ -73,7 +72,6 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 		        std::string name = ""
 				);
 		virtual ~ElfProcessLoader64();
-		virtual void printImage();
 
 		virtual uint64_t getTextStart();
 		virtual uint64_t getDataStart();
@@ -85,8 +83,6 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 		virtual std::vector<RelSym*> getProvidedSyms();
 
 	protected:
-		virtual void initText();    // Initialize the first memory segment
-		virtual void initData();    // Initialize the second memory segment
 
         //Add all sections between [startAddr,endAddr) to the target image
 //        virtual void addSectionsToSeg(int nrSecHeaders,
@@ -96,11 +92,6 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 //                                      std::vector<uint8_t> *target,
 //                                      uint32_t *targetLength);
 
-
-		virtual bool isCodeAddress(uint64_t addr);
-		virtual bool isDataAddress(uint64_t addr);
-		virtual bool isTextOffset(uint64_t off);
-		virtual bool isDataOffset(uint64_t off);
 
         virtual uint32_t appendSegToImage(SectionInfo *segment,
                                           std::vector<uint8_t> *target,
@@ -129,10 +120,6 @@ class ElfProcessLoader64 : public ElfProcessLoader{
 		virtual void setHeapSegment(SectionInfo* heap);
 
 		virtual uint64_t getOffASLR(uint8_t type); //TODO
-
-		void appendEhdr();
-		void appendPhdr();
-		void appendText();
 
 };
 

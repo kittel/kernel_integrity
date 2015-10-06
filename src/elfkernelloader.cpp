@@ -122,10 +122,8 @@ void ElfKernelLoader::initText(void) {
 
 	applyJumpEntries( jumpStart, numberOfEntries );
 
-	this->textSegmentLength = this->textSegmentContent.size();
-	uint32_t fill = 0x200000 - (this->textSegmentLength % 0x200000);
-	this->textSegmentContent.insert(this->textSegmentContent.end(),
-			fill, 0);
+	uint32_t fill = 0x200000 - (this->textSegmentContent.size() % 0x200000);
+	this->textSegmentContent.insert(this->textSegmentContent.end(), fill, 0);
 
 	this->addSymbols();
 }

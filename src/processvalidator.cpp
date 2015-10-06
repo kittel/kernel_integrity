@@ -18,12 +18,18 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 		vmi(vmi), kl(kl), pid(pid), tm(){
 
 	std::cout << "ProcessValidator got: " << binaryName << std::endl;
+	
+
 
 	this->loadExec(binaryName);
 	
 	std::cout << "Linking VMAs to corresponding Loaders..." << std::endl;
 	this->mappedVMAs = tm.getVMAInfo(pid);
 	this->buildMaps(this->mappedVMAs);
+
+	
+	for (auto& section : this->mappedVMAs){
+	}
 
 
 	std::vector<VMAInfo> range;

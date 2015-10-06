@@ -34,8 +34,25 @@ std::string ElfProcessLoader::getName(){
 	return this->execName;
 }
 
-void ElfProcessLoader::initText(){}
-void ElfProcessLoader::initData(){}
+void ElfProcessLoader::initText(){
+	this->textSegmentInfo = this->elffile->findCodeSegment();
+
+	auto index = this->elffile->getFileContent() + this->textSegmentInfo.offset;
+    this->textSegmentContent.insert(
+	       this->textSegmentContent.end(),
+	       index,
+           index + this->textSegmentInfo.filesz);
+}
+
+void ElfProcessLoader::initData(){
+	this->dataSegmentInfo = this->elffile->findDataSegment();
+
+	auto index = this->elffile->getFileContent() + this->dataSegmentInfo.offset;
+    this->dataSegmentContent.insert(
+	       this->dataSegmentContent.end(),
+	       index,
+           index + this->dataSegmentInfo.filesz);
+}
 
 /* Initialize a complete memory image for validation. Relocations are not yet processed */
 void ElfProcessLoader::parseElfFile(){
@@ -121,4 +138,55 @@ SectionInfo* ElfProcessLoader::getSegmentForAddress(uint64_t addr){
 void ElfProcessLoader::updateSectionInfoMemAddress(SectionInfo &info){
 	UNUSED(info);
 }
+
 void ElfProcessLoader::addSymbols(){}
+
+/* Check if the given virtual address is located in the textSegment */
+bool ElfProcessLoader::isCodeAddress(uint64_t addr){
+	// get offset to last page border
+	uint64_t endAddr = ((uint64_t)this->textSegment.memindex)
+						+ (this->textSegmentInfo.offset & 0xfff)
+						+ this->textSegmentInfo.memsz;
+	// off = 0x1000 - (endAddr & 0xfff)
+	uint64_t offset = 0x1000 - (endAddr & 0xfff);
+
+	if(addr >= ((uint64_t)this->textSegment.memindex)
+		&& addr < (endAddr + offset)){ 
+		return true;
+	}
+	else return false;
+}
+
+
+/* Check if the given virtual address is located in the dataSection */
+bool ElfProcessLoader::isDataAddress(uint64_t addr){
+
+	// get offset to last page border
+	uint64_t endAddr = ((uint64_t)this->dataSection.memindex)
+						+(this->dataSegmentInfo.offset & 0xfff)
+						+ this->dataSegmentInfo.memsz;
+	// off = 0x1000 - (endAddr & 0xfff)
+	uint64_t offset = 0x1000 - (endAddr & 0xfff);
+
+	if(addr >= ((uint64_t)this->dataSection.memindex)
+		&& addr < (endAddr + offset)){ 
+		return true;
+	}
+	else return false;
+}
+
+/* Check if the given fileOffset (in bytes) lays in the textSegment */
+bool ElfProcessLoader::isTextOffset(uint64_t off){
+	uint64_t pagedDataOff = (this->dataSegmentInfo.offset
+								- (this->dataSegmentInfo.offset & 0xfff));
+	if(off >= this->textSegmentInfo.offset && off <= pagedDataOff) return true;
+	else return false;
+}
+
+/* Check if the given fileOffset (in bytes) lays in the dataSection */
+bool ElfProcessLoader::isDataOffset(uint64_t off){
+	uint64_t pagedDataOff = (this->dataSegmentInfo.offset
+								- (this->dataSegmentInfo.offset & 0xfff));
+	if(off <= pagedDataOff) return true;
+	else return false;
+}

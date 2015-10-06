@@ -103,10 +103,8 @@ void ElfModuleLoader::initText(void) {
     }
 
 	// Fill up the last page
-	this->textSegmentLength = this->textSegmentContent.size();
-	uint32_t fill = 0x1000 - (this->textSegmentLength % 0x1000);
-	this->textSegmentContent.insert(this->textSegmentContent.end(),
-			fill, 0);
+	uint32_t fill = 0x1000 - (this->textSegmentContent.size() % 0x1000);
+	this->textSegmentContent.insert(this->textSegmentContent.end(), fill, 0);
 
 	SectionInfo info = this->elffile->findSectionWithName("__mcount_loc");
 	this->updateSectionInfoMemAddress(info);

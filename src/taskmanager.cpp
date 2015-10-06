@@ -66,6 +66,26 @@ Instance TaskManager::getMMStruct(Instance *task){
 	return mm;
 }
 
+std::string TaskManager::getPathFromDentry(Instance& dentry){
+	std::string path = "";
+	std::string name = dentry
+				.memberByName("d_name", false)
+				.memberByName("name", true)
+				.getRawValue<std::string>(false);
+		
+	while(name.compare("/") != 0){
+		path.insert(0, name);
+		path.insert(0, "/");
+		dentry = dentry.memberByName("d_parent", true, true);
+		name = dentry
+					.memberByName("d_name", false)
+					.memberByName("name", true)
+					.getRawValue<std::string>(false);
+	}
+
+	return path;
+}
+
 /* Return a vector of VMAInfo*, containing all VMA mapping information
  * for the given pid. 
  *
@@ -119,12 +139,10 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid){
 					.memberByName("f_mapping",true)
 					.memberByName("host", true).memberByName("i_ino")
 					.getValue<uint64_t>();
-			name = cur.memberByName("vm_file", true)
+			Instance dentry = cur.memberByName("vm_file", true)
 					.memberByName("f_path", false)
-					.memberByName("dentry", true)
-					.memberByName("d_name", false)
-					.memberByName("name", true)
-					.getRawValue<std::string>(false);
+					.memberByName("dentry", true);
+			name = getPathFromDentry(dentry);
 		}
 		else {
 			fileOff = 0;

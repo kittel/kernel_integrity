@@ -303,7 +303,7 @@ int main (int argc, char **argv)
 	ElfKernelLoader* kl = KernelValidator::loadKernel(kerndir);
 	kl->setVMIInstance(vmi);
 	
-	if(true /* option to validate kernel */){
+	if(false /* option to validate kernel */){
 
 		if (!fexists(targetsFile)) {
 			std::cout << COLOR_RED << COLOR_BOLD <<

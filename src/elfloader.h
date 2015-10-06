@@ -41,7 +41,6 @@ class ElfLoader{
 		
 		SectionInfo textSegment;    // The first big memory segment
 	    std::vector<uint8_t> textSegmentContent;
-		uint32_t textSegmentLength;
 
 	    std::vector<uint8_t> jumpTable;
 		std::vector<uint8_t> roData;

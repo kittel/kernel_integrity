@@ -510,7 +510,7 @@ void KernelValidator::validateCodePage(page_info_t * page, ElfLoader* elf){
 		// check for uninitialized content after initialized 
 		// part of kernels text segment
 		if ( dynamic_cast<ElfKernelLoader*>(elf) && 
-			 i >= (int32_t) (elf->textSegmentLength - pageOffset))
+			 i >= (int32_t) (elf->textSegmentContent.size() - pageOffset))
 		{
 			std::cout << COLOR_RED << 
 			             "Validating: " << elf->getName() << 
