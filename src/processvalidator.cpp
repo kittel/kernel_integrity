@@ -12,70 +12,34 @@
 
 #include <processvalidator.h>
 
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
+
 // TODO: retrieve paths from command line parameters
 ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 	const std::string binaryName, VMIInstance* vmi, int32_t pid):
-		vmi(vmi), kl(kl), pid(pid), tm(){
+		vmi(vmi), kl(kl), pid(pid), binaryName(binaryName), tm(){
 
 	std::cout << "ProcessValidator got: " << binaryName << std::endl;
-	
 
-
-	this->loadExec(binaryName);
+	this->execLoader = this->loadExec(binaryName);
 	
-	std::cout << "Linking VMAs to corresponding Loaders..." << std::endl;
 	this->mappedVMAs = tm.getVMAInfo(pid);
-	this->buildMaps(this->mappedVMAs);
 
-	
 	for (auto& section : this->mappedVMAs){
-	}
-
-
-	std::vector<VMAInfo> range;
-	for (auto& section : this->mappedVMAs){
-		if(CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)){
-			range.push_back(section);
-		}
-	}
-
-	for (auto& line : this->mappedVMAs){
-		if(line.flags & VMAInfo::VM_EXEC ||
-		    !(line.flags & VMAInfo::VM_WRITE)){
+		if (section.name.compare("[vsdo]") == 0){
 			continue;
-		}
-		uint64_t counter = 0;
-		auto content = vmi->readVectorFromVA(line.start,
-		                                    line.end - line.start,
-		                                    pid);
-		uint8_t* data = content.data();
-		for(uint32_t i = 0 ; i < content.size() - 7; i++){
-			uint64_t* value = (uint64_t*) data + i;
-			//if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
-			//	continue;
-			//}
-			for(auto& section : range){
-				if((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))){
-					if (contained(*value, section.start, section.end)) {
-						counter++;
-					//std::cout << "Found ptr to: " << section->name << std::endl;
-					}
-				}
-			}
+		}else if ((section.flags & VMAInfo::VM_EXEC)){
+			validateCodePage(&section);
+		}else{
+			validateDataPage(&section);
 		}
 
-		std::cout << "Found " << COLOR_RED << COLOR_BOLD << 
-		    counter << COLOR_RESET << " pointers in section:" << std::endl;
-		line.print();
 	}
+
 
 
 	exit(0);
-
-	//Load trusted executable for checking
-	this->lastLoader = this->execLoader;
-
-	// get memindex information
 
 	// adjust the memindex of every library execLoader needs
 	std::cout << "Updating memindexes of all libraries..." << std::endl;
@@ -87,6 +51,113 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 }
 
 ProcessValidator::~ProcessValidator(){}
+
+void ProcessValidator::validateCodePage(VMAInfo* vma){
+	std::vector<uint8_t> codevma;
+	ElfProcessLoader* binary = 0;
+
+	if (binaryName.length() >= vma->name.length() &&
+	    binaryName.compare (binaryName.length() - vma->name.length(),
+                            vma->name.length(), vma->name) == 0){
+		binary = this->execLoader;
+
+	}else{
+		ElfProcessLoader* lib = this->findLoaderByName(vma->name);
+		if (!lib) {
+			std::cout << COLOR_RED <<
+			    "Warning: Found library in process that was not a dependency" << 
+				COLOR_RESET << std::endl;
+			return;
+		}
+		binary = lib;
+	}
+
+		// read vma from memory
+		codevma = 
+		    vmi->readVectorFromVA(vma->start,
+		                          vma->end - vma->start,
+		                          pid);
+		std::cout << "Found codevma for " <<
+		    vma->name << std::endl;
+		std::cout << "vma im Memory has length: " << std::hex <<
+		    vma->end - vma->start <<
+		    std::dec << std::endl;
+		std::cout << "vma in File has length: " << std::hex <<
+		    binary->textSegmentContent.size() <<
+		    std::dec << std::endl;
+
+
+		const uint8_t* memContent = codevma.data();
+		const uint8_t* fileContent = binary->textSegmentContent.data();
+		int32_t size = binary->textSegmentContent.size();
+		for (int32_t i = 0 ; i < size; i++){
+			if ( memContent[i] != fileContent[i] ){
+				
+				std::cout << "First change" << 
+							 " in byte 0x" << std::hex << i << 
+							 " is 0x" << (uint32_t) fileContent[i] <<
+							 " should be 0x" << (uint32_t) memContent[i] << 
+							 std::dec << std::endl;
+				//Print 40 Bytes from should be
+			
+				std::cout << "The loaded block is: " << std::hex << std::endl;
+				for (int32_t k = i-15 ; (k < i + 15) && (k < size); k++)
+				{
+					if (k < 0 || k >= size) continue;
+					if (k == i) std::cout << " # ";
+					std::cout << std::setfill('0') << std::setw(2) <<
+						(uint32_t) fileContent[k] << " ";
+				}
+			
+				std::cout << std::endl << 
+				    "The block in mem is: " << std::hex << std::endl;
+				for (int32_t k = i-15 ; (k < i + 15) && (k < size); k++)
+				{
+					if (k < 0 || k >= size) continue;
+					if (k == i) std::cout << " # ";
+					std::cout << std::setfill('0') << std::setw(2) << 
+						(uint32_t) memContent[k] << " ";
+				}
+			
+				std::cout << std::dec << std::endl << std::endl;
+			}
+		}
+
+}
+
+void ProcessValidator::validateDataPage(VMAInfo* vma){
+	std::vector<VMAInfo> range;
+	for (auto& section : this->mappedVMAs){
+		if(CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)){
+			range.push_back(section);
+		}
+	}
+
+	uint64_t counter = 0;
+	auto content = vmi->readVectorFromVA(vma->start,
+	                                    vma->end - vma->start,
+	                                    pid);
+	uint8_t* data = content.data();
+	for(uint32_t i = 0 ; i < content.size() - 7; i++){
+		uint64_t* value = (uint64_t*) data + i;
+		//if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
+		//	continue;
+		//}
+		for(auto& section : range){
+			if((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))){
+				if (contained(*value, section.start, section.end)) {
+					counter++;
+				//std::cout << "Found ptr to: " << section->name << std::endl;
+				}
+			}
+		}
+	}
+
+	std::cout << "Found " << COLOR_RED << COLOR_BOLD << 
+	    counter << COLOR_RESET << " pointers in section:" << std::endl;
+	vma->print();
+}
+
 
 /* Process load-time relocations of all libraries, which are mapped to the
  * virtual address space of our main process. The following steps have to be
@@ -194,101 +265,6 @@ void ProcessValidator::announceSyms(ElfProcessLoader* lib){
 	}
 	return;
 }
-
-
-/* Initialize vmaToLoaderMap and addrToLoaderMap  */
-void ProcessValidator::buildMaps(std::vector<VMAInfo> vec){
-
-	return;
-	std::cout << "Trying to build Maps..." << std::endl;
-	//ElfProcessLoader *lib = NULL;
-
-	// for every vma try to find a corresponding Loader
-	for(auto& it : vec){
-		continue;
-	}
-
-//		// if main binary
-//		if((getNameFromPath(this->execLoader->getName())
-//			.compare((*it)->name)) == 0){
-//			vmaToLoaderMap.insert(
-//				std::pair<VMAInfo*, ElfProcessLoader*>((*it), this->execLoader));
-//			addrToLoaderMap.insert(
-//				std::pair<uint64_t, ElfProcessLoader*>((*it)->start, 
-//															this->execLoader));
-//			lib = this->execLoader;
-//#ifdef DEBUG
-//			std::cout << "Added " << (*it)->name << " to Maps."
-//			<< std::endl;
-//#endif
-//			continue;
-//		}
-
-//		// if anon mapping
-//		if(it->ino == 0){
-//			//Is this the vdso page?
-//			if(it->start == this->vdsoLoader->getTextStart()){
-//				// add the vdso to the addr->loader map
-//#ifdef DEBUG
-//				std::cout << "Found VDSO mapping." << std::endl;
-//#endif
-//				addrToLoaderMap.insert(
-//				std::pair<uint64_t, ElfProcessLoader*>(this->vdsoLoader->getTextStart(),
-//												this->vdsoLoader));
-//			}
-//			// if this is a regular anon mapping -> associate with last lib
-//			// the mapping will most certainly be the heap of the last lib
-//			else{
-//				// if this is the stack of our main binary
-//				if( it->start >= this->stdStackTop &&
-//					it->start <= this->stdStackBot){
-//#ifdef DEBUG
-//					std::cout << "Found stack of the main binary." << std::endl;
-//#endif
-//					addrToLoaderMap.insert(
-//					std::pair<uint64_t, ElfProcessLoader*>(it->start,
-//															this->execLoader));
-//				}
-//				else{
-//					std::string name = getNameFromPath(lib->getName());
-//#ifdef DEBUG
-//					std::cout << "Found heap of " << name << std::endl;
-//#endif
-//					addrToLoaderMap.insert(
-//						std::pair<uint64_t, ElfProcessLoader*>(it->start, lib));
-//					name.append(" <heap>");
-//					SectionInfo* heap =
-//						new SectionInfo(name, 0, 0, it->start,
-//										(it->end - it->start));
-//					lib->setHeapSegment(heap);
-//				}
-//			}
-//			continue;
-//		}
-//
-//		// if usual library
-//		lib = kl->findLibByName(it->name);
-//		if(lib == NULL){
-//			assert(lib);
-//#ifdef DEBUG
-//			std::cout << "error:(buildMaps) Couldn't find corresponding"
-//			<< " library for VMA [" << it->name << "]" << std::endl;
-//#endif
-//			// TODO make sure all libs are here
-//			// lib mustn't be NULL for dereferencing in output above
-//			lib = this->execLoader;
-//		}
-//		vmaToLoaderMap.insert(
-//			std::pair<VMAInfo*, ElfProcessLoader*>(it, lib));
-//		addrToLoaderMap.insert(
-//			std::pair<uint64_t, ElfProcessLoader*>(it->start, lib));
-//#ifdef DEBUG
-//		std::cout << "Added " << it->name << " to Maps."
-//		<< std::endl;
-//#endif
-//	}
-}
-
 
 /* Print the information for all mapped VMAs */
 void ProcessValidator::printVMAs(){
@@ -641,6 +617,14 @@ ElfProcessLoader* ProcessValidator::getLoaderForAddress(uint64_t addr,
 	return ret;
 }
 
+ElfProcessLoader* ProcessValidator::findLoaderByName(const std::string &name) const{
+	
+	std::string libname = fs::path(name).filename().string();
+	std::cout << libname << std::endl;
+	return kl->findLibByName(libname);
+}
+
+
 /* Find a corresponding SectionInfo for the given vaddr */
 SectionInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr){
 
@@ -901,7 +885,7 @@ int ProcessValidator::validatePage(page_info_t *page, int32_t pid){
 //	return 0;
 }
 
-int ProcessValidator::loadExec(const std::string path){
+ElfProcessLoader* ProcessValidator::loadExec(const std::string path){
 	
 	//Create ELF Object
 	ElfFile *execFile = ElfFile::loadElfFile(path);
@@ -912,6 +896,6 @@ int ProcessValidator::loadExec(const std::string path){
                (execFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, name, kl));
 	this->execLoader->parseElfFile();
 
-	return 0;
+	return this->execLoader;
 }
 

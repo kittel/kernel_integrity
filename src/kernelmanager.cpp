@@ -323,6 +323,15 @@ void KernelManager::parseSystemMap(){
 
 ElfLoader *KernelManager::loadLibrary(std::string libraryName){
 	
+	std::string filename = findLibraryFile(libraryName);
+	if(filename.empty()){
+		std::cout << libraryName << ": Library File not found" << std::endl;
+		return NULL;
+	}
+	fs::path file = fs::canonical(filename);
+	filename = file.string();
+	libraryName = file.filename().string();
+
 //	moduleMapMutex.lock();
 //	// Check if module is already loaded
 	if (this->libraryMap.find(libraryName) != this->libraryMap.end()){
@@ -336,13 +345,9 @@ ElfLoader *KernelManager::loadLibrary(std::string libraryName){
 //	moduleMap[moduleName] = NULL;
 //	moduleMapMutex.unlock();
 	
-	std::string filename = findLibraryFile(libraryName);
-	if(filename.empty()){
-		std::cout << libraryName << ": Library File not found" << std::endl;
-		return NULL;
-	}
 	//Create ELF Object
 	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
+	std::cout << "Library loaded: " << libraryName << std::endl;
 	auto library = dynamic_cast<ElfProcessLoader64 *>
                (libraryFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC,
 	                               libraryName, this));
@@ -350,7 +355,6 @@ ElfLoader *KernelManager::loadLibrary(std::string libraryName){
 	library->parseElfFile();
 	
 //	moduleMapMutex.lock();
-	std::cout << "library loaded: " << libraryName << std::endl;
 	this->libraryMap[libraryName] = library;
 //	moduleMapMutex.unlock();
 //	

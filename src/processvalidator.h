@@ -46,6 +46,8 @@ class ProcessValidator{
 		int32_t pid;
 
 		ElfProcessLoader* execLoader;
+		std::string binaryName;
+
 		ElfProcessLoader* vdsoLoader;
 		std::map<std::string, std::string> envMap;
 		TaskManager tm;
@@ -67,17 +69,21 @@ class ProcessValidator{
 		int evalLazy(uint64_t start, uint64_t addr);
 		int _validatePage(page_info_t *page, int32_t pid);
 
-		int loadExec(const std::string pathName);
+		ElfProcessLoader* loadExec(const std::string pathName);
 		
 		void updateMemindexes();
-		void buildMaps(std::vector<VMAInfo> vec);
 		void processLoadRel();
 		void announceSyms(ElfProcessLoader* lib);
 
 		ElfProcessLoader* getLoaderForAddress(uint64_t addr,
 		                                      ElfProcessLoader* backup);
+		ElfProcessLoader* findLoaderByName(const std::string &name) const;
+
 		std::set<ElfProcessLoader*> getMappedLibs();
 		SectionInfo* getSegmentForAddress(uint64_t addr);
+
+		void validateCodePage(VMAInfo* vma);
+		void validateDataPage(VMAInfo* vma);
 };
 
 #endif /* PROCESSVALIDATOR_H */

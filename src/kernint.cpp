@@ -11,6 +11,9 @@
 #include <kernelvalidator.h>
 #include <processvalidator.h>
 
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
+
 void signalHandler( int signum ){
 	UNUSED(signum);
 	KernelValidator* instance = 
@@ -157,7 +160,7 @@ void displayHelp(const char* argv0){
 }
 
 int main (int argc, char **argv)
-{	
+{
 	
 	std::cout << COLOR_RESET;
     VMIInstance *vmi;
@@ -295,6 +298,7 @@ int main (int argc, char **argv)
 				binaryName << COLOR_RESET << std::endl;
 			exit(0);
 		}
+		binaryName = fs::canonical(binaryName).string();
 		if (!fexists(libraryDir)) {
 			std::cout << COLOR_RED << COLOR_BOLD <<
 				"Library Dir does not exist: " <<
