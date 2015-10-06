@@ -146,6 +146,10 @@ const char * helpString = R"EOF(
 
 	-l, --libraryPath=<libraryPath>
 		Use <libraryPath> to load trusted libraries.
+
+	Note: If the guest os is mounted via sshfs the transform_symlinks
+	      option needs to be used!
+		  sshfs -o transform_symlinks <user>@<ip>:/ <dir>/
 )EOF";
 
 void displayHelp(const char* argv0){
