@@ -1,3 +1,0 @@
-This tool is for both validating the kernel code integrity of a running vm as 
-well as to check the integrity of kernel stack structures with the aim to find
-control structures for return-oriented-programming like approaches.
