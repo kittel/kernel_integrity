@@ -28,7 +28,7 @@ ElfFile64::ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent):
 			this->strindex = elf64Shdr[i].sh_link;
 		}
 	}
-	
+
 	uint32_t symSize = elf64Shdr[this->symindex].sh_size;
 	Elf64_Sym *symBase = (Elf64_Sym *) (this->fileContent
 			+ elf64Shdr[this->symindex].sh_offset);
@@ -49,15 +49,15 @@ ElfLoader* ElfFile64::parseElf(ElfFile::ElfProgramType type,
 	if(type == ElfFile::ELFPROGRAMTYPEKERNEL){
 		return new ElfKernelLoader64(this);
 	}else if(type == ElfFile::ELFPROGRAMTYPEMODULE){
-		return new ElfModuleLoader64(this, 
+		return new ElfModuleLoader64(this,
 				name, parent);
 	}else if(type == ElfFile::ELFPROGRAMTYPEEXEC){
-		return new ElfProcessLoader64(this, 
+		return new ElfProcessLoader64(this,
 				parent, name);
 		//TODO: name doesn't get handled properly
 	}
 	std::cout << "No usable ELFPROGRAMTYPE defined." << std::endl;
-	return NULL;
+	return nullptr;
 }
 
 int ElfFile64::getNrOfSections(){
@@ -72,10 +72,10 @@ SectionInfo ElfFile64::findSectionWithName(std::string sectionName){
 				+ elf64Shdr[i].sh_name;
 
 		if (sectionName.compare(tempBuf) == 0) {
-			return SectionInfo(sectionName, i, 
-			                   this->fileContent + 
+			return SectionInfo(sectionName, i,
+			                   this->fileContent +
 			                        elf64Shdr[i].sh_offset,
-			                        elf64Shdr[i].sh_addr, 
+			                        elf64Shdr[i].sh_addr,
 			                   elf64Shdr[i].sh_size);
 			//printf("Found Strtab in Section %i: %s\n", i, tempBuf);
 		}
@@ -86,13 +86,13 @@ SectionInfo ElfFile64::findSectionWithName(std::string sectionName){
 SectionInfo ElfFile64::findSectionByID(uint32_t sectionID){
 	if(sectionID < elf64Ehdr->e_shnum){
 
-		std::string sectionName = toString(this->fileContent + 
-		                      elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + 
+		std::string sectionName = toString(this->fileContent +
+		                      elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
 		                      elf64Shdr[sectionID].sh_name);
 		return SectionInfo(sectionName, sectionID,
-		                   this->fileContent + 
+		                   this->fileContent +
 		                        elf64Shdr[sectionID].sh_offset,
-		                        elf64Shdr[sectionID].sh_addr, 
+		                        elf64Shdr[sectionID].sh_addr,
 		                   elf64Shdr[sectionID].sh_size);
 	}
 	return SectionInfo();
@@ -127,8 +127,8 @@ bool ElfFile64::isDataAddress(uint64_t address){
 }
 
 std::string ElfFile64::sectionName(int sectionID){
-	return toString(this->fileContent + 
-	                   elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + 
+	return toString(this->fileContent +
+	                   elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
 	                   elf64Shdr[sectionID].sh_name);
 }
 
@@ -141,7 +141,7 @@ uint64_t ElfFile64::sectionAlign(int sectionID){
 }
 
 std::string ElfFile64::symbolName(Elf64_Word index){
-	return toString(&((this->fileContent + 
+	return toString(&((this->fileContent +
 								elf64Shdr[this->strindex].sh_offset)[index]));
 }
 
@@ -162,7 +162,7 @@ bool ElfFile64::isExecutable(){
 }
 
 void ElfFile64::applyRelocations(ElfModuleLoader *loader){
-	
+
 	if (!this->isRelocatable()){
 		return;
 	}
@@ -194,10 +194,10 @@ void ElfFile64::applyRelocations(ElfModuleLoader *loader){
 
 std::vector<std::string> ElfFile64::getDependencies(){
 	std::vector<std::string> dependencies;
-	
+
 	// if this is a static exec we don't have any dependencies
 	if(!this->isDynamic() && !this->isExecutable()) return dependencies;
-	
+
 	// get .dynamic section
 	SectionInfo dynamic = this->findSectionWithName(".dynamic");
 	SectionInfo dynstr = this->findSectionWithName(".dynstr");
@@ -245,7 +245,7 @@ SegmentInfo ElfFile64::findDataSegment(){
 	return SegmentInfo();
 }
 
-template<typename T> 
+template<typename T>
 void ElfFile64::getRelEntries(std::vector<T> &ret, uint32_t type){
 	int maxSec = this->getNrOfSections();
 	int nrRel = 0;

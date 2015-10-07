@@ -3,11 +3,10 @@
 
 #include "elfkernelloader.h"
 
-class ElfKernelLoader32 : public ElfKernelLoader{
-	public:
-		ElfKernelLoader32(ElfFile32* elffile);
-		virtual ~ElfKernelLoader32();
-	protected:
+class ElfKernelLoader32 : public ElfKernelLoader {
+public:
+	ElfKernelLoader32(ElfFile32* elffile);
+	virtual ~ElfKernelLoader32();
 };
 
-#endif  /* ELFKERNELOADER32_H */
+#endif

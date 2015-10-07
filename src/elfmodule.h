@@ -2,11 +2,10 @@
 #define ELFMODULE_H
 
 
-
 class ElfModule {
-	private:
-		ElfModule();
-		virtual ~ElfModule();
+private:
+	ElfModule();
+	virtual ~ElfModule();
 };
 
 

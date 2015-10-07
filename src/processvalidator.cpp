@@ -17,8 +17,15 @@ namespace fs = boost::filesystem;
 
 // TODO: retrieve paths from command line parameters
 ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
-	const std::string binaryName, VMIInstance* vmi, int32_t pid):
-		vmi(vmi), kl(kl), pid(pid), binaryName(binaryName), tm(){
+                                   const std::string binaryName,
+                                   VMIInstance *vmi,
+                                   int32_t pid)
+	:
+	vmi(vmi),
+	kl(kl),
+	pid(pid),
+	binaryName(binaryName),
+	tm() {
 
 	std::cout << "ProcessValidator got: " << binaryName << std::endl;
 
@@ -26,21 +33,19 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 	
 	this->mappedVMAs = tm.getVMAInfo(pid);
 
-	for (auto& section : this->mappedVMAs){
-		if (section.name.compare("[vsdo]") == 0){
+	for (auto &section : this->mappedVMAs) {
+		if (section.name.compare("[vsdo]") == 0) {
 			continue;
-		}else if ((section.flags & VMAInfo::VM_EXEC)){
+		} else if ((section.flags & VMAInfo::VM_EXEC)) {
 			validateCodePage(&section);
-		}else{
+		} else {
 			validateDataPage(&section);
 		}
-
 	}
 
 
 
 	exit(0);
-
 	// adjust the memindex of every library execLoader needs
 	std::cout << "Updating memindexes of all libraries..." << std::endl;
 	this->updateMemindexes();
@@ -50,18 +55,18 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 	this->processLoadRel();
 }
 
-ProcessValidator::~ProcessValidator(){}
+ProcessValidator::~ProcessValidator() {}
 
-void ProcessValidator::validateCodePage(VMAInfo* vma){
+void ProcessValidator::validateCodePage(VMAInfo* vma) {
 	std::vector<uint8_t> codevma;
 	ElfProcessLoader* binary = 0;
 
 	if (binaryName.length() >= vma->name.length() &&
 	    binaryName.compare (binaryName.length() - vma->name.length(),
-                            vma->name.length(), vma->name) == 0){
+	                        vma->name.length(), vma->name) == 0) {
 		binary = this->execLoader;
 
-	}else{
+	} else {
 		ElfProcessLoader* lib = this->findLoaderByName(vma->name);
 		if (!lib) {
 			std::cout << COLOR_RED <<
@@ -72,79 +77,72 @@ void ProcessValidator::validateCodePage(VMAInfo* vma){
 		binary = lib;
 	}
 
-		// read vma from memory
-		codevma = 
-		    vmi->readVectorFromVA(vma->start,
-		                          vma->end - vma->start,
-		                          pid);
-		std::cout << "Found codevma for " <<
-		    vma->name << std::endl;
-		std::cout << "vma im Memory has length: " << std::hex <<
-		    vma->end - vma->start <<
-		    std::dec << std::endl;
-		std::cout << "vma in File has length: " << std::hex <<
-		    binary->textSegmentContent.size() <<
-		    std::dec << std::endl;
+	// read vma from memory
+	codevma = vmi->readVectorFromVA(vma->start,
+	                                vma->end - vma->start,
+	                                pid);
+	std::cout << "Found codevma for " << vma->name << std::endl;
+	std::cout << "vma im Memory has length: " << std::hex << vma->end - vma->start << std::dec << std::endl;
+	std::cout << "vma in File has length: " << std::hex << binary->textSegmentContent.size() << std::dec << std::endl;
 
 
-		const uint8_t* memContent = codevma.data();
-		const uint8_t* fileContent = binary->textSegmentContent.data();
-		int32_t size = binary->textSegmentContent.size();
-		for (int32_t i = 0 ; i < size; i++){
-			if ( memContent[i] != fileContent[i] ){
-				
-				std::cout << "First change" << 
-							 " in byte 0x" << std::hex << i << 
-							 " is 0x" << (uint32_t) fileContent[i] <<
-							 " should be 0x" << (uint32_t) memContent[i] << 
-							 std::dec << std::endl;
-				//Print 40 Bytes from should be
+	const uint8_t *memContent = codevma.data();
+	const uint8_t *fileContent = binary->textSegmentContent.data();
+	int32_t size = binary->textSegmentContent.size();
+
+	for (int32_t i = 0 ; i < size; i++) {
+		if (memContent[i] != fileContent[i]) {
 			
-				std::cout << "The loaded block is: " << std::hex << std::endl;
-				for (int32_t k = i-15 ; (k < i + 15) && (k < size); k++)
-				{
-					if (k < 0 || k >= size) continue;
-					if (k == i) std::cout << " # ";
-					std::cout << std::setfill('0') << std::setw(2) <<
-						(uint32_t) fileContent[k] << " ";
-				}
-			
-				std::cout << std::endl << 
-				    "The block in mem is: " << std::hex << std::endl;
-				for (int32_t k = i-15 ; (k < i + 15) && (k < size); k++)
-				{
-					if (k < 0 || k >= size) continue;
-					if (k == i) std::cout << " # ";
-					std::cout << std::setfill('0') << std::setw(2) << 
-						(uint32_t) memContent[k] << " ";
-				}
-			
-				std::cout << std::dec << std::endl << std::endl;
+			std::cout << "First change" << 
+			             " in byte 0x" << std::hex << i << 
+			             " is 0x" << (uint32_t) fileContent[i] <<
+			             " should be 0x" << (uint32_t) memContent[i] << 
+			             std::dec << std::endl;
+			//Print 40 Bytes from should be
+		
+			std::cout << "The loaded block is: " << std::hex << std::endl;
+
+			for (int32_t k = i-15 ; (k < i + 15) && (k < size); k++) {
+				if (k < 0 || k >= size) continue;
+				if (k == i) std::cout << " # ";
+				std::cout << std::setfill('0') << std::setw(2) <<
+				             (uint32_t) fileContent[k] << " ";
 			}
-		}
 
+			std::cout << std::endl << 
+			    "The block in mem is: " << std::hex << std::endl;
+			for (int32_t k = i-15 ; (k < i + 15) && (k < size); k++) {
+				if (k < 0 || k >= size) continue;
+				if (k == i) std::cout << " # ";
+				std::cout << std::setfill('0') << std::setw(2) <<
+				          (uint32_t) memContent[k] << " ";
+			}
+
+			std::cout << std::dec << std::endl << std::endl;
+		}
+	}
 }
 
-void ProcessValidator::validateDataPage(VMAInfo* vma){
+void ProcessValidator::validateDataPage(VMAInfo* vma) {
 	std::vector<VMAInfo> range;
-	for (auto& section : this->mappedVMAs){
-		if(CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)){
+	for (auto &section : this->mappedVMAs) {
+		if (CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)) {
 			range.push_back(section);
 		}
 	}
 
 	uint64_t counter = 0;
 	auto content = vmi->readVectorFromVA(vma->start,
-	                                    vma->end - vma->start,
-	                                    pid);
+	                                     vma->end - vma->start,
+	                                     pid);
 	uint8_t* data = content.data();
-	for(uint32_t i = 0 ; i < content.size() - 7; i++){
-		uint64_t* value = (uint64_t*) data + i;
+	for (uint32_t i = 0; i < content.size() - 7; i++) {
+		uint64_t *value = (uint64_t*) data + i;
 		//if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
 		//	continue;
 		//}
-		for(auto& section : range){
-			if((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))){
+		for (auto &section : range) {
+			if ((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))) {
 				if (contained(*value, section.start, section.end)) {
 					counter++;
 				//std::cout << "Found ptr to: " << section->name << std::endl;
@@ -153,8 +151,8 @@ void ProcessValidator::validateDataPage(VMAInfo* vma){
 		}
 	}
 
-	std::cout << "Found " << COLOR_RED << COLOR_BOLD << 
-	    counter << COLOR_RESET << " pointers in section:" << std::endl;
+	std::cout << "Found " << COLOR_RED << COLOR_BOLD <<
+	             counter << COLOR_RESET << " pointers in section:" << std::endl;
 	vma->print();
 }
 
@@ -169,15 +167,13 @@ void ProcessValidator::validateDataPage(VMAInfo* vma){
  *      - retrieve all exported symbols from the respective library
  *      - process relocation of the respective library
  */
-void ProcessValidator::processLoadRel(){
-
+void ProcessValidator::processLoadRel() {
 	// retrieve mapped libraries in the right order
-	std::set<ElfProcessLoader*> mappedLibs = this->getMappedLibs();
+	std::set<ElfProcessLoader *> mappedLibs = this->getMappedLibs();
 
 	// for every mapped library
-	for(auto& it : mappedLibs){
-
-		//initialize provided symbols based on updated memindexes
+	for (auto &it : mappedLibs) {
+		// initialize provided symbols based on updated memindexes
 		it->initProvidedSymbols();
 
 		// announce provided symbols
@@ -189,27 +185,26 @@ void ProcessValidator::processLoadRel(){
 	return;
 }
 
-/* Gather all libraries which are mapped into the current Address-Space 
+/* Gather all libraries which are mapped into the current Address-Space
  *
  * The dynamic linker has already done the ordering work.
  * The libraries lay in this->mappedVMAs, lowest address first.
  * => Reverse iterate through the mappedVMAs and find the corresponding loader,
  *    gives the loaders in the correct processing order.
  */
-std::set<ElfProcessLoader*> ProcessValidator::getMappedLibs(){
+std::set<ElfProcessLoader *> ProcessValidator::getMappedLibs() {
+	std::set<ElfProcessLoader *> ret;
+	ElfProcessLoader *l;
 
-	std::set<ElfProcessLoader*> ret;
-	ElfProcessLoader* l;
-
-	for(auto& it : this->mappedVMAs){
-
-		try{
+	for (auto &it : this->mappedVMAs) {
+		try {
 			l = this->vmaToLoaderMap.at(&it);
-		} catch (const std::out_of_range& oor){
+		} catch (const std::out_of_range &oor) {
 #ifdef VERBOSE
 			std::cout << "Couldn't find " << it.name << " at "
-			<< (void*)it.start
-			<< " in vmaToLoaderMap database. Skipping..." << std::endl;
+			          << (void *)it.start
+			          << " in vmaToLoaderMap database. Skipping..."
+			          << std::endl;
 #endif
 			continue;
 		}
@@ -219,101 +214,97 @@ std::set<ElfProcessLoader*> ProcessValidator::getMappedLibs(){
 	return ret;
 }
 
-/* Add the symbols, announced by lib, to the nameRelSymMap 
+/* Add the symbols, announced by lib, to the nameRelSymMap
  *
  *  - sweep through all provided symbols of the lib
  *  - if( symbol not yet in map || symbol in map(WEAK) and exported symbol(GLOBAL)
  *      - add to map
  */
-void ProcessValidator::announceSyms(ElfProcessLoader* lib){
+void ProcessValidator::announceSyms(ElfProcessLoader *lib) {
+	std::vector<RelSym *> syms = lib->getProvidedSyms();
+	RelSym *match              = nullptr;
 
-	std::vector<RelSym*> syms = lib->getProvidedSyms();
-	RelSym* match = NULL;
-
-	for(auto& it :syms){
-
-		try{
+	for (auto &it : syms) {
+		try {
 			match = this->relSymMap.at(it->name);
-		} catch (const std::out_of_range& oor){
+		} catch (const std::out_of_range &oor) {
 			// symbol not yet in map -> add
 #ifdef VERBOSE
 			std::cout << "Adding " << std::setw(40) << std::setfill(' ')
-			<< std::left << it->name << "@["
-			<< getNameFromPath(it->parent->getName()) << "] to relSymMap. "
-			<< "[" << (void*)it->value << "]"
-			<< std::endl;
+			          << std::left << it->name << "@["
+			          << getNameFromPath(it->parent->getName())
+			          << "] to relSymMap. "
+			          << "[" << (void *)it->value << "]" << std::endl;
 #endif
 			this->relSymMap[it->name] = it;
 			continue;
 		}
 
 		// symbol already in map -> check if we may overwrite
-		if(match != NULL){
+		if (match != nullptr) {
 			// if mapped symbol is WEAK and cur symbol is GLOBAL -> overwrite
-			if(ELF64_ST_BIND(match->info) == STB_WEAK
-				&& ELF64_ST_BIND(it->info) == STB_GLOBAL){
+			if (ELF64_ST_BIND(match->info) == STB_WEAK &&
+			    ELF64_ST_BIND(it->info) == STB_GLOBAL) {
 #ifdef VERBOSE
-				std::cout << "Overwriting [WEAK] '" << match->name
-				<< "' from " << getNameFromPath(match->parent->getName())
-				<< " with [GLOBAL] instance from "
-				<< getNameFromPath(it->parent->getName()) << "." << std::endl;
+				std::cout << "Overwriting [WEAK] '" << match->name << "' from "
+				          << getNameFromPath(match->parent->getName())
+				          << " with [GLOBAL] instance from "
+				          << getNameFromPath(it->parent->getName()) << "."
+				          << std::endl;
 #endif
 				this->relSymMap[it->name] = it;
 			}
-			match = NULL;
+			match = nullptr;
 		}
 	}
 	return;
 }
 
 /* Print the information for all mapped VMAs */
-void ProcessValidator::printVMAs(){
+void ProcessValidator::printVMAs() {
 
 	std::cout << "Currently mapped VMAs:" << std::endl;
 
 	int i = 0;
-	for(auto& it : this->mappedVMAs){
+	for (auto &it : this->mappedVMAs) {
 		std::string name;
-		if(it.name.compare("") == 0){
+		if (it.name.compare("") == 0) {
 			name = "<anonymous>";
-		}
-		else{
+		} else {
 			name = it.name;
 		}
 		std::cout << "[" << std::right << std::setfill(' ') << std::setw(3)
-			<< std::dec << i << "] "
-			<< std::left << std::setw(30) << name <<
-			std::hex << std::setfill('0')
-			<< "0x" << std::right << std::setw(12) << it.start << " - " 
-			<< "0x" << std::right << std::setw(12) << it.end << "  "
-			<< "0x" << std::right << std::setw(10) << it.off*0x1000
-			<< std::setfill(' ') << std::endl;
+		          << std::dec << i << "] " << std::left << std::setw(30) << name
+		          << std::hex << std::setfill('0') << "0x" << std::right
+		          << std::setw(12) << it.start << " - "
+		          << "0x" << std::right << std::setw(12) << it.end << "  "
+		          << "0x" << std::right << std::setw(10) << it.off * 0x1000
+		          << std::setfill(' ') << std::endl;
 		i++;
 	}
 	return;
 }
 
-
 /* Update the memindexes for all loaded libraries */
-void ProcessValidator::updateMemindexes(){
-
+void ProcessValidator::updateMemindexes() {
 	std::string input;
 	std::string mapping;
 
-	input = getNameFromPath(this->execLoader->getName());
+	input   = getNameFromPath(this->execLoader->getName());
 	mapping = (*std::begin(this->mappedVMAs)).name;
-	if(input.compare(mapping) != 0){
+	if (input.compare(mapping) != 0) {
 		std::cout << "Name of input binary and vma mapping differs! Aborting!"
-		<< std::endl
-		<< " Input: " << input << ", Mapping: " << mapping << std::endl;
+		          << std::endl
+		          << " Input: " << input << ", Mapping: " << mapping
+		          << std::endl;
 		exit(1);
 	}
 
-
 	ElfProcessLoader *lib = 0;
-	uint64_t lastInode = 0;
-	uint64_t lastOffset = (uint64_t)-1; // set to greates possible value
-//	bool isDataSet = false; // is dataSegment->memindex already set for curLoader
+	uint64_t lastInode    = 0;
+	uint64_t lastOffset   = (uint64_t)-1;  // set to greates possible value
+	//bool isDataSet = false; // is dataSegment->memindex already set for
+	//curLoader
 	bool isTextSet = false;
 
 	/* sweep through all VMAs and update the corresponding memindex
@@ -323,48 +314,51 @@ void ProcessValidator::updateMemindexes(){
 	 * corresponds to its textSegment, while the mapping with the dataSegBaseOff
 	 * of an inode corresponds to its dataSegment.
 	 */
-	for(auto& it : this->mappedVMAs){
+	for (auto &it : this->mappedVMAs) {
 #ifdef DEBUG
-		std::cout << "Processing entry with start addr " << (void*)it.start
-		<< " and inode " << std::dec << it.ino << std::endl;
+		std::cout << "Processing entry with start addr " << (void *)it.start
+		          << " and inode " << std::dec << it.ino << std::endl;
 #endif
 		// if the current iterator belongs to the father process
-		if(getNameFromPath(this->execLoader->getName()).compare(it.name) == 0){
+		if (getNameFromPath(this->execLoader->getName()).compare(it.name) ==
+		    0) {
 			// update textSegment?
 			// update dataSegment? -> atm only works for PDC
-			lib = this->execLoader;
+			lib       = this->execLoader;
 			lastInode = it.ino;
 			continue;
 		}
 		// if the current iterator belongs to the vdso
-		else if(this->vdsoLoader->getTextStart() == it.start){
+		else if (this->vdsoLoader->getTextStart() == it.start) {
 			continue;
 		}
 		// if the current iterator is a regular library or anon mapping
-		else{
+		else {
 			// if anon mapping
-			if(it.ino == 0) continue;
-			else{
+			if (it.ino == 0)
+				continue;
+			else {
 				// if in vm-area of a new loader (inode nrs differ)
-				if(lastInode != it.ino){
+				if (lastInode != it.ino) {
 					lastOffset = (uint64_t)-1;
 
 					// lib++
-					try{
+					try {
 						lib = this->vmaToLoaderMap.at(&it);
-					} catch (const std::out_of_range& oor){
+					} catch (const std::out_of_range &oor) {
 						std::cout << "Couldn't find mapping starting at "
-						<< (void*)it.start
-						<< " in library database. Skipping..." << std::endl;
+						          << (void *)it.start
+						          << " in library database. Skipping..."
+						          << std::endl;
 						continue;
 					}
 
 					isTextSet = false;
-//					isDataSet = false;
+					// isDataSet = false;
 
 					// if the textSegment isn't already set TODO move this back?
-					if(!isTextSet){
-						if(lib->isTextOffset(it.off * this->stdPageSize)){
+					if (!isTextSet) {
+						if (lib->isTextOffset(it.off * this->stdPageSize)) {
 							lib->updateMemIndex(it.start, SEG_NR_TEXT);
 							isTextSet = true;
 						}
@@ -373,16 +367,17 @@ void ProcessValidator::updateMemindexes(){
 					lastInode = it.ino;
 				}
 				// if still inside same inode area
-				else{
+				else {
 					// if dataSegment is not already set
-					//if(!isDataSet){
-					// if current offset is a data offset and smaller as all before
-					if((it.off * this->stdPageSize) < lastOffset){
+					// if(!isDataSet){
+					// if current offset is a data offset and smaller as all
+					// before
+					if ((it.off * this->stdPageSize) < lastOffset) {
 						// if the current address is the first data address
-						if(lib->isDataOffset(it.off * this->stdPageSize)){
+						if (lib->isDataOffset(it.off * this->stdPageSize)) {
 							lib->updateMemIndex(it.start, SEG_NR_DATA);
 							lastOffset = it.off * this->stdPageSize;
-//							isDataSet = true;
+							// isDataSet = true;
 						}
 					}
 					lastInode = it.ino;
@@ -394,26 +389,23 @@ void ProcessValidator::updateMemindexes(){
 }
 
 /* If not specified otherwise, reads the first page from heap */
-std::vector<uint8_t> ProcessValidator::getHeapContent(VMIInstance *vmi,
-														int32_t pid,
-														uint32_t readAmount = 0x1000){
+std::vector<uint8_t> ProcessValidator::getHeapContent(VMIInstance *vmi, int32_t pid, uint32_t readAmount=0x1000) {
 	std::vector<uint8_t> heap_content;
 	uint64_t heapStart = this->execLoader->getHeapStart();
 
 	std::cout << "Reading first 0x" << std::hex << readAmount << " bytes from"
-	<< " heap (" << (void*)heapStart << ") of process " << std::dec << pid
-	<< " ... " << std::endl;
+	          << " heap (" << (void *)heapStart << ") of process " << std::dec
+	          << pid << " ... " << std::endl;
 
 	// read heap content from vm
 	heap_content = vmi->readVectorFromVA(heapStart, readAmount, pid);
 	return heap_content;
 }
 
-
 std::vector<uint8_t> ProcessValidator::getStackContent(VMIInstance *vmi,
-														int32_t pid,
-														uint32_t offset,
-													   uint32_t readAmount=0){
+                                                       int32_t pid,
+                                                       uint32_t offset,
+                                                       uint32_t readAmount=0){
 
 	uint64_t stack_bottom = 0;
 	uint64_t stdStackTop = this->stdStackTop; // usual top of stack
@@ -421,26 +413,26 @@ std::vector<uint8_t> ProcessValidator::getStackContent(VMIInstance *vmi,
 	uint64_t startAddr = 0;
 
 	// if ASLR == off, stack always grows down from 0x7ffffffff000 for stat and dyn
-	if(offset == 0){
+	if (offset == 0) {
 		stack_bottom = this->stdStackBot;
 	}
 	else{
-	// TODO if ASLR is implemented
+		// TODO if ASLR is implemented
 		stack_bottom = this->stdStackBot + offset;
 	}
-	if(stack_bottom == 0){
+	if (stack_bottom == 0) {
 		std::cout << "error: (getProcessEnvironment) could not calculate stack_bottom."
-		<< std::endl;
+		          << std::endl;
 		return stack_content;
 	}
 
-	if(readAmount == 0){ // if not specified use default value;
+	if (readAmount == 0) { // if not specified use default value;
 		readAmount = stack_bottom - stdStackTop;
 	}
 	startAddr = stack_bottom - readAmount;
 
 	std::cout << "Retrieving lower 0x" << std::hex << readAmount
-	<< " bytes of stack from process " << std::dec << pid << " ..." << std::endl;
+	          << " bytes of stack from process " << std::dec << pid << " ..." << std::endl;
 
 	// get stack content from VM
 	stack_content = vmi->readVectorFromVA(startAddr, readAmount, pid);
@@ -454,7 +446,7 @@ void ProcessValidator::getProcessEnvironment(VMIInstance *vmi, int32_t pid, uint
 	std::vector<std::string> temp; // buffer for environ
 	std::vector<uint8_t> stack_content;
 	uint32_t readAmount = 0x1000; // 0x1000 bytes should be way enough to contain
-								  // all environment variables
+	// all environment variables
 	std::string marker = "x86_64"; // marker, on stack on top of environment variables
 	uint8_t matching = 0;    // amount of matching marker bytes
 	std::string stringBuf = ""; // buffer for extracting 'var=value'
@@ -465,58 +457,70 @@ void ProcessValidator::getProcessEnvironment(VMIInstance *vmi, int32_t pid, uint
 	uint32_t varBegin = 0;
 
 	// get position of environ
-	for(uint32_t i = 0; i < stack_content.size(); i++){
-		switch(matching){
-			case 0:
-						if(stack_content[i] == 'x'){
-							matching++;
-						} else { matching = 0;}
-						continue;
-			case 1:
-						if(stack_content[i] == '8'){
-							matching++;
-						} else { matching = 0;}
-						continue;
-			case 2:
-						if(stack_content[i] == '6'){
-							matching++;
-						} else { matching = 0;}
-						continue;
-			case 3:
-						if(stack_content[i] == '_'){
-							matching++;
-						} else { matching = 0;}
-						continue;
-			case 4:
-						if(stack_content[i] == '6'){
-							matching++;
-						} else { matching = 0;}
-						continue; 
-			case 5:
-						if(stack_content[i] == '4'){
-							varBegin = i+2;
-							break;
-						} else {matching = 0;}
-						continue;
+	for (uint32_t i = 0; i < stack_content.size(); i++) {
+		switch (matching) {
+		case 0:
+			if (stack_content[i] == 'x') {
+				matching++;
+			} else {
+				matching = 0;
+			}
+			continue;
+		case 1:
+			if (stack_content[i] == '8') {
+				matching++;
+			} else {
+				matching = 0;
+			}
+			continue;
+		case 2:
+			if (stack_content[i] == '6') {
+				matching++;
+			} else {
+				matching = 0;
+			}
+			continue;
+		case 3:
+			if (stack_content[i] == '_') {
+				matching++;
+			} else {
+				matching = 0;
+			}
+			continue;
+		case 4:
+			if (stack_content[i] == '6') {
+				matching++;
+			} else {
+				matching = 0;
+			}
+			continue;
+		case 5:
+			if (stack_content[i] == '4') {
+				varBegin = i + 2;
+				break;
+			} else {
+				matching = 0;
+			}
+			continue;
 		}
-		if(matching == 5) break;
+		if (matching == 5)
+			break;
 	}
 
-
-	if(varBegin == 0){
+	if (varBegin == 0) {
 		std::cout << "error: (getProcessEnvironment) couldn't find marker "
-		<< marker <<  std::endl;
+		          << marker <<  std::endl;
 		return;
 	}
 
 
 	// parse variables from stack_content
-	for(; varBegin < stack_content.size(); varBegin++){
-		if(stack_content[varBegin] == 0x0){
-				temp.push_back(stringBuf);
-				stringBuf = "";
+	for (; varBegin < stack_content.size(); varBegin++) {
+		if (stack_content[varBegin] == 0x0) {
+			temp.push_back(stringBuf);
+			stringBuf = "";
 		}
-		else{
+		else {
 			stringBuf.push_back(stack_content[varBegin]);
 		}
 	}
@@ -524,37 +528,33 @@ void ProcessValidator::getProcessEnvironment(VMIInstance *vmi, int32_t pid, uint
 	int len;
 
 	// remove everything non-variable
-	for(auto& it : temp){
+	for (auto &it : temp) {
 		// if no '=' is in the current string, ignore it.
 		len = it.find('=');
-		if((it.find('=') != std::string::npos)
-			&& (it[0] >= 65)
-			&& (it[0] <= 90)){
-			this->envMap.insert(std::pair<std::string, std::string>(
-								it.substr(0, len),
-								it.substr(len+1, std::string::npos)));
+		if ((it.find('=') != std::string::npos) && (it[0] >= 65) && (it[0] <= 90)) {
+			this->envMap.insert(std::pair<std::string, std::string>(it.substr(0, len),
+			                                                        it.substr(len+1, std::string::npos)));
 		}
 	}
 
 
 #ifdef DEBUG
 	std::cout << "debug: (getProcessEnvironment) Parsed env-vars. Content:" << std::endl;
-	for ( auto& var : this->envMap){
+	for (auto &var : this->envMap) {
 		std::cout << var.first << "\t" << var.second << std::endl;
 	}
 
 #endif
 }
 
-int ProcessValidator::checkEnvironment(std::map<std::string, std::string> inputMap){
+int ProcessValidator::checkEnvironment(const std::map<std::string, std::string> &inputMap){
 
 	int errors = 0;
 	std::string value;
 
-
 	// check all input settings
-	for(auto& inputPair : inputMap){
-		try{
+	for (auto &inputPair : inputMap) {
+		try {
 			// get env value for current input key
 			value = this->envMap.at(inputPair.first);
 		}
@@ -564,20 +564,21 @@ int ProcessValidator::checkEnvironment(std::map<std::string, std::string> inputM
 			// -> check next input setting
 #ifdef DEBUG
 			std::cout << "debug: (checkEnvironment) no entry " << inputPair.first
-			<< " in envMap." << std::endl;
+			          << " in envMap." << std::endl;
 #endif
 			continue;
 		}
-		if(value.compare(inputPair.second) == 0){
+
+		if (value.compare(inputPair.second) == 0) {
 			// setting is right
 #ifdef DEBUG
 			std::cout << "debug: (checkEnvironment) entry " << inputPair.first
-			<< " in envMap has the correct value " << inputPair.second << std::endl;
+			          << " in envMap has the correct value " << inputPair.second << std::endl;
 #endif
-		continue;
+			continue;
 		}
-		else{
-			// setting is wrong 
+		else {
+			// setting is wrong
 			errors++;
 			std::cout
 #ifndef DUMP
@@ -602,15 +603,15 @@ int ProcessValidator::checkEnvironment(std::map<std::string, std::string> inputM
  * loader, if no entry in the database is found.
  */
 ElfProcessLoader* ProcessValidator::getLoaderForAddress(uint64_t addr,
-                                                        ElfProcessLoader* backup){
+                                                        ElfProcessLoader* backup) {
 
-	ElfProcessLoader *ret = NULL;
-	try{
+	ElfProcessLoader *ret = nullptr;
+	try {
 		ret = this->addrToLoaderMap.at(addr);
-	} catch (const std::out_of_range& oor){
+	} catch (const std::out_of_range& oor) {
 #ifdef DEBUG
 		std::cout << "Couldn't find corresponding match to " << (void*)addr
-		<< " in addr->loader map. Defaulting to last loader..." << std::endl;
+		          << " in addr->loader map. Defaulting to last loader..." << std::endl;
 #endif
 		ret = backup;
 	}
@@ -626,7 +627,7 @@ ElfProcessLoader* ProcessValidator::findLoaderByName(const std::string &name) co
 
 
 /* Find a corresponding SectionInfo for the given vaddr */
-SectionInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr){
+SectionInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr) {
 
 	SectionInfo *ret;
 
@@ -646,53 +647,50 @@ SectionInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr){
  *   - else
  *       - return 1
  */
-int ProcessValidator::evalLazy(uint64_t start, uint64_t addr){
-
+int ProcessValidator::evalLazy(uint64_t start, uint64_t addr) {
 	ElfProcessLoader* loader = 0;
 
-	try{
+	try {
 		loader = this->addrToLoaderMap.at(start);
-	} catch (const std::out_of_range& oor){
+	} catch (const std::out_of_range& oor) {
 #ifdef DEBUG
 		std::cout << "debug:(evalLazy) Couldn't find a corresponding loader "
-		<< "for address " << (void*)addr << std::endl;
-		return 1;
+		          << "for address " << (void*)addr << std::endl;
 #endif
+		return 1;
 	}
-
-//	std::cout << "loader: " << (void*)loader << std::endl;
 
 	return loader->evalLazy(addr, &this->relSymMap);
 }
 
-int ProcessValidator::_validatePage(page_info_t *page, int32_t pid){
+int ProcessValidator::_validatePage(page_info_t *page, int32_t pid) {
 	assert(page);
 
 	// TODO optimize this output, such that we don't have to check for stack
 	// address here everytime
-	if(page->vaddr >= this->stdStackTop && page->vaddr <= this->stdStackBot){
+	if (page->vaddr >= this->stdStackTop && page->vaddr <= this->stdStackBot) {
 		std::cout << "Located in stack of "
-		<< getNameFromPath(this->execLoader->getName()) << std::endl;
+		          << getNameFromPath(this->execLoader->getName()) << std::endl;
 		return 0;
 	}
 
 	SectionInfo *targetSegment = this->getSegmentForAddress(page->vaddr);
 
-	if(targetSegment == NULL){
+	if (targetSegment == nullptr) {
 		std::cout << "Located in heap." << std::endl;
 		return 0;
 	}
 
 	// check if the targetSegment is a heapSegment (might check name cont. heap)
-//	if(targetSegment->index == 0 && targetSegment->segID == 0){
-	if(targetSegment->segName.find("<heap>") != std::string::npos){
+	// if(targetSegment->index == 0 && targetSegment->segID == 0){
+	if (targetSegment->segName.find("<heap>") != std::string::npos) {
 		std::cout << "Located in heap of " << targetSegment->segName
-		<< ". Skipping..." << std::endl;
+		          << ". Skipping..." << std::endl;
 		return 0;
 	}
-	else{
+	else {
 		std::cout << "Located in " << getNameFromPath(this->lastLoader->getName())
-		<< std::endl;
+		          << std::endl;
 	}
 
 
@@ -701,201 +699,175 @@ int ProcessValidator::_validatePage(page_info_t *page, int32_t pid){
 #endif
 
 	//TODO: Check what happens, if offset is negative (maybe replace by int64_t
-	uint64_t pageOffset = 0; // offset of page to actual aligned memindex of the
-                             // containing segment
-//#ifdef DEBUG
-	uint64_t pageIndex = 0;  // offset above in amount of pages (index)
-//#endif
-	uint32_t changeCount = 0; // Number of differing bytes in validation process
+	uint64_t pageOffset  = 0;   // offset of page to actual aligned memindex of the containing segment
+	uint64_t pageIndex   = 0;   // offset above in amount of pages (index)
+	uint32_t changeCount = 0;   // Number of differing bytes in validation process
 
 #ifdef DEBUG
 	printf("debug: page->vaddr:0x%lx, memindex=0x%lx\n", page->vaddr, (uint64_t) targetSegment->memindex);
 #endif
 
-	pageOffset = (page->vaddr - 
-				 ((uint64_t) targetSegment->memindex)); //& 0xffffffffffff ));
-	pageIndex = (page->vaddr - 
-				 ((uint64_t) targetSegment->memindex)// & 0xffffffffffff )
-				) / page->size;
+	pageOffset = (page->vaddr - ((uint64_t) targetSegment->memindex));
+	pageIndex = (page->vaddr - ((uint64_t) targetSegment->memindex)) / page->size;
 
 #ifdef DEBUG
 	std::cout << "debug: Initialized pageOffset=0x" << pageOffset << ", pageIndex=0x"
-			  << pageIndex << std::endl;
+	          << pageIndex << std::endl;
 #endif
 
 	std::cout << "pageOffset: " << (void*) pageOffset
-	<< ", pageIndex: " << (void*) pageIndex << std::endl;
+	          << ", pageIndex: " << (void*) pageIndex << std::endl;
 
 
 	// get Page from exec
-    // check if the loaded procimage already contains the page we just retrieved
-	if(targetSegment->size < pageOffset){
-		//This section is not completely loaded
+	// check if the loaded procimage already contains the page we just retrieved
+	if (targetSegment->size < pageOffset) {
+		// This section is not completely loaded
 		assert(false);
 	}
-    // the corresponding page out of our procimage
-	uint8_t *loadedPage = targetSegment->index + pageOffset;
-//	uint8_t* loadedPage = (execLoader->getImageForAddress(page->vaddr, pageOffset));
-					//	execLoader->textSegmentContent.data() + pageOffset;
-	if(loadedPage == NULL) return 1;
 
+	// the corresponding page out of our procimage
+	uint8_t *loadedPage = targetSegment->index + pageOffset;
+	// uint8_t* loadedPage = (execLoader->getImageForAddress(page->vaddr,
+	//                                                       pageOffset));
+	// execLoader->textSegmentContent.data() + pageOffset;
+	if (loadedPage == nullptr)
+		return 1;
 
 	// get Page _content_ from VM
-	std::vector<uint8_t> pageInMem =
-						 vmi->readVectorFromVA(page->vaddr, page->size, pid);
+	std::vector<uint8_t> pageInMem = vmi->readVectorFromVA(page->vaddr, page->size, pid);
 
 #ifdef DEBUG
 	std::cout << "Content of the whitelisted page:" << std::endl;
-    std::vector<uint8_t> dummy;
-    dummy.insert(std::begin(dummy), loadedPage, (loadedPage + 0x1000));
-    printHexDump(&dummy);
+	std::vector<uint8_t> dummy;
+	dummy.insert(std::begin(dummy), loadedPage, (loadedPage + 0x1000));
+	printHexDump(&dummy);
 
-    std::cout << "Content of the page in memory:" << std::endl;
-    printHexDump(&pageInMem);
-/*	for(auto& it = std::begin(pageInMem); it != std::end(pageInMem); it++){
+	std::cout << "Content of the page in memory:" << std::endl;
+	printHexDump(&pageInMem);
+	/*
+	for(auto &it : pageInMem) {
 		printf("%c", *it);
 	}
-*/
+	*/
 #endif
-
 
 	// lazy evaluation lock
 	// TODO maybe optimize, only search for lazyBinding entry every 8 bytes?
 	uint8_t remain = 0;
 
 	// check byte for byte
-	for(int32_t i = 0; i < page->size; i++){
-
-		if(loadedPage[i] == pageInMem[i]){
+	for (int32_t i = 0; i < page->size; i++) {
+		if (loadedPage[i] == pageInMem[i]) {
 #ifdef DEBUG
-	#ifndef DUMP
-			std::cout << COLOR_GREEN << "Address "<< COLOR_BOLD <<  std::hex
-					  << (void*) (page->vaddr+i) << COLOR_BOLD_OFF << " is fine."
-					  << std::endl << COLOR_NORM;
-	#endif
-	#ifdef DUMP
-			std::cout << "Address 0x" << std::hex << (int)(page->vaddr+i)
-					  << " is fine." << std::endl;
-	#endif
+#ifndef DUMP
+			std::cout << COLOR_GREEN << "Address " << COLOR_BOLD << std::hex
+			          << (void *)(page->vaddr + i) << COLOR_BOLD_OFF
+			          << " is fine." << std::endl
+			          << COLOR_NORM;
 #endif
-			if(remain > 0) remain--;
+#ifdef DUMP
+			std::cout << "Address 0x" << std::hex << (int)(page->vaddr + i)
+			          << " is fine." << std::endl;
+#endif
+#endif
+			if (remain > 0)
+				remain--;
 			continue;
-		}
-		else{
-
+		} else {
 			// if we have _not_ written recently due to lazyEval we may write
-			if(remain == 0){
-				// Lazy Evaluation TODO this can be optimized by giving the targetSegment->index directly
-				if(!this->evalLazy((uint64_t)targetSegment->memindex,
-									((uint64_t)targetSegment->memindex) + i + pageOffset)){
+			if (remain == 0) {
+				// Lazy Evaluation TODO this can be optimized by giving the
+				// targetSegment->index directly
+				if (!this->evalLazy((uint64_t)targetSegment->memindex,
+				                    ((uint64_t)targetSegment->memindex) + i + pageOffset)) {
 					// Lazy evaluation has been applied. Block the next 8 Bytes
 					// from writing!
 					remain = 7;
 #ifdef DEBUG
-					std::cout << "Found change. remain: " << std::hex << (int)remain << std::endl;
+					std::cout << "Found change. remain: " << std::hex
+					          << (int)remain << std::endl;
 #endif
-					if(loadedPage[i] == pageInMem[i]){
+					if (loadedPage[i] == pageInMem[i]) {
 #ifdef DEBUG
-	#ifndef DUMP
-						std::cout << COLOR_GREEN << "Address "<< COLOR_BOLD <<  std::hex
-							  << (void*) (page->vaddr+i) << COLOR_BOLD_OFF << " is fine."
-							  << " [Evaluated Lazy]"
-							  << std::endl << COLOR_NORM;
-	#endif
-	#ifdef DUMP
-						std::cout << "Address 0x" << std::hex << (int)(page->vaddr+i)
-							  << " is fine. [Evaluated Lazy]" << std::endl;
-	#endif
+#ifndef DUMP
+						std::cout << COLOR_GREEN << "Address " << COLOR_BOLD
+						          << std::hex << (void *)(page->vaddr + i)
+						          << COLOR_BOLD_OFF << " is fine."
+						          << " [Evaluated Lazy]" << std::endl
+						          << COLOR_NORM;
+#endif
+#ifdef DUMP
+						std::cout << "Address 0x" << std::hex
+						          << (int)(page->vaddr + i)
+						          << " is fine. [Evaluated Lazy]" << std::endl;
+#endif
 #endif
 						continue;
 					}
 				}
 			}
-			// if we have written recently, the error should be resolved or malicious
-			else{
+
+			// if we have written recently, the error should be resolved or
+			// malicious
+			else {
 				remain--;
 			}
 
 			changeCount++;
 #ifndef DUMP
 			std::cout << COLOR_RED << "Found mutation at " << COLOR_BOLD
-					  << std::hex << (void*)(i+page->vaddr)
-					  << COLOR_BOLD_OFF << ". Expected:'" << COLOR_BOLD << "0x"
-					  << std::setfill('0') << std::setw(2) << (int)(loadedPage[i])
-					  << COLOR_BOLD_OFF << "', found:'" << COLOR_BOLD << "0x"
-					  << std::setw(2) << (int)(pageInMem[i]) << COLOR_BOLD_OFF
-					  << "'. Errors = " << std::dec <<  changeCount << COLOR_NORM << std::endl;
+			          << std::hex << (void *)(i + page->vaddr) << COLOR_BOLD_OFF
+			          << ". Expected:'" << COLOR_BOLD << "0x"
+			          << std::setfill('0') << std::setw(2)
+			          << (int)(loadedPage[i]) << COLOR_BOLD_OFF << "', found:'"
+			          << COLOR_BOLD << "0x" << std::setw(2)
+			          << (int)(pageInMem[i]) << COLOR_BOLD_OFF
+			          << "'. Errors = " << std::dec << changeCount << COLOR_NORM
+			          << std::endl;
 #endif
 #ifdef DUMP
-			std::cout << "Found mutation at " << std::hex << (void*)(i+page->vaddr)
-					  << ". Expected:'" << "0x" << std::setfill('0') << std::setw(2)
-					  << (int)(loadedPage[i]) << "', found:'" << "0x" << std::setw(2)
-					  << (int)(pageInMem[i]) << "'. Change count = " << std::dec
-					  << changeCount << std::endl;
+			std::cout << "Found mutation at " << std::hex
+			          << (void *)(i + page->vaddr) << ". Expected:'"
+			          << "0x" << std::setfill('0') << std::setw(2)
+			          << (int)(loadedPage[i]) << "', found:'"
+			          << "0x" << std::setw(2) << (int)(pageInMem[i])
+			          << "'. Change count = " << std::dec << changeCount
+			          << std::endl;
 #endif
 		}
 	}
 
-	if(changeCount == 0) std::cout << "Page fine." << std::endl;
+	if (changeCount == 0)
+		std::cout << "Page fine." << std::endl;
 
 	return changeCount;
 }
-
 
 int ProcessValidator::validatePage(page_info_t *page, int32_t pid){
 
 #ifndef DUMP
 	std::cout << std::setfill('-') << std::setw(80) << "" << COLOR_YELLOW << std::endl
-			  << "Verifying page.\nVirtual Address: "<< COLOR_BOLD << "0x" << std::hex << page->vaddr << COLOR_BOLD_OFF
-			  << "\nPhysical Address: 0x" << std::hex << page->paddr << std::endl
-			  << COLOR_NORM;
+	          << "Verifying page.\nVirtual Address: "<< COLOR_BOLD << "0x" << std::hex << page->vaddr << COLOR_BOLD_OFF
+	          << "\nPhysical Address: 0x" << std::hex << page->paddr << std::endl
+	          << COLOR_NORM;
 #endif
 #ifdef DUMP
 	std::cout << std::setfill('-') << std::setw(80) << "" << std::endl
-			  << "Verifying page.\nVirtual Address: " << "0x" << std::hex << page->vaddr
-			  << "\nPhysical Address: 0x" << std::hex << page->paddr << std::endl;
+	          << "Verifying page.\nVirtual Address: " << "0x" << std::hex << page->vaddr
+	          << "\nPhysical Address: 0x" << std::hex << page->paddr << std::endl;
 #endif
 
-
-/* OBSOLETE
-	// Try to find a corresponding whitelisted executable for the page
-	//TODO fix this, atm points to segment after textSegment
-
-	ElfLoader *corrExec;
-
-	corrExec = this->execLoader->getExecForAddress(page->vaddr);
-
-	if(corrExec == NULL){
-		std::cout << "error: (validatePage) No corresponding file found for address " << std::hex
-                  << (void*) page->vaddr << std::endl;
-		return 1;
-	}
-	else{
-		// check (W xor X) policy
-		if (corrExec->isDataAddress(page->vaddr)){
-			if(this->vmi->isPageExecutable(page)){
-				std::cout << COLOR_RED  << "Warning: Executable _AND_ writable page found at "
-				<< COLOR_BOLD << (void*) page->vaddr << COLOR_BOLD_OFF
-				<< COLOR_NORM << std::endl;
-			}
-		}
-*/
 	return this->_validatePage(page, pid);
-//	}
-//	return 0;
 }
 
-ElfProcessLoader* ProcessValidator::loadExec(const std::string path){
-	
-	//Create ELF Object
+ElfProcessLoader *ProcessValidator::loadExec(const std::string &path) {
+	// Create ELF Object
 	ElfFile *execFile = ElfFile::loadElfFile(path);
 
-	std::string name = path.substr(path.rfind("/", std::string::npos) + 1,
-	                               std::string::npos);
-	this->execLoader = dynamic_cast<ElfProcessLoader64 *>
-               (execFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, name, kl));
+	std::string name = path.substr(path.rfind("/", std::string::npos) + 1, std::string::npos);
+	this->execLoader = dynamic_cast<ElfProcessLoader64 *>(execFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, name, kl));
 	this->execLoader->parseElfFile();
 
 	return this->execLoader;
 }
-

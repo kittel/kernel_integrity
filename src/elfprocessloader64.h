@@ -20,14 +20,12 @@
 
 
 
-/*
+/**
  * This class is a derivated ElfProcessLoader for use with 64-Bit Systems.
  * It holds a process image for validation, which is derived from the original
  * ELF by retracing the building process in the target system.
  *
- */
-class ElfProcessLoader64 : public ElfProcessLoader{
-/*  Important members inherited from higher classes:
+ *  Important members inherited from higher classes:
  *
  *  protected:
  *      ElfFile                 *elffile;
@@ -50,77 +48,70 @@ class ElfProcessLoader64 : public ElfProcessLoader{
  *
  *      std::vector<uint8_t>    textSegmentContent; // actual textSegment data 
  */
+class ElfProcessLoader64 : public ElfProcessLoader {
 	friend class ProcessValidator;
 
-	private:
-		bool bindLazy;
+private:
+	bool bindLazy;
 
-		uint64_t vdsoAddr; // if exec : Starting vaddr of the VDSO Image
-                           // if vdso : 0 [the vdso doesn't care where it is at]
-					
-		std::vector<RelSym*> providedSyms; // symbols provided by this loader
-		std::map<std::string, uint32_t> neededSyms; // first:name, second:symtabID
+	uint64_t vdsoAddr; // if exec : Starting vaddr of the VDSO Image
+	// if vdso : 0 [the vdso doesn't care where it is at]
 
+	std::vector<RelSym*> providedSyms; // symbols provided by this loader
+	std::map<std::string, uint32_t> neededSyms; // first:name, second:symtabID
 
-		std::vector<Elf64_Rel> rel;   // relocation entries of the file (.rel)
-		std::vector<Elf64_Rela> rela; // dito (.rela)
+	std::vector<Elf64_Rel> rel;   // relocation entries of the file (.rel)
+	std::vector<Elf64_Rela> rela; // dito (.rela)
 
+public:
+	ElfProcessLoader64(ElfFile64 *elffile,
+	                   KernelManager *parent,
+	                   std::string name="");
 
-	public:
-		ElfProcessLoader64(ElfFile64 *elffile, 
-			   	KernelManager *parent,
-		        std::string name = ""
-				);
-		virtual ~ElfProcessLoader64();
+	virtual ~ElfProcessLoader64();
 
-		virtual uint64_t getTextStart();
-		virtual uint64_t getDataStart();
-		virtual uint64_t getDataOff();
-		virtual uint64_t getTextOff();
-        virtual uint32_t getTextSize();
-		virtual uint32_t getDataSize();
+	virtual uint64_t getTextStart();
+	virtual uint64_t getDataStart();
+	virtual uint64_t getDataOff();
+	virtual uint64_t getTextOff();
+	virtual uint32_t getTextSize();
+	virtual uint32_t getDataSize();
 
-		virtual std::vector<RelSym*> getProvidedSyms();
+	virtual std::vector<RelSym*> getProvidedSyms();
 
-	protected:
+protected:
+	// Add all sections between [startAddr,endAddr) to the target image
+	//        virtual void addSectionsToSeg(int nrSecHeaders,
+	//                                      int prevMemAddr, int prevSecSize,
+	//                                      uint64_t startAddr, uint64_t endAddr,
+	//                                      SectionInfo *handler,
+	//                                      std::vector<uint8_t> *target,
+	//                                      uint32_t *targetLength);
 
-        //Add all sections between [startAddr,endAddr) to the target image
-//        virtual void addSectionsToSeg(int nrSecHeaders,
-//                                      int prevMemAddr, int prevSecSize,
-//                                      uint64_t startAddr, uint64_t endAddr,
-//                                      SectionInfo *handler,
-//                                      std::vector<uint8_t> *target,
-//                                      uint32_t *targetLength);
+	virtual uint32_t appendSegToImage(SectionInfo *segment,
+	                                  std::vector<uint8_t> *target,
+	                                  uint32_t offset);
+	virtual uint32_t appendVecToImage(std::vector<uint8_t> *src,
+	                                  std::vector<uint8_t> *target);
 
+	virtual void initProvidedSymbols();
 
-        virtual uint32_t appendSegToImage(SectionInfo *segment,
-                                          std::vector<uint8_t> *target,
-                                          uint32_t offset);
-		virtual uint32_t appendVecToImage(std::vector<uint8_t> *src,
-                                          std::vector<uint8_t> *target);
-
-		std::vector<Elf64_Rel>  getRelEntries();
-		std::vector<Elf64_Rela> getRelaEntries();
-
-		virtual void initProvidedSymbols();
-
-		virtual uint64_t getVAForAddr(uint64_t addr, uint32_t shtID);
+	virtual uint64_t getVAForAddr(uint64_t addr, uint32_t shtID);
 
 
-		virtual void applyLoadRel(std::unordered_map<std::string, RelSym*> *map);
-		virtual int evalLazy(uint64_t addr,
-						std::unordered_map<std::string, RelSym*> *map);
-//		TODO use template instead of two separate functions
-		virtual void relocate(Elf64_Rela* rel,
-						std::unordered_map<std::string, RelSym*> *map);
-		virtual void relocate(Elf64_Rel* rel,
-						std::unordered_map<std::string, RelSym*> *map);
-		virtual void writeRelValue(uint64_t locAddr, uint64_t symAddr);
-        virtual void updateMemIndex(uint64_t addr, uint8_t segNr);
-		virtual void setHeapSegment(SectionInfo* heap);
+	virtual void applyLoadRel(std::unordered_map<std::string, RelSym*> *map);
+	virtual int evalLazy(uint64_t addr, std::unordered_map<std::string, RelSym*> *map);
 
-		virtual uint64_t getOffASLR(uint8_t type); //TODO
+	virtual void relocate(Elf64_Rela* rel,
+	                      std::unordered_map<std::string, RelSym*> *map);
+	virtual void relocate(Elf64_Rel* rel,
+	                      std::unordered_map<std::string, RelSym*> *map);
 
+	virtual void writeRelValue(uint64_t locAddr, uint64_t symAddr);
+	virtual void updateMemIndex(uint64_t addr, uint8_t segNr);
+	virtual void setHeapSegment(SectionInfo* heap);
+
+	virtual uint64_t getOffASLR(uint8_t type); //TODO
 };
 
 

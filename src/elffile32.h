@@ -16,38 +16,38 @@
 #include <map>
 
 class ElfFile32 : public ElfFile {
-	public:
-		ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent);
-		virtual ~ElfFile32();
+public:
+	ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent);
+	virtual ~ElfFile32();
 
-		int getNrOfSections();
+	int getNrOfSections();
 
-		SectionInfo findSectionWithName(std::string sectionName);
-		SectionInfo findSectionByID(uint32_t sectionID);
-		bool isCodeAddress(uint64_t address);
-		bool isDataAddress(uint64_t address);
-		std::string sectionName(int sectionID);
-		uint8_t *sectionAddress(int sectionID);
-		uint64_t sectionAlign(int sectionID);
+	SectionInfo findSectionWithName(std::string sectionName);
+	SectionInfo findSectionByID(uint32_t sectionID);
+	bool isCodeAddress(uint64_t address);
+	bool isDataAddress(uint64_t address);
+	std::string sectionName(int sectionID);
+	uint8_t *sectionAddress(int sectionID);
+	uint64_t sectionAlign(int sectionID);
 
-		SegmentInfo findCodeSegment();
-		SegmentInfo findDataSegment();
+	SegmentInfo findCodeSegment();
+	SegmentInfo findDataSegment();
 
-		std::string symbolName(uint32_t index);
+	std::string symbolName(uint32_t index);
 
-		uint64_t findAddressOfVariable(std::string symbolName);
+	uint64_t findAddressOfVariable(std::string symbolName);
 
-		ElfLoader* parseElf(ElfFile::ElfProgramType type,
-		                    std::string name = "",
-		                    KernelManager* parent = 0);
+	ElfLoader* parseElf(ElfFile::ElfProgramType type,
+	                    std::string name = "",
+	                    KernelManager* parent = 0);
 
-		bool isRelocatable();
-		void applyRelocations(ElfModuleLoader *loader);
-		virtual bool isDynamic();
-		std::vector<std::string> getDependencies();
+	bool isRelocatable();
+	void applyRelocations(ElfModuleLoader *loader);
+	virtual bool isDynamic();
+	std::vector<std::string> getDependencies();
 
-		virtual bool isExecutable();
-	protected:
+	virtual bool isExecutable();
+protected:
 };
 
 #endif /* ELFFILE32_H */

@@ -13,7 +13,7 @@
 
 ElfFile32::ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent):
 	ElfFile(fd, fileSize, fileContent, ELFTYPE32, ELFPROGRAMTYPEMODULE){
-    throw NotImplementedException();
+	throw NotImplementedException();
 }
 
 ElfFile32::~ElfFile32(){}
@@ -69,7 +69,7 @@ void ElfFile32::applyRelocations(ElfModuleLoader *loader){
 	UNUSED(loader);
 	throw NotImplementedException();
 }
-		
+
 std::string ElfFile32::symbolName(uint32_t index){
 	UNUSED(index);
 	throw NotImplementedException();
@@ -80,17 +80,17 @@ uint64_t ElfFile32::findAddressOfVariable(std::string symbolName){
 	throw NotImplementedException();
 }
 
-ElfLoader* ElfFile32::parseElf(ElfFile::ElfProgramType type, 
-		                       std::string name,
+ElfLoader* ElfFile32::parseElf(ElfFile::ElfProgramType type,
+                               std::string name,
                                KernelManager* parent){
 	UNUSED(name);
 	UNUSED(parent);
-	if(type == ElfFile::ELFPROGRAMTYPEKERNEL){
+	if (type == ElfFile::ELFPROGRAMTYPEKERNEL) {
 		//return new ElfKernelLoader32(this);
-	}else if(type == ElfFile::ELFPROGRAMTYPEMODULE){
+	} else if(type == ElfFile::ELFPROGRAMTYPEMODULE) {
 		//return new ElfModuleLoader32(this, parent);
 	}
-	return NULL;
+	return nullptr;
 }
 
 

@@ -20,6 +20,7 @@ autoscan.log
 
 dwarfsymbols
 test
+doc/
 
 m4/lt*
 
