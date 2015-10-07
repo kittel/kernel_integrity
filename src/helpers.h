@@ -8,14 +8,13 @@
 #define CONTAINS(min, size, what)  (min <= what && min + size >= what)
 #define contained(value, left, right) (value >= left && value <= right)
 
-#include <string>
-#include <sstream>
-#include <vector>
-#include <iostream>
 #include <fstream>
 #include <iomanip>
-#include <fstream>
 #include <iostream>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #define COLOR_RESET         "\033[0m"
 #define COLOR_NORM          "\033[39m"
@@ -158,4 +157,28 @@ inline bool betweenRange(T value, const std::vector<std::pair<T, T>> &r){
 	}
 	return false;
 }
+
+/**
+ * Perform a static cast for unique pointers.
+ */
+template <typename Target, typename Current, typename Del>
+std::unique_ptr<Target, Del> static_cast_unique_ptr(std::unique_ptr<Current, Del> &&p) {
+	auto d = static_cast<Target *>(p.release());
+	return std::unique_ptr<Target, Del>(d, std::move(p.get_deleter()));
+}
+
+/**
+ * Performs a dynamic cast for unique ptrs.
+ * When the cast is invalid, return a nullptr.
+ */
+template <typename Target, typename Current, typename Del>
+std::unique_ptr<Target, Del> dynamic_cast_unique_ptr(std::unique_ptr<Current, Del> &&p) {
+	if (Target *result = dynamic_cast<Target *>(p.get())) {
+		p.release();
+		auto deleter = p.get_deleter();
+		return std::unique_ptr<Target, Del>(result, std::move(deleter));
+	}
+	return std::unique_ptr<Target, Del>(nullptr, p.get_deleter());
+}
+
 #endif /* _HELPERS_H_ */

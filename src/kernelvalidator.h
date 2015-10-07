@@ -1,6 +1,8 @@
 #ifndef KERNELVALIDATOR_H
 #define KERNELVALIDATOR_H
 
+#include <memory>
+
 #include "elffile.h"
 #include "elfloader.h"
 
@@ -23,7 +25,7 @@ public:
 	static KernelValidator* getInstance();
 	ElfKernelLoader* getKernelLoader(){ return this->kernelLoader; }
 
-	static ElfKernelLoader* loadKernel(std::string dirName);
+	static ElfKernelLoader *loadKernel(const std::string &dirName);
 
 private:
 	struct {

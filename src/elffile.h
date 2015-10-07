@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 
 #include <map>
+#include <memory>
 #include <vector>
 
 class ElfLoader;
@@ -65,20 +66,20 @@ public:
 };
 
 
-class ElfFile{
+class ElfFile {
 public:
-	typedef enum {
-		ELFTYPENONE = 0,
+	enum class ElfType {
+		ELFTYPENONE,
 		ELFTYPE32,
 		ELFTYPE64
-	} ElfType;
+	};
 
-	typedef enum {
-		ELFPROGRAMTYPENONE = 0,
+	enum class ElfProgramType {
+		ELFPROGRAMTYPENONE,
 		ELFPROGRAMTYPEKERNEL,
 		ELFPROGRAMTYPEMODULE,
-		ELFPROGRAMTYPEEXEC      // NEW: Type for loading executables
-	} ElfProgramType;
+		ELFPROGRAMTYPEEXEC      //!< Type for loading executables
+	};
 
 	virtual ~ElfFile();
 
@@ -113,9 +114,9 @@ public:
 
 	static ElfFile* loadElfFileFromBuffer(uint8_t* buf, size_t size) throw();
 	static ElfFile* loadElfFile(std::string filename) throw();
-	virtual ElfLoader* parseElf(ElfFile::ElfProgramType type,
-	                            std::string name = "",
-	                            KernelManager* parent = 0) = 0;
+	virtual ElfLoader *parseElf(ElfProgramType type,
+	                            std::string name="",
+	                            KernelManager* parent=0) = 0;
 
 	virtual bool isRelocatable() = 0;
 	virtual void applyRelocations(ElfModuleLoader *loader) = 0;
@@ -143,7 +144,6 @@ protected:
 
 	typedef std::map<std::string, uint64_t> SymbolNameMap;
 	SymbolNameMap symbolNameMap;
-
 };
 
 #include <elffile32.h>
