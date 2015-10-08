@@ -36,9 +36,9 @@ public:
 
 	uint64_t findAddressOfVariable(std::string symbolName);
 
-	ElfLoader* parseElf(ElfFile::ElfProgramType type,
-	                    std::string name = "",
-	                    KernelManager* parent = 0);
+	ElfLoader *parseElf(ElfFile::ElfProgramType type,
+	                    std::string name="",
+	                    KernelManager *parent=0);
 
 	bool isRelocatable();
 	void applyRelocations(ElfModuleLoader *loader);

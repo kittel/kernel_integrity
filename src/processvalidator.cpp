@@ -17,7 +17,7 @@ namespace fs = boost::filesystem;
 
 // TODO: retrieve paths from command line parameters
 ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
-                                   const std::string binaryName,
+                                   const std::string &binaryName,
                                    VMIInstance *vmi,
                                    int32_t pid)
 	:
@@ -29,8 +29,8 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 	std::cout << "ProcessValidator got: " << binaryName << std::endl;
 
-	this->execLoader = this->loadExec(binaryName);
-	
+	this->loadExec(binaryName);
+
 	this->mappedVMAs = tm.getVMAInfo(pid);
 
 	for (auto &section : this->mappedVMAs) {
@@ -57,9 +57,9 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 ProcessValidator::~ProcessValidator() {}
 
-void ProcessValidator::validateCodePage(VMAInfo* vma) {
+void ProcessValidator::validateCodePage(VMAInfo *vma) {
 	std::vector<uint8_t> codevma;
-	ElfProcessLoader* binary = 0;
+	ElfProcessLoader *binary = nullptr;
 
 	if (binaryName.length() >= vma->name.length() &&
 	    binaryName.compare (binaryName.length() - vma->name.length(),
@@ -67,11 +67,11 @@ void ProcessValidator::validateCodePage(VMAInfo* vma) {
 		binary = this->execLoader;
 
 	} else {
-		ElfProcessLoader* lib = this->findLoaderByName(vma->name);
+		ElfProcessLoader *lib = this->findLoaderByName(vma->name);
 		if (!lib) {
 			std::cout << COLOR_RED <<
-			    "Warning: Found library in process that was not a dependency" << 
-				COLOR_RESET << std::endl;
+			    "Warning: Found library in process that was not a dependency" <<
+			    COLOR_RESET << std::endl;
 			return;
 		}
 		binary = lib;
@@ -866,7 +866,8 @@ ElfProcessLoader *ProcessValidator::loadExec(const std::string &path) {
 	ElfFile *execFile = ElfFile::loadElfFile(path);
 
 	std::string name = path.substr(path.rfind("/", std::string::npos) + 1, std::string::npos);
-	this->execLoader = dynamic_cast<ElfProcessLoader64 *>(execFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, name, kl));
+
+	this->execLoader = dynamic_cast<ElfProcessLoader *>(execFile->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEEXEC, name, kl));
 	this->execLoader->parseElfFile();
 
 	return this->execLoader;

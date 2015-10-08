@@ -1,6 +1,8 @@
 #ifndef PROCESSVALIDATOR_H
 #define PROCESSVALIDATOR_H
 
+#include <memory>
+
 #include "elffile.h"
 #include "elfloader.h"
 
@@ -25,8 +27,8 @@
  */
 class ProcessValidator{
 public:
-	ProcessValidator(ElfKernelLoader* kl, std::string binaryName,
-	                 VMIInstance* vmi, int32_t pid);
+	ProcessValidator(ElfKernelLoader *kl, const std::string &binaryName,
+	                 VMIInstance *vmi, int32_t pid);
 	virtual ~ProcessValidator();
 	int validatePage(page_info_t *page, int32_t pid);
 	void getProcessEnvironment(VMIInstance *vmi, int32_t pid,
@@ -46,7 +48,7 @@ private:
 	ElfKernelLoader* kl;
 	int32_t pid;
 
-	ElfProcessLoader* execLoader;
+	ElfProcessLoader *execLoader;
 	std::string binaryName;
 
 	ElfProcessLoader* vdsoLoader;

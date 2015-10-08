@@ -7,6 +7,7 @@
 #include <csignal>
 #include <chrono>
 #include <getopt.h>
+#include <memory>
 
 #include <kernelvalidator.h>
 #include <processvalidator.h>
@@ -161,7 +162,6 @@ void displayHelp(const char *argv0) {
 
 int main(int argc, char **argv) {
 	std::cout << COLOR_RESET;
-	VMIInstance *vmi;
 
 	// Parse options from cmdline
 	std::string vmPath;
@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
 
 	std::string libraryDir;
 	std::string binaryName;
-	uint32_t pid = 0;
+	int32_t pid = 0;
 
 	int c;
 
@@ -281,7 +281,7 @@ int main(int argc, char **argv) {
 	signal(SIGINT, signalHandler);
 	signal(SIGTERM, signalHandler);
 
-	vmi = new VMIInstance(vmPath, hypflag | VMI_INIT_COMPLETE);
+	VMIInstance vmi(vmPath, hypflag | VMI_INIT_COMPLETE);
 
 	if (kerndir.empty()) {
 		assert(false);
@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
 
 	std::cout << COLOR_GREEN << "Loading Kernel" << COLOR_NORM << std::endl;
 	ElfKernelLoader *kl = KernelValidator::loadKernel(kerndir);
-	kl->setVMIInstance(vmi);
+	kl->setVMIInstance(&vmi);
 
 	if (true /* option to validate kernel */) {
 		if (!fexists(targetsFile)) {
@@ -322,18 +322,18 @@ int main(int argc, char **argv) {
 			exit(0);
 		}
 
-		KernelValidator *val = new KernelValidator(kl, vmi, targetsFile);
-		val->setOptions(loopMode, codeValidation, pointerExamination);
+		KernelValidator val{kl, &vmi, targetsFile};
+		val.setOptions(loopMode, codeValidation, pointerExamination);
 		std::cout << "Starting Kernel Validation" << std::endl;
-		validateKernel(val);
+		validateKernel(&val);
 	}
 
 	if (!binaryName.empty() && pid != 0) {
 		// Ensure that all arguments make sense at this point
 		std::cout << "Starting Process Validation..." << std::endl;
 		kl->setLibraryDir(libraryDir);
-		ProcessValidator *val = new ProcessValidator(kl, binaryName, vmi, pid);
+		ProcessValidator val{kl, binaryName, &vmi, pid};
 		UNUSED(val);
-		// validateUserspace(val, vmi, pid);
+		//validateUserspace(&val, vmi, pid);
 	}
 }

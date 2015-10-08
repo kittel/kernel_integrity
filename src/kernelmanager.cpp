@@ -72,8 +72,7 @@ ElfLoader *KernelManager::loadModule(std::string moduleName) {
 		return nullptr;
 	}
 	ElfFile *file = ElfFile::loadElfFile(filename);
-	auto module =
-	file->parseElf(ElfFile::ELFPROGRAMTYPEMODULE, moduleName, this);
+	auto module = file->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEMODULE, moduleName, this);
 
 	moduleMapMutex.lock();
 	moduleMap[moduleName] = module;
@@ -357,8 +356,8 @@ ElfLoader *KernelManager::loadLibrary(std::string libraryName) {
 	// create ELF Object
 	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
 	std::cout << "Library loaded: " << libraryName << std::endl;
-	auto library = dynamic_cast<ElfProcessLoader64 *>(libraryFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC,
-	                                                  libraryName, this));
+	auto library = dynamic_cast<ElfProcessLoader64 *>(libraryFile->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEEXEC,
+	                                                                        libraryName, this));
 	//this->execLoader->supplyVDSO(dynamic_cast<ElfProcessLoader64*>(this->vdsoLoader));
 	library->parseElfFile();
 	// moduleMapMutex.lock();
@@ -412,11 +411,9 @@ ElfLoader *KernelManager::loadVDSO() {
 		vdsoImage.memberByName("size").getValue<uint64_t>());
 
 	// Load VDSO page
-	ElfFile *vdsoFile =
-	ElfFile::loadElfFileFromBuffer(vdso.data(), vdso.size());
+	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(vdso.data(), vdso.size());
 
-	auto vdsoLoader = dynamic_cast<ElfProcessLoader64 *>(
-		vdsoFile->parseElf(ElfFile::ELFPROGRAMTYPEEXEC, "[vdso]", this));
+	auto vdsoLoader = dynamic_cast<ElfProcessLoader64 *>(vdsoFile->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEEXEC, "[vdso]", this));
 	vdsoLoader->parseElfFile();
 
 	this->libraryMap[vdsoString] = vdsoLoader;

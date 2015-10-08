@@ -63,18 +63,18 @@ void KernelValidator::setOptions(bool lm, bool cv, bool pe){
 
 KernelValidator* KernelValidator::instance = nullptr;
 
-KernelValidator* KernelValidator::getInstance(){
+KernelValidator* KernelValidator::getInstance() {
 	return KernelValidator::instance;
 }
 
-ElfKernelLoader* KernelValidator::loadKernel(std::string dirName){
+ElfKernelLoader *KernelValidator::loadKernel(const std::string &dirName) {
 	std::string kernelName = dirName;
 	kernelName.append("/vmlinux");
 	ElfFile *kernelFile = ElfFile::loadElfFile(kernelName);
 
-	ElfKernelLoader* kernelLoader;
-	kernelLoader = dynamic_cast<ElfKernelLoader *>(
-		kernelFile->parseElf(ElfFile::ELFPROGRAMTYPEKERNEL));
+	// This is really really a mess. The cast shouldn't even be necessary.
+	ElfKernelLoader *kernelLoader = dynamic_cast<ElfKernelLoader *>(kernelFile->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEKERNEL));
+
 	kernelLoader->setKernelDir(dirName);
 	kernelLoader->parseSystemMap();
 	kernelLoader->parseElfFile();
@@ -82,7 +82,7 @@ ElfKernelLoader* KernelValidator::loadKernel(std::string dirName){
 	return kernelLoader;
 }
 
-uint64_t KernelValidator::validatePages(){
+uint64_t KernelValidator::validatePages() {
 	uint64_t iterations = 0;
 
 	do {
@@ -120,7 +120,7 @@ uint64_t KernelValidator::validatePages(){
 }
 
 
-void KernelValidator::validatePage(page_info_t * page){
+void KernelValidator::validatePage(page_info_t * page) {
 	//std::cout << "Try to verify page: " << std::hex <<
 	//             page->vaddr << std::dec << std::endl;
 

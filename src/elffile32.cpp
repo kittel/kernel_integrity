@@ -11,8 +11,10 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-ElfFile32::ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent):
-	ElfFile(fd, fileSize, fileContent, ELFTYPE32, ELFPROGRAMTYPEMODULE){
+ElfFile32::ElfFile32(FILE* fd, size_t fileSize, uint8_t* fileContent)
+	:
+	ElfFile(fd, fileSize, fileContent, ElfType::ELFTYPE32, ElfProgramType::ELFPROGRAMTYPEMODULE) {
+
 	throw NotImplementedException();
 }
 
@@ -80,14 +82,14 @@ uint64_t ElfFile32::findAddressOfVariable(std::string symbolName){
 	throw NotImplementedException();
 }
 
-ElfLoader* ElfFile32::parseElf(ElfFile::ElfProgramType type,
+ElfLoader *ElfFile32::parseElf(ElfProgramType type,
                                std::string name,
-                               KernelManager* parent){
+                               KernelManager *parent){
 	UNUSED(name);
 	UNUSED(parent);
-	if (type == ElfFile::ELFPROGRAMTYPEKERNEL) {
+	if (type == ElfProgramType::ELFPROGRAMTYPEKERNEL) {
 		//return new ElfKernelLoader32(this);
-	} else if(type == ElfFile::ELFPROGRAMTYPEMODULE) {
+	} else if(type == ElfProgramType::ELFPROGRAMTYPEMODULE) {
 		//return new ElfModuleLoader32(this, parent);
 	}
 	return nullptr;
