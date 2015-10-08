@@ -6,6 +6,7 @@
 #include <map>
 #include <unordered_map>
 #include <mutex>
+#include <vector>
 
 #include "libdwarfparser/instance.h"
 #include "libvmiwrapper/libvmiwrapper.h"
@@ -76,7 +77,7 @@ protected:
 
 private:
 	std::string kernelDirName;
-	std::string libDirName;
+	std::vector<std::string> libDirName;
 
 	typedef std::map<std::string, Instance> ModuleInstanceMap;
 	ModuleInstanceMap moduleInstanceMap;

@@ -47,7 +47,16 @@ void KernelManager::setKernelDir(const std::string &dirName) {
 }
 
 void KernelManager::setLibraryDir(const std::string &dirName) {
-	this->libDirName = dirName;
+	const std::string delimiters = ":";
+	std::string::size_type lastPos = dirName.find_first_not_of(delimiters, 0);
+	std::string::size_type pos = dirName.find_first_of(delimiters, lastPos);
+
+	while (std::string::npos != pos || std::string::npos != lastPos)
+	{
+		libDirName.push_back(dirName.substr(lastPos, pos - lastPos));
+		lastPos = dirName.find_first_not_of(delimiters, pos);
+		pos = dirName.find_first_of(delimiters, lastPos);
+	}
 }
 
 ElfLoader *KernelManager::loadModule(std::string moduleName) {
@@ -355,7 +364,6 @@ ElfLoader *KernelManager::loadLibrary(std::string libraryName) {
 
 	// create ELF Object
 	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
-	std::cout << "Library loaded: " << libraryName << std::endl;
 	auto library = dynamic_cast<ElfProcessLoader64 *>(libraryFile->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEEXEC,
 	                                                                        libraryName, this));
 	//this->execLoader->supplyVDSO(dynamic_cast<ElfProcessLoader64*>(this->vdsoLoader));
@@ -376,9 +384,11 @@ ElfProcessLoader *KernelManager::findLibByName(std::string name) {
 
 std::string KernelManager::findLibraryFile(std::string libName) {
 	std::regex regex = std::regex(libName);
-	for (fs::recursive_directory_iterator end, dir(this->libDirName); dir != end; dir++) {
-		if (std::regex_match((*dir).path().filename().string(), regex)) {
-			return (*dir).path().native();
+	for (auto& directory : this->libDirName){
+		for (fs::recursive_directory_iterator end, dir(directory); dir != end; dir++) {
+			if (std::regex_match((*dir).path().filename().string(), regex)) {
+				return (*dir).path().native();
+			}
 		}
 	}
 	return "";

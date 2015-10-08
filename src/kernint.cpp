@@ -302,12 +302,6 @@ int main(int argc, char **argv) {
 			exit(0);
 		}
 		binaryName = fs::canonical(binaryName).string();
-		if (!fexists(libraryDir)) {
-			std::cout << COLOR_RED << COLOR_BOLD
-			          << "Library Dir does not exist: " << libraryDir
-			          << COLOR_RESET << std::endl;
-			exit(0);
-		}
 	}
 
 	std::cout << COLOR_GREEN << "Loading Kernel" << COLOR_NORM << std::endl;

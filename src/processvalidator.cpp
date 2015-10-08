@@ -34,9 +34,6 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 	this->mappedVMAs = tm.getVMAInfo(pid);
 
 	for (auto& section : this->mappedVMAs) {
-		section.print();
-	}
-	for (auto& section : this->mappedVMAs) {
 		if (section.name[0] == '[') {
 			continue;
 		} else if ((section.flags & VMAInfo::VM_EXEC)) {
@@ -72,9 +69,10 @@ void ProcessValidator::validateCodePage(VMAInfo *vma) {
 	} else {
 		ElfProcessLoader *lib = this->findLoaderByName(vma->name);
 		if (!lib) {
-			std::cout << COLOR_RED <<
-			    "Warning: Found library in process that was not a dependency" <<
-			    COLOR_RESET << std::endl;
+			// TODO find out why libnss* is always mapped to the process space
+			//std::cout << COLOR_RED <<
+			//    "Warning: Found library in process that was not a dependency " <<
+			//    vma->name << COLOR_RESET << std::endl;
 			return;
 		}
 		binary = lib;
@@ -88,7 +86,7 @@ void ProcessValidator::validateCodePage(VMAInfo *vma) {
 	fileContent = binary->textSegmentContent.data();
 	textsize = binary->textSegmentContent.size();
 
-	while (bytesChecked < textsize) { 
+	while (bytesChecked < textsize) {
 
 		// read vma from memory
 		codevma = vmi->readVectorFromVA(vma->start + bytesChecked,
@@ -617,7 +615,6 @@ ElfProcessLoader* ProcessValidator::getLoaderForAddress(uint64_t addr,
 ElfProcessLoader* ProcessValidator::findLoaderByName(const std::string &name) const{
 	
 	std::string libname = fs::path(name).filename().string();
-	std::cout << libname << std::endl;
 	return kl->findLibByName(libname);
 }
 
