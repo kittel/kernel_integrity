@@ -1,7 +1,5 @@
 #include "elfprocessloader64.h"
 
-#define PAGESIZE 0x1000
-
 ElfProcessLoader64::ElfProcessLoader64(ElfFile64 *file,
                                        KernelManager *parent,
                                        std::string name)

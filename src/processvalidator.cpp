@@ -33,13 +33,16 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 	this->mappedVMAs = tm.getVMAInfo(pid);
 
-	for (auto &section : this->mappedVMAs) {
-		if (section.name.compare("[vsdo]") == 0) {
+	for (auto& section : this->mappedVMAs) {
+		section.print();
+	}
+	for (auto& section : this->mappedVMAs) {
+		if (section.name[0] == '[') {
 			continue;
 		} else if ((section.flags & VMAInfo::VM_EXEC)) {
 			validateCodePage(&section);
-		} else {
-			validateDataPage(&section);
+		}else{
+			//validateDataPage(&section);
 		}
 	}
 
@@ -77,48 +80,41 @@ void ProcessValidator::validateCodePage(VMAInfo *vma) {
 		binary = lib;
 	}
 
-	// read vma from memory
-	codevma = vmi->readVectorFromVA(vma->start,
-	                                vma->end - vma->start,
-	                                pid);
-	std::cout << "Found codevma for " << vma->name << std::endl;
-	std::cout << "vma im Memory has length: " << std::hex << vma->end - vma->start << std::dec << std::endl;
-	std::cout << "vma in File has length: " << std::hex << binary->textSegmentContent.size() << std::dec << std::endl;
+	const uint8_t *fileContent = 0;
+	const uint8_t *memContent = 0;
+	size_t textsize = 0;
+	size_t bytesChecked = 0;
 
+	fileContent = binary->textSegmentContent.data();
+	textsize = binary->textSegmentContent.size();
 
-	const uint8_t *memContent = codevma.data();
-	const uint8_t *fileContent = binary->textSegmentContent.data();
-	int32_t size = binary->textSegmentContent.size();
+	while (bytesChecked < textsize) { 
 
-	for (int32_t i = 0 ; i < size; i++) {
-		if (memContent[i] != fileContent[i]) {
-			
-			std::cout << "First change" << 
-			             " in byte 0x" << std::hex << i << 
-			             " is 0x" << (uint32_t) fileContent[i] <<
-			             " should be 0x" << (uint32_t) memContent[i] << 
-			             std::dec << std::endl;
-			//Print 40 Bytes from should be
-		
-			std::cout << "The loaded block is: " << std::hex << std::endl;
+		// read vma from memory
+		codevma = vmi->readVectorFromVA(vma->start + bytesChecked,
+		                                vma->end - vma->start - bytesChecked,
+		                                pid);
+		memContent = codevma.data();
 
-			for (int32_t k = i-15 ; (k < i + 15) && (k < size); k++) {
-				if (k < 0 || k >= size) continue;
-				if (k == i) std::cout << " # ";
-				std::cout << std::setfill('0') << std::setw(2) <<
-				             (uint32_t) fileContent[k] << " ";
+		for (size_t j = 0 ; 
+				j < std::min(textsize - bytesChecked, codevma.size()); 
+				j++) {
+			if (memContent[j] != fileContent[bytesChecked + j]) {
+				
+				std::cout << COLOR_RED << COLOR_BOLD <<
+				    "MISMATCH in code segment!" << COLOR_RESET << std::endl;
+				return;
 			}
+		}
+		bytesChecked += codevma.size();
 
-			std::cout << std::endl << 
-			    "The block in mem is: " << std::hex << std::endl;
-			for (int32_t k = i-15 ; (k < i + 15) && (k < size); k++) {
-				if (k < 0 || k >= size) continue;
-				if (k == i) std::cout << " # ";
-				std::cout << std::setfill('0') << std::setw(2) <<
-				          (uint32_t) memContent[k] << " ";
-			}
-
-			std::cout << std::dec << std::endl << std::endl;
+		// Ab unmapped page can not be modified
+		if (bytesChecked < textsize){
+			//std::cout << COLOR_RED << COLOR_BOLD << 
+			//	"Some part of the text segment is not mapped in the VM" <<
+			//	std::endl << "\t" << "Offset: " << vma->start + bytesChecked <<
+			//	COLOR_RESET << std::endl;
+			bytesChecked += PAGESIZE;
 		}
 	}
 }
@@ -136,8 +132,8 @@ void ProcessValidator::validateDataPage(VMAInfo* vma) {
 	                                     vma->end - vma->start,
 	                                     pid);
 	uint8_t* data = content.data();
-	for (uint32_t i = 0; i < content.size() - 7; i++) {
-		uint64_t *value = (uint64_t*) data + i;
+	for(uint32_t i = 0 ; i < content.size() - 7; i++){
+		uint64_t* value = (uint64_t*) (data + i);
 		//if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
 		//	continue;
 		//}
@@ -279,7 +275,7 @@ void ProcessValidator::printVMAs() {
 		          << std::setw(12) << it.start << " - "
 		          << "0x" << std::right << std::setw(12) << it.end << "  "
 		          << "0x" << std::right << std::setw(10) << it.off * 0x1000
-		          << std::setfill(' ') << std::endl;
+		          << std::setfill(' ') << std::dec << std::endl;
 		i++;
 	}
 	return;
@@ -695,7 +691,7 @@ int ProcessValidator::_validatePage(page_info_t *page, int32_t pid) {
 
 
 #ifdef DEBUG
-	std::cout << "debug: checking page 0x" << std::hex << page->vaddr << std::endl;
+	std::cout << "debug: checking page 0x" << std::hex << page->vaddr << std::dec << std::endl;
 #endif
 
 	//TODO: Check what happens, if offset is negative (maybe replace by int64_t
@@ -763,12 +759,12 @@ int ProcessValidator::_validatePage(page_info_t *page, int32_t pid) {
 #ifndef DUMP
 			std::cout << COLOR_GREEN << "Address " << COLOR_BOLD << std::hex
 			          << (void *)(page->vaddr + i) << COLOR_BOLD_OFF
-			          << " is fine." << std::endl
+			          << " is fine." << std::dec << std::endl
 			          << COLOR_NORM;
 #endif
 #ifdef DUMP
 			std::cout << "Address 0x" << std::hex << (int)(page->vaddr + i)
-			          << " is fine." << std::endl;
+			          << " is fine." << std::dec << std::endl;
 #endif
 #endif
 			if (remain > 0)
@@ -786,7 +782,7 @@ int ProcessValidator::_validatePage(page_info_t *page, int32_t pid) {
 					remain = 7;
 #ifdef DEBUG
 					std::cout << "Found change. remain: " << std::hex
-					          << (int)remain << std::endl;
+					          << (int)remain << std::dec << std::endl;
 #endif
 					if (loadedPage[i] == pageInMem[i]) {
 #ifdef DEBUG

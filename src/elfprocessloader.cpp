@@ -1,7 +1,5 @@
 #include "elfprocessloader.h"
 
-#define PAGESIZE 0x1000
-
 RelSym::RelSym(std::string name,
                uint64_t value,
                uint8_t info,
@@ -44,9 +42,9 @@ void ElfProcessLoader::initText() {
 	this->textSegmentInfo = this->elffile->findCodeSegment();
 
 	auto index = this->elffile->getFileContent() + this->textSegmentInfo.offset;
+	size_t pages = (this->textSegmentInfo.filesz + PAGESIZE) / PAGESIZE;
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
-	                                index,
-	                                index + this->textSegmentInfo.filesz);
+	                                index, index + pages * PAGESIZE);
 }
 
 void ElfProcessLoader::initData() {

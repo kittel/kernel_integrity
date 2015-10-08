@@ -10,6 +10,8 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
+#define PAGESIZE 0x1000
+
 /**
  * This class contains the extracted information of an address space's VMAs
  *

@@ -3,6 +3,8 @@
 
 #include "elfloader.h"
 
+#include "taskmanager.h"
+
 #include <unordered_map>
 
 // The beauty of forward declarations
