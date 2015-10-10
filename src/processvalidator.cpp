@@ -25,7 +25,7 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 	kl(kl),
 	pid(pid),
 	binaryName(binaryName),
-	tm() {
+	tm(vmi) {
 
 	std::cout << "ProcessValidator got: " << binaryName << std::endl;
 
@@ -42,13 +42,6 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 			//validateDataPage(&section);
 		}
 	}
-
-
-
-	exit(0);
-	// adjust the memindex of every library execLoader needs
-	std::cout << "Updating memindexes of all libraries..." << std::endl;
-	this->updateMemindexes();
 
 	// process load-time relocations
 	std::cout << "Processing load-time relocations..." << std::endl;
@@ -106,7 +99,7 @@ void ProcessValidator::validateCodePage(VMAInfo *vma) {
 		}
 		bytesChecked += codevma.size();
 
-		// Ab unmapped page can not be modified
+		// An unmapped page can not be modified
 		if (bytesChecked < textsize){
 			//std::cout << COLOR_RED << COLOR_BOLD << 
 			//	"Some part of the text segment is not mapped in the VM" <<
@@ -279,108 +272,6 @@ void ProcessValidator::printVMAs() {
 	return;
 }
 
-/* Update the memindexes for all loaded libraries */
-void ProcessValidator::updateMemindexes() {
-	std::string input;
-	std::string mapping;
-
-	input   = getNameFromPath(this->execLoader->getName());
-	mapping = (*std::begin(this->mappedVMAs)).name;
-	if (input.compare(mapping) != 0) {
-		std::cout << "Name of input binary and vma mapping differs! Aborting!"
-		          << std::endl
-		          << " Input: " << input << ", Mapping: " << mapping
-		          << std::endl;
-		exit(1);
-	}
-
-	ElfProcessLoader *lib = 0;
-	uint64_t lastInode    = 0;
-	uint64_t lastOffset   = (uint64_t)-1;  // set to greates possible value
-	//bool isDataSet = false; // is dataSegment->memindex already set for
-	//curLoader
-	bool isTextSet = false;
-
-	/* sweep through all VMAs and update the corresponding memindex
-	 *
-	 * In a virtual address space, vma mappings of libraries are grouped by
-	 * their corresponding files/inodes. The first vma mapping of an inode
-	 * corresponds to its textSegment, while the mapping with the dataSegBaseOff
-	 * of an inode corresponds to its dataSegment.
-	 */
-	for (auto &it : this->mappedVMAs) {
-#ifdef DEBUG
-		std::cout << "Processing entry with start addr " << (void *)it.start
-		          << " and inode " << std::dec << it.ino << std::endl;
-#endif
-		// if the current iterator belongs to the father process
-		if (getNameFromPath(this->execLoader->getName()).compare(it.name) ==
-		    0) {
-			// update textSegment?
-			// update dataSegment? -> atm only works for PDC
-			lib       = this->execLoader;
-			lastInode = it.ino;
-			continue;
-		}
-		// if the current iterator belongs to the vdso
-		else if (this->vdsoLoader->getTextStart() == it.start) {
-			continue;
-		}
-		// if the current iterator is a regular library or anon mapping
-		else {
-			// if anon mapping
-			if (it.ino == 0)
-				continue;
-			else {
-				// if in vm-area of a new loader (inode nrs differ)
-				if (lastInode != it.ino) {
-					lastOffset = (uint64_t)-1;
-
-					// lib++
-					try {
-						lib = this->vmaToLoaderMap.at(&it);
-					} catch (const std::out_of_range &oor) {
-						std::cout << "Couldn't find mapping starting at "
-						          << (void *)it.start
-						          << " in library database. Skipping..."
-						          << std::endl;
-						continue;
-					}
-
-					isTextSet = false;
-					// isDataSet = false;
-
-					// if the textSegment isn't already set TODO move this back?
-					if (!isTextSet) {
-						if (lib->isTextOffset(it.off * this->stdPageSize)) {
-							lib->updateMemIndex(it.start, SEG_NR_TEXT);
-							isTextSet = true;
-						}
-					}
-
-					lastInode = it.ino;
-				}
-				// if still inside same inode area
-				else {
-					// if dataSegment is not already set
-					// if(!isDataSet){
-					// if current offset is a data offset and smaller as all
-					// before
-					if ((it.off * this->stdPageSize) < lastOffset) {
-						// if the current address is the first data address
-						if (lib->isDataOffset(it.off * this->stdPageSize)) {
-							lib->updateMemIndex(it.start, SEG_NR_DATA);
-							lastOffset = it.off * this->stdPageSize;
-							// isDataSet = true;
-						}
-					}
-					lastInode = it.ino;
-					continue;
-				}
-			}
-		}
-	}
-}
 
 /* If not specified otherwise, reads the first page from heap */
 std::vector<uint8_t> ProcessValidator::getHeapContent(VMIInstance *vmi, int32_t pid, uint32_t readAmount=0x1000) {
@@ -396,195 +287,35 @@ std::vector<uint8_t> ProcessValidator::getHeapContent(VMIInstance *vmi, int32_t 
 	return heap_content;
 }
 
-std::vector<uint8_t> ProcessValidator::getStackContent(VMIInstance *vmi,
-                                                       int32_t pid,
-                                                       uint32_t offset,
-                                                       uint32_t readAmount=0){
-
-	uint64_t stack_bottom = 0;
-	uint64_t stdStackTop = this->stdStackTop; // usual top of stack
-	std::vector<uint8_t> stack_content;
-	uint64_t startAddr = 0;
-
-	// if ASLR == off, stack always grows down from 0x7ffffffff000 for stat and dyn
-	if (offset == 0) {
-		stack_bottom = this->stdStackBot;
-	}
-	else{
-		// TODO if ASLR is implemented
-		stack_bottom = this->stdStackBot + offset;
-	}
-	if (stack_bottom == 0) {
-		std::cout << "error: (getProcessEnvironment) could not calculate stack_bottom."
-		          << std::endl;
-		return stack_content;
-	}
-
-	if (readAmount == 0) { // if not specified use default value;
-		readAmount = stack_bottom - stdStackTop;
-	}
-	startAddr = stack_bottom - readAmount;
-
-	std::cout << "Retrieving lower 0x" << std::hex << readAmount
-	          << " bytes of stack from process " << std::dec << pid << " ..." << std::endl;
-
+std::vector<uint8_t>
+ProcessValidator::getStackContent(size_t readAmount) const {
+	const VMAInfo* stack = this->findVMAByName("[stack]");
 	// get stack content from VM
-	stack_content = vmi->readVectorFromVA(startAddr, readAmount, pid);
-
-	return stack_content;
-}
-
-
-void ProcessValidator::getProcessEnvironment(VMIInstance *vmi, int32_t pid, uint32_t offset){
-
-	std::vector<std::string> temp; // buffer for environ
-	std::vector<uint8_t> stack_content;
-	uint32_t readAmount = 0x1000; // 0x1000 bytes should be way enough to contain
-	// all environment variables
-	std::string marker = "x86_64"; // marker, on stack on top of environment variables
-	uint8_t matching = 0;    // amount of matching marker bytes
-	std::string stringBuf = ""; // buffer for extracting 'var=value'
-
-	// get stack part, containing env
-	stack_content = this->getStackContent(vmi, pid, offset, readAmount);
-
-	uint32_t varBegin = 0;
-
-	// get position of environ
-	for (uint32_t i = 0; i < stack_content.size(); i++) {
-		switch (matching) {
-		case 0:
-			if (stack_content[i] == 'x') {
-				matching++;
-			} else {
-				matching = 0;
-			}
-			continue;
-		case 1:
-			if (stack_content[i] == '8') {
-				matching++;
-			} else {
-				matching = 0;
-			}
-			continue;
-		case 2:
-			if (stack_content[i] == '6') {
-				matching++;
-			} else {
-				matching = 0;
-			}
-			continue;
-		case 3:
-			if (stack_content[i] == '_') {
-				matching++;
-			} else {
-				matching = 0;
-			}
-			continue;
-		case 4:
-			if (stack_content[i] == '6') {
-				matching++;
-			} else {
-				matching = 0;
-			}
-			continue;
-		case 5:
-			if (stack_content[i] == '4') {
-				varBegin = i + 2;
-				break;
-			} else {
-				matching = 0;
-			}
-			continue;
-		}
-		if (matching == 5)
-			break;
-	}
-
-	if (varBegin == 0) {
-		std::cout << "error: (getProcessEnvironment) couldn't find marker "
-		          << marker <<  std::endl;
-		return;
-	}
-
-
-	// parse variables from stack_content
-	for (; varBegin < stack_content.size(); varBegin++) {
-		if (stack_content[varBegin] == 0x0) {
-			temp.push_back(stringBuf);
-			stringBuf = "";
-		}
-		else {
-			stringBuf.push_back(stack_content[varBegin]);
-		}
-	}
-
-	int len;
-
-	// remove everything non-variable
-	for (auto &it : temp) {
-		// if no '=' is in the current string, ignore it.
-		len = it.find('=');
-		if ((it.find('=') != std::string::npos) && (it[0] >= 65) && (it[0] <= 90)) {
-			this->envMap.insert(std::pair<std::string, std::string>(it.substr(0, len),
-			                                                        it.substr(len+1, std::string::npos)));
-		}
-	}
-
-
-#ifdef DEBUG
-	std::cout << "debug: (getProcessEnvironment) Parsed env-vars. Content:" << std::endl;
-	for (auto &var : this->envMap) {
-		std::cout << var.first << "\t" << var.second << std::endl;
-	}
-
-#endif
+	//return vmi->readVectorFromVA(stack->start, readAmount, pid);
+	
+	return vmi->readVectorFromVA(stack->end - readAmount, readAmount, pid, true);
 }
 
 int ProcessValidator::checkEnvironment(const std::map<std::string, std::string> &inputMap){
 
 	int errors = 0;
-	std::string value;
+	auto envMap = tm.getEnvForTask(pid);
 
 	// check all input settings
 	for (auto &inputPair : inputMap) {
-		try {
-			// get env value for current input key
-			value = this->envMap.at(inputPair.first);
-		}
-		catch (const std::out_of_range& oor) {
-			// TODO : This behaviour only validates, if variable is set. maybe change
-			// no such entry in our environ -> variable not set -> no threat
-			// -> check next input setting
-#ifdef DEBUG
-			std::cout << "debug: (checkEnvironment) no entry " << inputPair.first
-			          << " in envMap." << std::endl;
-#endif
-			continue;
-		}
-
-		if (value.compare(inputPair.second) == 0) {
-			// setting is right
-#ifdef DEBUG
-			std::cout << "debug: (checkEnvironment) entry " << inputPair.first
-			          << " in envMap has the correct value " << inputPair.second << std::endl;
-#endif
-			continue;
-		}
-		else {
-			// setting is wrong
-			errors++;
-			std::cout
-#ifndef DUMP
-			<< COLOR_RED
-#endif
-			<< "Found mismatch in environment variables on entry " << inputPair.first
-			<< ". Expected: '" << inputPair.second << "', found: '"
-			<< value << "'. Errors: " << errors
-#ifndef DUMP
-			<< COLOR_NORM
-#endif
-			<< std::endl;
+		if(envMap.find(inputPair.first) != envMap.end()){
+			if (envMap[inputPair.first].compare(inputPair.second) == 0) {
+				// setting is right
+				continue;
+			}
+			else {
+				// setting is wrong
+				errors++;
+				std::cout << COLOR_RED
+				<< "Found mismatch in environment variables on entry " << inputPair.first
+				<< ". Expected: '" << inputPair.second << "', found: '"
+				<< envMap[inputPair.first] << "'." << COLOR_NORM << std::endl;
+			}
 		}
 	}
 	return errors;
@@ -613,9 +344,17 @@ ElfProcessLoader* ProcessValidator::getLoaderForAddress(uint64_t addr,
 }
 
 ElfProcessLoader* ProcessValidator::findLoaderByName(const std::string &name) const{
-	
 	std::string libname = fs::path(name).filename().string();
 	return kl->findLibByName(libname);
+}
+
+const VMAInfo* ProcessValidator::findVMAByName(const std::string &name) const{
+	for (auto& vma : this->mappedVMAs){
+		if (vma.name.compare(name) == 0){
+			return &vma;
+		}
+	}
+	return nullptr;
 }
 
 

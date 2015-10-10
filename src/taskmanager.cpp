@@ -27,7 +27,7 @@ void VMAInfo::print() {
  * Initialize the TaskManager, parsing all necessary dwarf information from
  * vmlinux file.
  */
-TaskManager::TaskManager() : taskMap(), initTask() {
+TaskManager::TaskManager(VMIInstance *vmi) : initTask(), vmi(vmi) {
 	auto var = Variable::findVariableByName("init_task");
 	assert(var->getLocation());
 
@@ -108,10 +108,8 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 	std::string prevName;
 
 	// Get address of VDSO page
-	VMIInstance *vmi = VMIInstance::getInstance();
-
 	uint64_t vdsoPtr =
-	mm.memberByName("context", true).memberByName("vdso").getAddress();
+	    mm.memberByName("context", true).memberByName("vdso").getAddress();
 	uint64_t vdsoPage = vmi->read64FromVA(vdsoPtr);
 
 	for (int i = 0; i < map_count; i++) {
@@ -200,6 +198,41 @@ Instance TaskManager::nextTask(Instance &task) {
 	Instance next = task.memberByName("tasks").memberByName("next", true);
 	next          = next.changeBaseType("task_struct", "tasks");
 	return next;
+}
+
+std::vector<std::string> TaskManager::getArgForTask(pid_t pid){
+	Instance mm = this->getTaskForPID(pid).memberByName("active_mm", true);
+	uint64_t start = mm.memberByName("arg_start").getValue<uint64_t>();
+	uint64_t end   = mm.memberByName("arg_end")  .getValue<uint64_t>();
+
+	std::vector<std::string> arguments;
+
+	uint64_t i = start;
+	while ( i < end ) {
+		std::string str = vmi->readStrFromVA(i, pid);
+		arguments.push_back(str);
+		i += str.size() + 1;
+	}
+
+	return arguments;
+}
+
+std::map<std::string, std::string> TaskManager::getEnvForTask(pid_t pid){
+	Instance mm = this->getTaskForPID(pid).memberByName("active_mm", true);
+	uint64_t start = mm.memberByName("env_start").getValue<uint64_t>();
+	uint64_t end   = mm.memberByName("env_end")  .getValue<uint64_t>();
+
+	std::map<std::string, std::string> environment;
+	
+	uint64_t i = start;
+	while ( i < end ) {
+		std::string str = vmi->readStrFromVA(i, pid);
+		size_t off = str.find("=");
+		environment[str.substr(0, off)] = str.substr(off + 1);
+		i += str.size() + 1;
+	}
+
+	return environment;
 }
 
 /* Retrieve the next Instance from a circular list given in member */

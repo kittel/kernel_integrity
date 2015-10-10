@@ -25,12 +25,11 @@ void signalHandler(int signum) {
 
 void validateKernel(KernelValidator *val) {
 	const auto time_start = std::chrono::system_clock::now();
-
 	uint64_t iterations = val->validatePages();
-
 	const auto time_stop = std::chrono::system_clock::now();
-
-	const auto d_actual = std::chrono::duration_cast<std::chrono::milliseconds>(time_stop - time_start).count();
+	const auto d_actual =
+	    std::chrono::duration_cast<std::chrono::milliseconds>
+	        (time_stop - time_start).count();
 
 	std::cout << "Executed " << iterations << " iterations in " << d_actual
 	          << " ms ( " << (((double)d_actual) / iterations)
@@ -38,22 +37,12 @@ void validateKernel(KernelValidator *val) {
 }
 
 void validateUserspace(ProcessValidator *val, VMIInstance *vmi, uint32_t pid) {
-#ifdef DEBUG
-	std::cout << "ProcessValidator created." << std::endl;
-	std::cout << "debug: Trying to get (Executable) Pages of Process <"
-	          << std::dec << pid << "> ..." << std::endl;
-#endif
+	
 	std::cout << "Loading pages to verify from VM..." << std::endl;
 	// PageMap executablePageMap = vmi->getExecutableUserspacePages(pid);
-	PageMap executablePageMap = vmi->getUserspacePages(pid);
+	PageMap executablePageMap = vmi->getPages(pid);
 
 	uint32_t errors = 0;
-
-	// check process environment
-	std::cout << "Loading environment variables from process " << std::dec
-	          << pid << " ..." << std::endl;
-	val->getProcessEnvironment(vmi, pid);  // (vmi, pid, offset) possible for aslr offset
-	std::cout << "Checking environment variable values..." << std::endl;
 
 	// whitelisted values for environment
 	// if LD_BIND_NOW = "" -> lazyBinding is off
@@ -68,16 +57,10 @@ void validateUserspace(ProcessValidator *val, VMIInstance *vmi, uint32_t pid) {
 
 	// abort if starting state couldn't be verified
 	if (errors > 0) {
-		std::cout
-#ifdef DUMP
-		<< COLOR_RED
-#endif
-		<< "Initial integrity of environment could not be verified! "
-		   "Aborting..."
-#ifdef DUMP
-		<< COLOR_NORM
-#endif
-		<< std::endl;
+		std::cout << COLOR_RED <<
+		    "Initial integrity of environment could not be verified! "
+		    "Aborting..."
+		<< COLOR_NORM << std::endl;
 	}
 
 	/*
@@ -328,6 +311,6 @@ int main(int argc, char **argv) {
 		kl->setLibraryDir(libraryDir);
 		ProcessValidator val{kl, binaryName, &vmi, pid};
 		UNUSED(val);
-		//validateUserspace(&val, vmi, pid);
+		validateUserspace(&val, &vmi, pid);
 	}
 }

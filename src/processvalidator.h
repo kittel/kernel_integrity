@@ -31,12 +31,8 @@ public:
 	                 VMIInstance *vmi, int32_t pid);
 	virtual ~ProcessValidator();
 	int validatePage(page_info_t *page, int32_t pid);
-	void getProcessEnvironment(VMIInstance *vmi, int32_t pid,
-	                           uint32_t aslr_off=0);
 	int checkEnvironment(const std::map<std::string, std::string> &inputMap);
-	std::vector<uint8_t> getStackContent(VMIInstance *vmi, int32_t pid,
-	                                     uint32_t aslr_off,
-	                                     uint32_t readAmount);
+	std::vector<uint8_t> getStackContent(size_t readAmount) const;
 	std::vector<uint8_t> getHeapContent(VMIInstance *vmi,
 	                                    int32_t pid,
 	                                    uint32_t readAmount);
@@ -52,7 +48,6 @@ private:
 	std::string binaryName;
 
 	ElfProcessLoader* vdsoLoader;
-	std::map<std::string, std::string> envMap;
 	TaskManager tm;
 
 	std::vector<VMAInfo> mappedVMAs;
@@ -74,13 +69,13 @@ private:
 
 	ElfProcessLoader *loadExec(const std::string &pathName);
 
-	void updateMemindexes();
 	void processLoadRel();
 	void announceSyms(ElfProcessLoader* lib);
 
 	ElfProcessLoader* getLoaderForAddress(uint64_t addr,
 	                                      ElfProcessLoader* backup);
 	ElfProcessLoader *findLoaderByName(const std::string &name) const;
+	const VMAInfo* findVMAByName(const std::string &name) const;
 
 	std::set<ElfProcessLoader *> getMappedLibs();
 	SectionInfo* getSegmentForAddress(uint64_t addr);

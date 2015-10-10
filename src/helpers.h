@@ -8,6 +8,8 @@
 #define CONTAINS(min, size, what)  (min <= what && min + size >= what)
 #define contained(value, left, right) (value >= left && value <= right)
 
+#include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -130,7 +132,9 @@ inline std::string getNameFromPath(const std::string &path) {
 	return ret;
 }
 
-inline void dumpToFile(const std::string &filename, const std::vector<uint8_t> &content){
+inline 
+void dumpToFile(const std::string &filename,
+                const std::vector<uint8_t> &content){
 	std::ofstream outfile (filename, std::ofstream::binary);
 	outfile.write((char*) content.data(), content.size());
 	outfile.close();
@@ -179,6 +183,12 @@ std::unique_ptr<Target, Del> dynamic_cast_unique_ptr(std::unique_ptr<Current, De
 		return std::unique_ptr<Target, Del>(result, std::move(deleter));
 	}
 	return std::unique_ptr<Target, Del>(nullptr, p.get_deleter());
+}
+
+inline
+size_t offset(const char* buf, size_t len, const char* str)
+{
+	return std::search(buf, buf + len, str, str + strlen(str)) - buf;
 }
 
 #endif /* _HELPERS_H_ */

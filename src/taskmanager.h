@@ -66,18 +66,19 @@ public:
 class TaskManager {
 
 public:
-	TaskManager();
+	TaskManager(VMIInstance *vmi);
 	~TaskManager();
 
 	Instance getTaskForPID(pid_t pid);
 	std::vector<VMAInfo> getVMAInfo(pid_t pid);
+	std::vector<std::string> getArgForTask(pid_t pid);
+	std::map<std::string, std::string> getEnvForTask(pid_t pid);
 
 protected:
-	typedef std::map<std::string, Instance*> TaskMap;
-	TaskMap taskMap;
 
 private:
 	Instance initTask;
+	VMIInstance* vmi;
 
 	Instance getMMStruct(Instance *task);
 	Instance nextTask(Instance &task);

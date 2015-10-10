@@ -100,7 +100,7 @@ uint64_t KernelValidator::validatePages() {
 			}
 		}
 
-		PageMap executablePageMap = vmi->getKernelPages();
+		PageMap executablePageMap = vmi->getPages(0);
 
 		for (auto &page : executablePageMap) {
 			if ((page.second->vaddr & 0xff0000000000) == 0x8800000000000){
