@@ -38,10 +38,6 @@
 #define COLOR_UNDERLINE     "\033[4m"
 #define COLOR_UNDERLINE_OFF "\033[24m"
 
-// determining updateMemIndex target. extendable.
-#define SEG_NR_TEXT 0
-#define SEG_NR_DATA 1
-
 inline std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
 	std::stringstream ss(s);
 	std::string item;

@@ -36,13 +36,8 @@ void validateKernel(KernelValidator *val) {
 	          << " ms/iteration) " << std::endl;
 }
 
-void validateUserspace(ProcessValidator *val, VMIInstance *vmi, uint32_t pid) {
+void validateUserspace(ProcessValidator *val) {
 	
-	std::cout << "Loading pages to verify from VM..." << std::endl;
-	// PageMap executablePageMap = vmi->getExecutableUserspacePages(pid);
-	PageMap executablePageMap = vmi->getPages(pid);
-
-	uint32_t errors = 0;
 
 	// whitelisted values for environment
 	// if LD_BIND_NOW = "" -> lazyBinding is off
@@ -53,43 +48,9 @@ void validateUserspace(ProcessValidator *val, VMIInstance *vmi, uint32_t pid) {
 		{"LD_BIND_NOW", "nope"}
 	};
 
-	errors += val->checkEnvironment(configEnv);
+	val->checkEnvironment(configEnv);
+	val->validateProcess();
 
-	// abort if starting state couldn't be verified
-	if (errors > 0) {
-		std::cout << COLOR_RED <<
-		    "Initial integrity of environment could not be verified! "
-		    "Aborting..."
-		<< COLOR_NORM << std::endl;
-	}
-
-	/*
-	// extract heap for fun
-	std::vector<uint8_t> buf = val->getHeapContent(vmi, pid, 0x2000);
-	printHexDump(&buf);
-	*/
-
-	// check gathered pages
-	std::cout << "Starting page validation ..." << std::endl;
-
-	for (auto &page : executablePageMap) {
-		errors += val->validatePage(page.second, pid);
-	}
-
-	std::cout << std::endl
-	          << std::setw(7) << std::setfill('-') << "" << std::endl
-	          << COLOR_BOLD << "RESULT:" << COLOR_BOLD_OFF << std::endl
-	          << std::setw(7) << std::setfill('-') << "" << std::endl;
-
-	if (errors == 0) {
-		std::cout << COLOR_GREEN << "No mutations found, binary clear < ^.^ >"
-		          << std::endl
-		          << COLOR_NORM;
-	} else {
-		std::cout << COLOR_YELLOW << std::dec << "Found " << errors
-		          << " mutations < O.o >" << COLOR_NORM << std::endl;
-	}
-	vmi->destroyMap(executablePageMap);
 }
 
 const char *helpString = R"EOF(
@@ -310,7 +271,6 @@ int main(int argc, char **argv) {
 		std::cout << "Starting Process Validation..." << std::endl;
 		kl->setLibraryDir(libraryDir);
 		ProcessValidator val{kl, binaryName, &vmi, pid};
-		UNUSED(val);
-		validateUserspace(&val, &vmi, pid);
+		validateUserspace(&val);
 	}
 }

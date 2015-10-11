@@ -33,6 +33,31 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 	this->mappedVMAs = tm.getVMAInfo(pid);
 
+	// process load-time relocations
+	std::cout << "Processing load-time relocations..." << std::endl;
+	this->processLoadRel();
+}
+
+ProcessValidator::~ProcessValidator() {}
+
+int ProcessValidator::validateProcess() {
+	// check if all mapped pages are known
+	std::cout << "Starting page validation ..." << std::endl;
+
+	PageMap executablePageMap = vmi->getPages(pid);
+	for (auto &page : executablePageMap) {
+		// check if page is contained in VMAs
+		if (!(page.second->vaddr & 0xffff800000000000) &&
+			!this->findVMAByAddress(page.second->vaddr)){
+			std::cout << COLOR_RED << COLOR_BOLD <<
+			    "Found page that has no corresponding VMA: " <<
+			    std::hex << page.second->vaddr << std::dec <<
+			    COLOR_RESET << std::endl;
+		}
+	}
+	vmi->destroyMap(executablePageMap);
+
+	// Check if all mapped VMAs are valid
 	for (auto& section : this->mappedVMAs) {
 		if (section.name[0] == '[') {
 			continue;
@@ -43,12 +68,9 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 		}
 	}
 
-	// process load-time relocations
-	std::cout << "Processing load-time relocations..." << std::endl;
-	this->processLoadRel();
+	// TODO count errors or change return value
+	return 0;
 }
-
-ProcessValidator::~ProcessValidator() {}
 
 void ProcessValidator::validateCodePage(VMAInfo *vma) {
 	std::vector<uint8_t> codevma;
@@ -272,21 +294,6 @@ void ProcessValidator::printVMAs() {
 	return;
 }
 
-
-/* If not specified otherwise, reads the first page from heap */
-std::vector<uint8_t> ProcessValidator::getHeapContent(VMIInstance *vmi, int32_t pid, uint32_t readAmount=0x1000) {
-	std::vector<uint8_t> heap_content;
-	uint64_t heapStart = this->execLoader->getHeapStart();
-
-	std::cout << "Reading first 0x" << std::hex << readAmount << " bytes from"
-	          << " heap (" << (void *)heapStart << ") of process " << std::dec
-	          << pid << " ... " << std::endl;
-
-	// read heap content from vm
-	heap_content = vmi->readVectorFromVA(heapStart, readAmount, pid);
-	return heap_content;
-}
-
 std::vector<uint8_t>
 ProcessValidator::getStackContent(size_t readAmount) const {
 	const VMAInfo* stack = this->findVMAByName("[stack]");
@@ -357,6 +364,15 @@ const VMAInfo* ProcessValidator::findVMAByName(const std::string &name) const{
 	return nullptr;
 }
 
+const VMAInfo*
+ProcessValidator::findVMAByAddress(const uint64_t address) const{
+	for (auto& vma : this->mappedVMAs){
+		if (address >= vma.start && address < vma.end){
+			return &vma;
+		}
+	}
+	return nullptr;
+}
 
 /* Find a corresponding SectionInfo for the given vaddr */
 SectionInfo* ProcessValidator::getSegmentForAddress(uint64_t vaddr) {
@@ -395,7 +411,7 @@ int ProcessValidator::evalLazy(uint64_t start, uint64_t addr) {
 	return loader->evalLazy(addr, &this->relSymMap);
 }
 
-int ProcessValidator::_validatePage(page_info_t *page, int32_t pid) {
+int ProcessValidator::_validatePage(page_info_t *page) {
 	assert(page);
 
 	// TODO optimize this output, such that we don't have to check for stack
@@ -576,21 +592,8 @@ int ProcessValidator::_validatePage(page_info_t *page, int32_t pid) {
 	return changeCount;
 }
 
-int ProcessValidator::validatePage(page_info_t *page, int32_t pid){
-
-#ifndef DUMP
-	std::cout << std::setfill('-') << std::setw(80) << "" << COLOR_YELLOW << std::endl
-	          << "Verifying page.\nVirtual Address: "<< COLOR_BOLD << "0x" << std::hex << page->vaddr << COLOR_BOLD_OFF
-	          << "\nPhysical Address: 0x" << std::hex << page->paddr << std::endl
-	          << COLOR_NORM;
-#endif
-#ifdef DUMP
-	std::cout << std::setfill('-') << std::setw(80) << "" << std::endl
-	          << "Verifying page.\nVirtual Address: " << "0x" << std::hex << page->vaddr
-	          << "\nPhysical Address: 0x" << std::hex << page->paddr << std::endl;
-#endif
-
-	return this->_validatePage(page, pid);
+int ProcessValidator::validatePage(page_info_t *page){
+	return this->_validatePage(page);
 }
 
 ElfProcessLoader *ProcessValidator::loadExec(const std::string &path) {

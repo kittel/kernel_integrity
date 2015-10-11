@@ -48,7 +48,6 @@ protected:
 	SectionInfo heapSection;  // handler for optional heap segment
 
 	std::vector<uint8_t> dataSegmentContent;  // actual dataSegment data
-	std::vector<uint8_t> heapSegmentContent;
 
 	ElfFile *getLibraryWithName(std::string name);
 	//virtual std::vector<uint8_t> *buildSegfromLib(ElfFile *lib);
@@ -60,9 +59,6 @@ protected:
 
 	virtual void applyLoadRel(std::unordered_map<std::string, RelSym*>* map) = 0;
 	virtual std::vector<RelSym*> getProvidedSyms() = 0;
-	virtual void setHeapSegment(SectionInfo* heap) = 0;
-
-	uint64_t getHeapStart();
 
 	virtual uint64_t getTextStart() = 0;
 	virtual uint64_t getDataStart() = 0;
@@ -71,7 +67,6 @@ protected:
 	virtual uint32_t getTextSize() = 0;
 	virtual uint32_t getDataSize() = 0;
 
-	ElfProcessLoader* getExecForAddress(uint64_t);
 	SectionInfo* getSegmentForAddress(uint64_t addr);
 
 	virtual bool isCodeAddress(uint64_t addr);
@@ -79,7 +74,6 @@ protected:
 
 	virtual bool isTextOffset(uint64_t off);
 	virtual bool isDataOffset(uint64_t off);
-	virtual void updateMemIndex(uint64_t addr, uint8_t segNr) = 0;
 
 	virtual int evalLazy(uint64_t addr,
 	                     std::unordered_map<std::string, RelSym*>* map) = 0;

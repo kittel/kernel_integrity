@@ -80,20 +80,6 @@ public:
 	virtual std::vector<RelSym*> getProvidedSyms();
 
 protected:
-	// Add all sections between [startAddr,endAddr) to the target image
-	//        virtual void addSectionsToSeg(int nrSecHeaders,
-	//                                      int prevMemAddr, int prevSecSize,
-	//                                      uint64_t startAddr, uint64_t endAddr,
-	//                                      SectionInfo *handler,
-	//                                      std::vector<uint8_t> *target,
-	//                                      uint32_t *targetLength);
-
-	virtual uint32_t appendSegToImage(SectionInfo *segment,
-	                                  std::vector<uint8_t> *target,
-	                                  uint32_t offset);
-	virtual uint32_t appendVecToImage(std::vector<uint8_t> *src,
-	                                  std::vector<uint8_t> *target);
-
 	virtual void initProvidedSymbols();
 
 	virtual uint64_t getVAForAddr(uint64_t addr, uint32_t shtID);
@@ -108,10 +94,7 @@ protected:
 	                      std::unordered_map<std::string, RelSym*> *map);
 
 	virtual void writeRelValue(uint64_t locAddr, uint64_t symAddr);
-	virtual void updateMemIndex(uint64_t addr, uint8_t segNr);
-	virtual void setHeapSegment(SectionInfo* heap);
 
-	virtual uint64_t getOffASLR(uint8_t type); //TODO
 };
 
 

@@ -75,31 +75,6 @@ void ElfProcessLoader::parseElfFile() {
 	this->initData();
 }
 
-/* Return the beginning of the heap */
-uint64_t ElfProcessLoader::getHeapStart() {
-	// heap starts after last data page
-	// if size not page aligned
-	uint16_t offset = 0;
-	if ((this->dataSection.size % 0x1000) != 0x0) {
-		offset = PAGESIZE - ((uint64_t) this->dataSection.size & 0xfff);
-	}
-
-	uint64_t heapStart =
-	(uint64_t) this->dataSection.memindex + this->dataSection.size + offset;
-	return heapStart;
-}
-
-/* Return a reference to the loader inheriting the given addr */
-ElfProcessLoader *ElfProcessLoader::getExecForAddress(uint64_t addr) {
-	if ((addr >= (uint64_t) this->textSegment.memindex && addr < (uint64_t)(this->textSegment.memindex + this->textSegment.size)) ||
-	    (addr >= (uint64_t) this->dataSection.memindex && addr < (uint64_t)(this->dataSection.memindex + this->dataSection.size))) {
-		return this;
-	}
-
-	// TODO search through dependencies.
-	return nullptr;
-}
-
 /* Return the SectionInfo, in which the given addr is contained. */
 SectionInfo *ElfProcessLoader::getSegmentForAddress(uint64_t addr) {
 	// check textSegment

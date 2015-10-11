@@ -19,10 +19,8 @@
  *
  * validatePage:    Check the given page for mutations.
  * loadExec:        Load the trusted Executable for validation
- * getProcessEnv:   Load the environment vars of the main process
  * checkEnv:        Validate the envVars, using the given default values
  * getStackContent: Read the given amount of bytes from the program stack
- * getHeapContent:  [dito]                                          heap
  * printVMAs:       print the memory mapping for the main binary
  */
 class ProcessValidator{
@@ -30,13 +28,12 @@ public:
 	ProcessValidator(ElfKernelLoader *kl, const std::string &binaryName,
 	                 VMIInstance *vmi, int32_t pid);
 	virtual ~ProcessValidator();
-	int validatePage(page_info_t *page, int32_t pid);
-	int checkEnvironment(const std::map<std::string, std::string> &inputMap);
 	std::vector<uint8_t> getStackContent(size_t readAmount) const;
-	std::vector<uint8_t> getHeapContent(VMIInstance *vmi,
-	                                    int32_t pid,
-	                                    uint32_t readAmount);
 	void printVMAs();
+
+	int checkEnvironment(const std::map<std::string, std::string> &inputMap);
+	int validateProcess();
+	int validatePage(page_info_t *page);
 protected:
 
 private:
@@ -65,7 +62,7 @@ private:
 	const uint16_t stdPageSize = 0x1000;
 
 	int evalLazy(uint64_t start, uint64_t addr);
-	int _validatePage(page_info_t *page, int32_t pid);
+	int _validatePage(page_info_t *page);
 
 	ElfProcessLoader *loadExec(const std::string &pathName);
 
@@ -76,6 +73,7 @@ private:
 	                                      ElfProcessLoader* backup);
 	ElfProcessLoader *findLoaderByName(const std::string &name) const;
 	const VMAInfo* findVMAByName(const std::string &name) const;
+	const VMAInfo* findVMAByAddress(const uint64_t address) const;
 
 	std::set<ElfProcessLoader *> getMappedLibs();
 	SectionInfo* getSegmentForAddress(uint64_t addr);

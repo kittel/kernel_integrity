@@ -8,9 +8,6 @@ ElfProcessLoader64::ElfProcessLoader64(ElfFile64 *file,
 	bindLazy(true) {
 
 	this->execName = name;
-#ifdef DEBUG
-	std::cout << "ElfProcessLoader64 initialized!" << std::endl;
-#endif
 }
 
 ElfProcessLoader64::~ElfProcessLoader64() {
@@ -39,177 +36,12 @@ std::vector<RelSym *> ElfProcessLoader64::getProvidedSyms() {
 	return this->providedSyms;
 }
 
-/* Supply heap information to the Loader */
-void ElfProcessLoader64::setHeapSegment(SectionInfo *heap) {
-	this->heapSection = *heap;
-}
-
-/*
- * For relocatable objects: Update the memindex value [defining where this .so
- * is located in the calling process' address space].
- */
-void ElfProcessLoader64::updateMemIndex(uint64_t addr, uint8_t segNr) {
-	std::string section;
-	SectionInfo *seg;
-	switch (segNr) {  // extendable with Macros in util.h
-
-	case SEG_NR_DATA:
-		seg     = &this->dataSection;
-		section = "data";
-		break;
-	case SEG_NR_TEXT:
-	default:
-		seg     = &this->textSegment;
-		section = "text";
-		break;
-	}
-
-	if (!this->elffile->isExecutable()) {
-#ifdef DEBUG
-		std::cout << "debug: Library " << getNameFromPath(this->execName)
-		          << " is updating [" << section << "] memindex (" << std::hex
-		          << (void *)seg->memindex << ") to " << (void *)addr
-		          << std::endl;
-#endif
-		seg->memindex = (uint8_t *)addr;
-	}
-}
-
 uint64_t ElfProcessLoader64::getDataOff() {
 	return this->dataSegmentInfo.offset;
 }
 
 uint64_t ElfProcessLoader64::getTextOff() {
 	return this->textSegmentInfo.offset;
-}
-
-/* Append the stated memory segment to the given image */
-uint32_t ElfProcessLoader64::appendSegToImage(SectionInfo *segment,
-                                              std::vector<uint8_t> *target,
-                                              uint32_t offset) {
-	uint8_t *startit = segment->index;  // iterator to section content
-	uint8_t *endit = segment->index + segment->size;
-
-	if (offset != 0) {
-		std::vector<uint8_t> off;
-		off.assign(offset, 0x0);
-		target->insert(target->end(), off.begin(), off.end());
-	}
-
-	target->insert(target->end(), startit, endit);
-	return segment->size + offset;
-}
-
-/* Append the stated vector to the given image */
-uint32_t ElfProcessLoader64::appendVecToImage(std::vector<uint8_t> *src,
-                                              std::vector<uint8_t> *target) {
-	auto startit = std::begin(*target);
-	auto endit = std::end(*target);
-	target->insert(target->end(), startit, endit);
-	return src->size();
-}
-
-
-/* Add the specified sections to the given memory Segment
- *
- * If invoking, set prevMemAddr = $(Start address of memory segment)
- *                  prevSecSize = 0
- *
- * for working offset initalization
- */
-/*
-void ElfProcessLoader64::addSectionsToSeg(int nrSecHeaders,
-                                          int prevMemAddr, int prevSecSize,
-                                          uint64_t startAddr, uint64_t endAddr,
-                                          SectionInfo *handler,
-                                          std::vector<uint8_t> *target,
-                                          uint32_t *targetLength){
-	int id = 0;
-	uint32_t offset = 0;
-	std::string strtarget;
-
-	if(target == &this->textSegmentContent) strtarget = "Text";
-	if(target == &this->dataSectionContent) strtarget = "Data";
-
-	// add all sections below endAddr to the target Segment
-	for(id = 0; id < nrSecHeaders; id++){
-
-		uint32_t flags = elf->elf64Shdr[id].sh_flags;
-		if(((flags & SHF_ALLOC) == SHF_ALLOC)){
-
-			*handler = elf->findSectionByID(id);
-
-
-
-			// if the current processed segment is .bss, and were processing the
-			// dataSection, fill with 0x0 until page border
-			if(handler->segName.compare(".bss") == 0 && target == &this->dataSectionContent){
-#ifdef VERBOSE
-				std::cout << "Found .bss section. Filling with 0x0 until next page border..."
-				          << std::endl;
-#endif
-				uint64_t bssStart = (uint64_t) elf->elf64Shdr[id].sh_offset;
-				uint64_t offsetToBorder = PAGESIZE - (bssStart & 0xfff);
-				std::vector<uint8_t> zeroes;
-				zeroes.assign(offsetToBorder, 0x0);
-				this->dataSectionLength += appendDataToVector(zeroes.data(),
-				                                              offsetToBorder,
-				                                              &this->dataSectionContent);
-				prevMemAddr = elf->elf64Shdr[id].sh_addr;
-				prevSecSize = elf->elf64Shdr[id].sh_size;
-				return;
-			}
-
-			// if the current segment is _not_ .bss but has type NOBITS (e.g. .tbss)
-			// simply ignore it and don't add any bytes to the image
-			if(elf->elf64Shdr[id].sh_type == SHT_NOBITS){
-				continue;
-			}
-
-
-			if((elf->elf64Shdr[id].sh_addr < endAddr && elf->elf64Shdr[id].sh_addr >= startAddr)){
-
-				offset = elf->elf64Shdr[id].sh_addr - (prevMemAddr + prevSecSize);
-#ifdef DEBUG
-				std::cout << "debug: offset = 0x" << std::hex << offset << std::endl;
-				if(offset != 0){
-					std::cout << "Offset of 0x" << std::hex << offset << " bytes "
-					          << "found before " << handler->segName
-					          << std::endl;
-				}
-#endif
-#ifdef VERBOSE
-				std::cout << "Adding section [" << std::dec << id << "] " << handler->segName
-				          << " to " << strtarget <<"-Segment at 0x" << std::hex << (*targetLength)
-				          << " + 0x" << (int)offset << std::endl;
-#endif
-				(*targetLength) += this->appendSegToImage(handler,
-				                                          target,
-				                                          offset);
-#ifdef DEBUG
-				std::cout << "debug: targetLength=" << std::hex << (*targetLength)
-				          << std::endl;
-#endif
-				prevMemAddr = elf->elf64Shdr[id].sh_addr;
-				prevSecSize = elf->elf64Shdr[id].sh_size;
-			}
-		}
-	}
-}
-*/
-
-/* Return the ASLR offsets for the current process address space */
-uint64_t ElfProcessLoader64::getOffASLR(uint8_t type) {
-	// TODO: find out how to gather the respective ASLR Offset
-
-	switch (type) {
-	case ASLR_BRK:
-	case ASLR_STACK:
-	case ASLR_VDSO:
-	default:
-		break;
-	}
-	return 0x0;
 }
 
 /* Initialize our providedSyms to prepare for relocation */

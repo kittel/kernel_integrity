@@ -170,6 +170,12 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 		vec.push_back(VMAInfo(curStart, curEnd, ino, fileOff, flags, name));
 		cur = cur.memberByName("vm_next", true, true);
 	}
+	// // Add vsyscall mapping.V
+	// // This is already mapped in the kernel
+	// // see arch/x86/include/uapi/asm/vsyscall.h
+	// // TODO fix this
+	// uint64_t vsyscall = -10UL << 20;
+	// vec.push_back(VMAInfo(vsyscall, vsyscall + PAGESIZE, 0, 0, 0, "[vsyscall]"));
 	return vec;
 }
 
