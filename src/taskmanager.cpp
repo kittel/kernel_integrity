@@ -1,5 +1,7 @@
 #include "taskmanager.h"
 
+#include "kernel.h"
+
 VMAInfo::VMAInfo(uint64_t start, uint64_t end, uint64_t ino,
                  uint64_t off, uint64_t flags, std::string name)
 	:
@@ -14,12 +16,14 @@ VMAInfo::~VMAInfo() {}
 
 void VMAInfo::print() {
 	std::string _name;
-	(name.empty()) ? _name = std::string("<anonymous>") : _name = name;
-	std::cout << std::hex << "0x" << start << " - 0x" << end << "   " << ino
-	          << "   " << name << " " << ((flags & VM_READ) ? 'r' : '-')
+	(this->name.empty()) ? _name = std::string("<anonymous>") : _name = this->name;
+	std::cout << std::hex << "0x" << this->start << " - 0x" << this->end << "   "
+	          << std::setw(5) << this->ino << "   " << ((flags & VM_READ) ? 'r' : '-')
 	          << ((flags & VM_WRITE) ? 'w' : '-')
 	          << ((flags & VM_EXEC) ? 'x' : '-')
-	          << ((flags & VM_MAYSHARE) ? 's' : 'p') << std::endl;
+
+	          << ((flags & VM_MAYSHARE) ? 's' : 'p') << "   " << this->name
+	          << std::dec << std::endl;
 	return;
 }
 
@@ -27,8 +31,12 @@ void VMAInfo::print() {
  * Initialize the TaskManager, parsing all necessary dwarf information from
  * vmlinux file.
  */
-TaskManager::TaskManager(VMIInstance *vmi) : initTask(), vmi(vmi) {
-	auto var = Variable::findVariableByName("init_task");
+TaskManager::TaskManager(Kernel *kernel)
+	:
+	initTask(),
+	kernel(kernel) {
+
+	auto var = this->kernel->symbols.findVariableByName("init_task");
 	assert(var->getLocation());
 
 	auto init = var->getInstance();
@@ -50,26 +58,24 @@ TaskManager::TaskManager(VMIInstance *vmi) : initTask(), vmi(vmi) {
 TaskManager::~TaskManager() {}
 
 /* Return an instance of the mm_struct member */
-Instance TaskManager::getMMStruct(Instance *task) {
+Instance TaskManager::getMMStruct(Instance *task) const {
 	Instance mm = task->memberByName("mm", true);
 	return mm;
 }
 
-std::string TaskManager::getPathFromDentry(Instance& dentry){
-	std::string path = "";
-	std::string name = dentry
-				.memberByName("d_name", false)
-				.memberByName("name", true)
-				.getRawValue<std::string>(false);
-		
-	while(name.compare("/") != 0){
+std::string TaskManager::getPathFromDentry(Instance& dentry) const {
+	std::string path;
+	std::string name = dentry.memberByName("d_name", false)
+	                         .memberByName("name", true)
+	                         .getRawValue<std::string>(false);
+
+	while (name.compare("/") != 0) {
 		path.insert(0, name);
 		path.insert(0, "/");
 		dentry = dentry.memberByName("d_parent", true, true);
-		name = dentry
-					.memberByName("d_name", false)
-					.memberByName("name", true)
-					.getRawValue<std::string>(false);
+		name = dentry.memberByName("d_name", false)
+		             .memberByName("name", true)
+		             .getRawValue<std::string>(false);
 	}
 
 	return path;
@@ -110,7 +116,7 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 	// Get address of VDSO page
 	uint64_t vdsoPtr =
 	    mm.memberByName("context", true).memberByName("vdso").getAddress();
-	uint64_t vdsoPage = vmi->read64FromVA(vdsoPtr);
+	uint64_t vdsoPage = this->kernel->vmi->read64FromVA(vdsoPtr);
 
 	for (int i = 0; i < map_count; i++) {
 		// TODO change to memberByName("", false).getRawValue<std::string>(true)
@@ -179,7 +185,7 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 	return vec;
 }
 
-Instance TaskManager::getTaskForPID(pid_t pid) {
+Instance TaskManager::getTaskForPID(pid_t pid) const {
 	// set iterator to the first child of init
 	Instance taskStruct = this->initTask.memberByName("tasks")
 	                                    .memberByName("next", true)
@@ -200,13 +206,13 @@ Instance TaskManager::getTaskForPID(pid_t pid) {
 }
 
 /* Return the next task from task list */
-Instance TaskManager::nextTask(Instance &task) {
+Instance TaskManager::nextTask(Instance &task) const {
 	Instance next = task.memberByName("tasks").memberByName("next", true);
 	next          = next.changeBaseType("task_struct", "tasks");
 	return next;
 }
 
-std::vector<std::string> TaskManager::getArgForTask(pid_t pid){
+std::vector<std::string> TaskManager::getArgForTask(pid_t pid) const {
 	Instance mm = this->getTaskForPID(pid).memberByName("active_mm", true);
 	uint64_t start = mm.memberByName("arg_start").getValue<uint64_t>();
 	uint64_t end   = mm.memberByName("arg_end")  .getValue<uint64_t>();
@@ -215,7 +221,7 @@ std::vector<std::string> TaskManager::getArgForTask(pid_t pid){
 
 	uint64_t i = start;
 	while ( i < end ) {
-		std::string str = vmi->readStrFromVA(i, pid);
+		std::string str = this->kernel->vmi->readStrFromVA(i, pid);
 		arguments.push_back(str);
 		i += str.size() + 1;
 	}
@@ -223,16 +229,16 @@ std::vector<std::string> TaskManager::getArgForTask(pid_t pid){
 	return arguments;
 }
 
-std::map<std::string, std::string> TaskManager::getEnvForTask(pid_t pid){
+std::unordered_map<std::string, std::string> TaskManager::getEnvForTask(pid_t pid) const {
 	Instance mm = this->getTaskForPID(pid).memberByName("active_mm", true);
 	uint64_t start = mm.memberByName("env_start").getValue<uint64_t>();
 	uint64_t end   = mm.memberByName("env_end")  .getValue<uint64_t>();
 
-	std::map<std::string, std::string> environment;
-	
+	std::unordered_map<std::string, std::string> environment;
+
 	uint64_t i = start;
 	while ( i < end ) {
-		std::string str = vmi->readStrFromVA(i, pid);
+		std::string str = this->kernel->vmi->readStrFromVA(i, pid);
 		size_t off = str.find("=");
 		environment[str.substr(0, off)] = str.substr(off + 1);
 		i += str.size() + 1;

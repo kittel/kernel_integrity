@@ -1,28 +1,19 @@
 #include "elfprocessloader.h"
 
-RelSym::RelSym(std::string name,
-               uint64_t value,
-               uint8_t info,
-               uint32_t shndx,
-               ElfProcessLoader *parent)
-	:
-	name(name),
-	value(value),
-	info(info),
-	shndx(shndx),
-	parent(parent) {}
-
-RelSym::~RelSym() {}
+#include "process.h"
 
 ElfProcessLoader::ElfProcessLoader(ElfFile *file,
-                                   KernelManager *parent,
-                                   std::string name)
+                                   Kernel *kernel,
+                                   const std::string &name,
+                                   Process *proc)
 	:
-	ElfLoader(file, dynamic_cast<ElfKernelLoader *>(parent)->getPVState()),
-	execName(name),
-	kernel(parent),
-	textSegmentInfo(),
-	dataSegmentInfo() {}
+	ElfLoader(file),
+	kernel{kernel},
+	proc{proc},
+	name{name} {
+
+	this->providedSyms = this->elffile->getSymbols();
+}
 
 ElfProcessLoader::~ElfProcessLoader() {}
 
@@ -30,12 +21,8 @@ void ElfProcessLoader::loadDependencies() {
 	auto dependencies = this->elffile->getDependencies();
 
 	for (auto &dep : dependencies) {
-		kernel->loadLibrary(dep);
+		this->proc->loadLibrary(dep);
 	}
-}
-
-std::string ElfProcessLoader::getName() {
-	return this->execName;
 }
 
 void ElfProcessLoader::initText() {
@@ -60,10 +47,14 @@ void ElfProcessLoader::initData() {
  * Initialize a complete memory image for validation. Relocations are not yet
  * processed
  */
-void ElfProcessLoader::parseElfFile() {
+void ElfProcessLoader::parse() {
 	if (this->elffile->isExecutable()) {
-		std::cout << "Loading VDSO" << std::endl;
-		this->kernel->loadVDSO();
+		//std::cout << "Loading VDSO" << std::endl;
+		// TODO: load vdso for the process.
+		//this->kernel->loadVDSO();
+
+		//create_process
+		//store process to kernel
 	}
 
 	// Load Dependencies
@@ -147,24 +138,21 @@ bool ElfProcessLoader::isDataAddress(uint64_t addr) {
 
 /* Check if the given fileOffset (in bytes) lays in the textSegment */
 bool ElfProcessLoader::isTextOffset(uint64_t off) {
-	uint64_t pagedDataOff = (this->dataSegmentInfo.offset
-	                         - (this->dataSegmentInfo.offset & 0xfff));
-	if (off >= this->textSegmentInfo.offset && off <= pagedDataOff) {
-		return true;
-	}
-	else {
-		return false;
-	}
+	return (off >= this->textSegmentInfo.offset &&
+	        off <= this->textSegmentInfo.filesz);
+
 }
 
 /* Check if the given fileOffset (in bytes) lays in the dataSection */
 bool ElfProcessLoader::isDataOffset(uint64_t off) {
-	uint64_t pagedDataOff = (this->dataSegmentInfo.offset
-	                         - (this->dataSegmentInfo.offset & 0xfff));
-	if (off <= pagedDataOff) {
-		return true;
-	}
-	else {
-		return false;
-	}
+	return (off >= this->dataSegmentInfo.offset &&
+	        off <= this->dataSegmentInfo.filesz);
+}
+
+const std::string &ElfProcessLoader::getName() {
+	return this->name;
+}
+
+std::vector<RelSym> ElfProcessLoader::getProvidedSyms() {
+	return this->providedSyms;
 }

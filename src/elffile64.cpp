@@ -11,9 +11,15 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
+ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent,
+                     SymbolManager *symspace)
 	:
-	ElfFile(fd, fileSize, fileContent, ElfType::ELFTYPE64, ElfProgramType::ELFPROGRAMTYPEEXEC) {  // TODO make this general
+	ElfFile(fd,
+	        fileSize,
+	        fileContent,
+	        ElfType::ELFTYPE64,
+	        ElfProgramType::ELFPROGRAMTYPEEXEC,
+	        symspace) {  // TODO make this general
 
 	uint8_t *elfEhdr = this->fileContent;
 	this->elf64Ehdr  = (Elf64_Ehdr *)elfEhdr;
@@ -43,20 +49,19 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 
 ElfFile64::~ElfFile64() {}
 
-ElfLoader *ElfFile64::parseElf(ElfProgramType type,
-                               std::string name,
-                               KernelManager *parent) {
+ElfKernelLoader *ElfFile64::parseKernel() {
+	return new ElfKernelLoader64(this);
+}
 
-	if (type == ElfProgramType::ELFPROGRAMTYPEKERNEL) {
-		return new ElfKernelLoader64(this);
-	} else if (type == ElfProgramType::ELFPROGRAMTYPEMODULE) {
-		return new ElfModuleLoader64(this, name, parent);
-	} else if (type == ElfProgramType::ELFPROGRAMTYPEEXEC) {
-		return new ElfProcessLoader64(this, parent, name);
-		// TODO: name doesn't get handled properly
-	}
-	std::cout << "No usable ELFPROGRAMTYPE defined." << std::endl;
-	return nullptr;
+ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
+                                              Kernel *kernel) {
+	return new ElfModuleLoader64(this, name, kernel);
+}
+
+ElfProcessLoader *ElfFile64::parseProcess(const std::string &name,
+                                          Process *process,
+                                          Kernel *kernel) {
+	return new ElfProcessLoader64(this, kernel, name, process);
 }
 
 int ElfFile64::getNrOfSections() {
@@ -64,7 +69,7 @@ int ElfFile64::getNrOfSections() {
 }
 
 /* This function actually searches for a _section_ in the ELF file */
-SectionInfo ElfFile64::findSectionWithName(std::string sectionName) {
+SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) {
 	char *tempBuf = 0;
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
 		tempBuf = (char *)this->fileContent +
@@ -143,7 +148,7 @@ std::string ElfFile64::symbolName(Elf64_Word index) {
 	return toString(&((this->fileContent + elf64Shdr[this->strindex].sh_offset)[index]));
 }
 
-uint64_t ElfFile64::findAddressOfVariable(std::string symbolName) {
+uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
 	return symbolNameMap[symbolName];
 }
 
@@ -287,4 +292,48 @@ void ElfFile64::getRelEntries(std::vector<Elf64_Rel> &ret) {
  */
 void ElfFile64::getRelaEntries(std::vector<Elf64_Rela> &ret) {
 	this->getRelEntries(ret, SHT_RELA);
+}
+
+
+std::vector<RelSym> ElfFile64::getSymbols() {
+	std::vector<RelSym> ret;
+
+	if (!this->isDynamic()) {
+		return ret;
+	}
+
+	SectionInfo symtabSection = this->findSectionWithName(".dynsym");
+	SectionInfo strtabSection = this->findSectionWithName(".dynstr");
+
+	Elf64_Sym *symtab = (Elf64_Sym *)symtabSection.index;
+
+	char *strtab = (char *)strtabSection.index;
+
+	uint64_t targetAddr = 0;  // this is final memory address after loading
+
+	uint32_t elements = symtabSection.size / sizeof(Elf64_Sym);
+	// initialize own symbols
+
+	for (unsigned int i = 0; i < elements; i++) {
+		// if symbol is GLOBAL and _not_ UNDEFINED save it for announcement
+		if ((ELF64_ST_BIND(symtab[i].st_info) == STB_GLOBAL ||
+		     ELF64_ST_BIND(symtab[i].st_info) == STB_WEAK) &&
+		    symtab[i].st_shndx != SHN_UNDEF &&
+		    symtab[i].st_shndx != SHN_ABS &&
+		    symtab[i].st_shndx != SHN_COMMON) {
+
+			// TODO
+			targetAddr = 0;
+			// targetAddr = this->getVAForAddr(symtab[i].st_value,
+			//                                 symtab[i].st_shndx);
+
+			RelSym sym = RelSym(std::string(&strtab[symtab[i].st_name]),
+			                    targetAddr,
+			                    symtab[i].st_info,
+			                    symtab[i].st_shndx);
+
+			ret.push_back(sym);
+		}
+	}
+	return ret;
 }

@@ -13,7 +13,7 @@ ElfKernelLoader64::~ElfKernelLoader64() {}
 
 void ElfKernelLoader64::addSymbols() {
 	SectionInfo symInfo = this->elffile->findSectionByID(this->elffile->symindex);
-	KernelManager *parent = dynamic_cast<KernelManager *>(this);
+	Kernel *kernel = dynamic_cast<Kernel *>(this);
 
 	uint32_t symSize   = symInfo.size;
 	Elf64_Sym *symBase = (Elf64_Sym *)symInfo.index;
@@ -42,7 +42,7 @@ void ElfKernelLoader64::addSymbols() {
 			// }
 			symbolName = newSymName;
 		}
-		parent->addSymbolAddress(symbolName, symbolAddress);
+		kernel->addSymbolAddress(symbolName, symbolAddress);
 
 		// We also have to consider local functions
 		// if((ELF64_ST_TYPE(sym->st_info) & STT_FUNC) &&
@@ -51,7 +51,7 @@ void ElfKernelLoader64::addSymbols() {
 			if (symbolAddress < (uint64_t) this->textSegment.memindex) {
 				symbolAddress += (uint64_t) this->textSegment.memindex;
 			}
-			parent->addFunctionAddress(symbolName, symbolAddress);
+			kernel->addFunctionAddress(symbolName, symbolAddress);
 		}
 	}
 }

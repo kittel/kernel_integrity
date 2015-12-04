@@ -1,14 +1,16 @@
 #ifndef TASKMANAGER_H
 #define TASKMANAGER_H
 
-#include <map>
+#include <cstdlib>
 #include <iostream>
-#include <stdlib.h>
+#include <unordered_map>
+
 #include "helpers.h"
 #include "libdwarfparser/instance.h"
-#include "libdwarfparser/variable.h"
 #include "libdwarfparser/libdwarfparser.h"
+#include "libdwarfparser/variable.h"
 #include "libvmiwrapper/libvmiwrapper.h"
+#include "process.h"
 
 #define PAGESIZE 0x1000
 
@@ -22,7 +24,7 @@
  * @off   : offset of the VMA from file beginning, if existant
  *          IMPORTANT: the offset is given in PAGE_SIZE units (0x1000)
  */
-class VMAInfo{
+class VMAInfo {
 public:
 	uint64_t start;
 	uint64_t end;
@@ -66,23 +68,32 @@ public:
 class TaskManager {
 
 public:
-	TaskManager(VMIInstance *vmi);
+	TaskManager(Kernel *kernel);
 	~TaskManager();
 
-	Instance getTaskForPID(pid_t pid);
+	Instance getTaskForPID(pid_t pid) const;
 	std::vector<VMAInfo> getVMAInfo(pid_t pid);
-	std::vector<std::string> getArgForTask(pid_t pid);
-	std::map<std::string, std::string> getEnvForTask(pid_t pid);
+
+	/**
+	 * Fetches the arguments for the task (aka argv)
+	 */
+	std::vector<std::string> getArgForTask(pid_t pid) const;
+
+	/**
+	 * Returns the environment variable mapping for a pid.
+	 */
+	std::unordered_map<std::string, std::string> getEnvForTask(pid_t pid) const;
 
 protected:
+	Instance initTask;
+	std::unordered_map<pid_t, Process> processes;
+
+	Kernel *kernel;
 
 private:
-	Instance initTask;
-	VMIInstance* vmi;
-
-	Instance getMMStruct(Instance *task);
-	Instance nextTask(Instance &task);
-	std::string getPathFromDentry(Instance& dentry);
+	Instance getMMStruct(Instance *task) const;
+	Instance nextTask(Instance &task) const;
+	std::string getPathFromDentry(Instance& dentry) const;
 };
 
 #endif //TASKMANAGER_H

@@ -5,64 +5,29 @@
 #include "exceptions.h"
 #include <cassert>
 
-ElfLoader* ElfKernelLoader::getModuleForCodeAddress(uint64_t address) {
-	// Does the address belong to the kernel?
-	if (this->isCodeAddress(address)) {
-		return this;
-	}
-
-	for (auto &modulePair : moduleMap) {
-		ElfLoader* module = dynamic_cast<ElfLoader*>(modulePair.second);
-		if (module->isCodeAddress(address)) {
-			return module;
-		}
-	}
-	return 0;
-}
-
-ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address) {
-	// Does the address belong to the kernel?
-	if (this->isCodeAddress(address) || this->isDataAddress(address)) {
-		return this;
-	}
-
-	for (auto &modulePair : moduleMap) {
-		ElfLoader* module = dynamic_cast<ElfLoader*>(modulePair.second);
-		if (module->isCodeAddress(address) || module->isDataAddress(address)) {
-			return module;
-		}
-	}
-	return 0;
-}
-
-std::string ElfKernelLoader::getName() {
-	return std::string("kernel");
-}
-
-ElfKernelLoader::ElfKernelLoader(ElfFile* elffile)
+ElfKernelLoader::ElfKernelLoader(ElfFile *elffile)
 	:
-	ElfLoader(elffile, ParavirtState::getInstance()),
-	KernelManager(),
-	vvarSegment(),
-	dataNosaveSegment(),
-	fentryAddress(0),
-	genericUnrolledAddress(0) {}
+	ElfLoader{elffile},
+	name{"kernel"},
+	pvpatcher(this->getParavirtState()),
+	fentryAddress{0},
+	genericUnrolledAddress{0} {}
 
 ElfKernelLoader::~ElfKernelLoader() {}
 
 void ElfKernelLoader::initText(void) {
-	ElfFile64* elffile = dynamic_cast<ElfFile64*>(this->elffile);
+	ElfFile64 *elffile = dynamic_cast<ElfFile64*>(this->elffile);
 
 	this->textSegment = elffile->findSectionWithName(".text");
 	this->updateSectionInfoMemAddress(this->textSegment);
 
 	this->fentryAddress = this->elffile->findAddressOfVariable("__fentry__");
-	this->genericUnrolledAddress =
-	this->elffile->findAddressOfVariable("copy_user_generic_unrolled");
+	this->genericUnrolledAddress = this->elffile->findAddressOfVariable("copy_user_generic_unrolled");
 
-	applyAltinstr();
-	applyParainstr();
-	applySmpLocks();
+	// patch kernel stuff.
+	this->applyAltinstr(&this->pvpatcher);
+	this->pvpatcher.applyParainstr(this);
+	this->applySmpLocks();
 
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 	                                this->textSegment.index,
@@ -92,7 +57,7 @@ void ElfKernelLoader::initText(void) {
 	initTextOffset;
 	info.size = (uint8_t*)elffile->findAddressOfVariable("__stop_mcount_loc") +
 	            initTextOffset - info.index;
-	applyMcount(info);
+	this->applyMcount(info, &this->pvpatcher);
 
 	// TODO! also enable this some time later
 	// Apply Tracepoint changes
@@ -118,10 +83,9 @@ void ElfKernelLoader::initText(void) {
 		this->jumpTable.insert(
 			this->jumpTable.end(), info.index, info.index + info.size);
 	}
-	uint32_t numberOfEntries =
-	(jumpStop - jumpStart) / sizeof(struct jump_entry);
+	uint32_t numberOfEntries = (jumpStop - jumpStart) / sizeof(struct jump_entry);
 
-	applyJumpEntries(jumpStart, numberOfEntries);
+	this->applyJumpEntries(jumpStart, numberOfEntries, &this->pvpatcher);
 
 	uint32_t fill = 0x200000 - (this->textSegmentContent.size() % 0x200000);
 	this->textSegmentContent.insert(this->textSegmentContent.end(), fill, 0);
@@ -152,10 +116,44 @@ void ElfKernelLoader::initData(void) {
 	this->roDataSection.size = this->roData.size();
 }
 
-void ElfKernelLoader::updateSectionInfoMemAddress(SectionInfo& info) {
+void ElfKernelLoader::updateSectionInfoMemAddress(SectionInfo &info) {
 	UNUSED(info);
 }
 
 bool ElfKernelLoader::isDataAddress(uint64_t addr) {
 	return this->elffile->isDataAddress(addr | 0xffff000000000000);
+}
+
+ElfLoader* ElfKernelLoader::getModuleForCodeAddress(uint64_t address) {
+	// Does the address belong to the kernel?
+	if (this->isCodeAddress(address)) {
+		return this;
+	}
+
+	for (auto &modulePair : moduleMap) {
+		ElfLoader *module = dynamic_cast<ElfLoader*>(modulePair.second);
+		if (module->isCodeAddress(address)) {
+			return module;
+		}
+	}
+	return 0;
+}
+
+ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address) {
+	// Does the address belong to the kernel?
+	if (this->isCodeAddress(address) || this->isDataAddress(address)) {
+		return this;
+	}
+
+	for (auto &modulePair : moduleMap) {
+		ElfLoader *module = dynamic_cast<ElfLoader*>(modulePair.second);
+		if (module->isCodeAddress(address) || module->isDataAddress(address)) {
+			return module;
+		}
+	}
+	return 0;
+}
+
+const std::string &ElfKernelLoader::getName() {
+	return this->name;
 }

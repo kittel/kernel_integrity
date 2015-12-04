@@ -11,7 +11,33 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-SectionInfo::SectionInfo(): segName(), segID(0), index(0), memindex(0), size(0){}
+RelSym::RelSym()
+	:
+	name{""},
+	value{0},
+	info{0},
+	shndx{0} {}
+
+RelSym::RelSym(const std::string &name,
+               uint64_t value,
+               uint8_t info,
+               uint32_t shndx)
+	:
+	name(name),
+	value(value),
+	info(info),
+	shndx(shndx) {}
+
+RelSym::~RelSym() {}
+
+SectionInfo::SectionInfo()
+	:
+	segName(),
+	segID(0),
+	index(0),
+	memindex(0),
+	size(0) {}
+
 SectionInfo::SectionInfo(uint8_t *i, unsigned int s)
 	:
 	segName(),
@@ -20,7 +46,7 @@ SectionInfo::SectionInfo(uint8_t *i, unsigned int s)
 	memindex(0),
 	size(s) {}
 
-SectionInfo::SectionInfo(std::string segName, uint32_t segID, uint8_t *i, uint64_t a, uint32_t s)
+SectionInfo::SectionInfo(const std::string &segName, uint32_t segID, uint8_t *i, uint64_t a, uint32_t s)
 	:
 	segName(segName),
 	segID(segID),
@@ -78,22 +104,24 @@ SegmentInfo::SegmentInfo(uint32_t p_type,
 
 SegmentInfo::~SegmentInfo() {}
 
-ElfFile::ElfFile(FILE* fd, size_t fileSize, uint8_t* fileContent, ElfType type,
-                 ElfProgramType programType)
+ElfFile::ElfFile(FILE *fd, size_t fileSize, uint8_t *fileContent,
+                 ElfType type,
+                 ElfProgramType programType,
+                 SymbolManager *symspace)
 	:
 	shstrindex(0),
 	symindex(0),
 	strindex(0),
+	symbols{symspace},
 	fd(fd),
 	fileSize(fileSize),
 	fileContent(fileContent),
 	type(type),
 	programType(programType),
-	filename(""),
-	symbolNameMap() {
+	filename("") {
 
 	try {
-		DwarfParser::parseDwarfFromFD(this->getFD());
+		DwarfParser::parseDwarfFromFD(this->getFD(), this->symbols);
 	} catch(DwarfException &e) {
 		std::cout << e.what() << std::endl;
 	}
@@ -109,8 +137,9 @@ ElfFile::~ElfFile(){
 	fclose(this->fd);
 }
 
-ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
-	FILE* fd = 0;
+ElfFile* ElfFile::loadElfFile(const std::string &filename,
+                              SymbolManager *symspace) throw(){
+	FILE* fd = nullptr;
 	fd = fopen(filename.c_str(), "rb");
 
 	if(!fd){
@@ -120,10 +149,10 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 		exit(0);
 	}
 
-	ElfFile* elfFile = 0;
+	ElfFile* elfFile = nullptr;
 
 	size_t fileSize = 0;
-	uint8_t* fileContent = 0;
+	uint8_t* fileContent = nullptr;
 
 	if (fd != nullptr) {
 		/* Go to the end of the file. */
@@ -133,7 +162,8 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 
 			//MMAP the file to memory
 			fileContent = (uint8_t*) mmap(0, fileSize,
-			                              PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(fd), 0);
+			                              PROT_READ | PROT_WRITE,
+			                              MAP_PRIVATE, fileno(fd), 0);
 			if (fileContent == MAP_FAILED) {
 				std::cout << "mmap failed" << std::endl;
 				throw ElfException("MMAP failed!!!\n");
@@ -145,11 +175,8 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 	}
 
 
-	if(fileContent[4] == ELFCLASS32) {
-		elfFile = new ElfFile32(fd, fileSize, fileContent);
-	}
-	else if(fileContent[4] == ELFCLASS64) {
-		elfFile = new ElfFile64(fd, fileSize, fileContent);
+	if(fileContent[4] == ELFCLASS64) {
+		elfFile = new ElfFile64(fd, fileSize, fileContent, symspace);
 	}
 	elfFile->fd = fd;
 	elfFile->fileSize = fileSize;
@@ -158,7 +185,8 @@ ElfFile* ElfFile::loadElfFile(std::string filename) throw(){
 	return elfFile;
 }
 
-ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) throw() {
+ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size,
+                                        SymbolManager *symspace) throw() {
 
 	ElfFile* elfFile = 0;
 
@@ -166,13 +194,8 @@ ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) throw() {
 	uint8_t* fileContent = buf;
 	FILE* fd = fmemopen(fileContent, fileSize, "rb");
 
-	if(fileContent[4] == ELFCLASS32)
-	{
-		elfFile = new ElfFile32(fd, fileSize, fileContent);
-	}
-	else if(fileContent[4] == ELFCLASS64)
-	{
-		elfFile = new ElfFile64(fd, fileSize, fileContent);
+	if(fileContent[4] == ELFCLASS64) {
+		elfFile = new ElfFile64(fd, fileSize, fileContent, symspace);
 	}
 	elfFile->fd = fd;
 
