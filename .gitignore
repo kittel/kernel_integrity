@@ -18,6 +18,7 @@ autoscan.log
 .deps
 .libs
 
+src/kernint
 dwarfsymbols
 test
 doc/
@@ -33,7 +34,6 @@ libtool
 ltmain.sh
 missing
 
-
 depcomp
 
 tags
@@ -43,3 +43,8 @@ tags
 .project
 .settings/
 stamp-h1
+
+doc/
+dwarf/
+kernels/
+
