@@ -1,13 +1,11 @@
 AM_CXXFLAGS = -ggdb -Wall -Wextra -Werror -fpic -I $(top_builddir)/src -std=c++1y -I /usr/include -O3 -pg
 
-kernint_CXXFLAGS=$(AM_CXXFLAGS) $(GLIB_CFLAGS) $(LIBS) \
-				 -I $(top_builddir)/../libdwarfparser/
+kernint_CXXFLAGS=$(AM_CXXFLAGS) $(GLIB_CFLAGS) $(LIBS)
 kernint_LDFLAGS=$(GLIB_LIBS) \
-				-L$(top_builddir)/../libdwarfparser/libdwarfparser/ \
-				-L$(top_builddir)/../libdwarfparser/libvmiwrapper/ \
 				-ldwarfparser -ldwarf -lelf \
 				-lvmiwrapper \
-				-lboost_system -lboost_filesystem -lpthread
+				-lboost_system -lboost_filesystem -lpthread \
+				-lCppUTest -lCppUTestExt
 
 bin_PROGRAMS=kernint
 

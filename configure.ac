@@ -98,12 +98,47 @@ fi
 
 ##########################################################################
 
-PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.16])                                   
-AC_SUBST([GLIB_CFLAGS])                                                         
+PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.16])
+AC_SUBST([GLIB_CFLAGS])
 AC_SUBST([GLIB_LIBS])
 
-AC_CHECK_LIB(vmi, vmi_init, [], [echo "Error! You need to have libavl around."; exit 1])
-AC_CHECK_HEADERS([libvmi/libvmi.h])
+
+# distribute additional compiler and linker flags
+# --> set these variables instead of CXXFLAGS or LDFLAGS
+AC_SUBST([AM_CPPFLAGS])
+AC_SUBST([AM_CXXFLAGS])
+AC_SUBST([AM_LDFLAGS])
+AC_SUBST([LIBS])
+
+
+AC_CHECK_LIB(vmi, vmi_init, [], 
+			 [AC_MSG_ERROR(["Error! You need to have libvmi around."])]
+)
+AC_CHECK_HEADERS([libvmi/libvmi.h], [], 
+				 [AC_MSG_ERROR(["Error! You need to have libvmi headers around."])]
+)
+AC_CHECK_LIB(elf, elf_begin, [], 
+			 [AC_MSG_ERROR(["Error! You need to have libel around."])]
+)
+AC_CHECK_LIB(dwarf, dwarf_init, [], 
+			 [AC_MSG_ERROR(["Error! You need to have libdwarf around."])], 
+			 ["-lelf"]
+)
+AC_CHECK_HEADERS([libdwarf/libdwarf.h], [], 
+				 [AC_MSG_ERROR(["Error! You need to have libdwarf headers around."])]
+)
+
+# Checks for libraries.
+OLD_CPPFLAGS=$CPPFLAGS
+CPPFLAGS="$CPPFLAGS  $GLIB_CFLAGS"
+AC_CHECK_HEADERS([libdwarfparser/libdwarfparser.h], [], 
+				 [AC_MSG_ERROR(["Error! You need to have libdwarfparser headers around."])]
+)
+
+AC_CHECK_HEADERS([libvmiwrapper/libvmiwrapper.h], [], 
+				 [AC_MSG_ERROR(["Error! You need to have libvmiwrapper headers around."])]
+)
+CPPFLAGS=$OLD_CPPFLAGS
 
 
 ##########################################################################
