@@ -309,28 +309,29 @@ void ElfProcessLoader64::relocate(Elf64_Rela *rel) {
 	char *dynstr          = (char *)dynstrseg.index;
 
 	std::string name = &dynstr[dynsym[ELF64_R_SYM(rel->r_info)].st_name];
-
-	RelSym *sym = this->proc->findSymbolByName(name);
-
-	// retrieve needed, corresponding RelSym
-	if (!sym) {
-		std::cout << "error:(relocate) Couldn't retrieve symbol " << name
-		          << " from symbolMap! Skipping..." << std::endl;
-		return;
-	}
-
-	std::cout << "Trying to relocate " << name << " in "
-	          << this->name << " <<-- " << sym->name
-	          << "." << std::endl;
-
-	// parse relocation entry
-	target = rel->r_offset;  // always direct value for JUMP_SLOT/GLOB_DAT
-	                         // addendum is also not involved in calc
-	value = sym->value;
-
-	// write final RelSym address into the corresponding segment
-	this->writeRelValue(target, value);
+	// XXX TODO make that shit better!
 	return;
+	//RelSym *sym = this->proc->findSymbolByName(name);
+
+	//// retrieve needed, corresponding RelSym
+	//if (!sym) {
+	//	std::cout << "error:(relocate) Couldn't retrieve symbol " << name
+	//	          << " from symbolMap! Skipping..." << std::endl;
+	//	return;
+	//}
+
+	//std::cout << "Trying to relocate " << name << " in "
+	//          << this->name << " <<-- " << sym->name
+	//          << "." << std::endl;
+
+	//// parse relocation entry
+	//target = rel->r_offset;  // always direct value for JUMP_SLOT/GLOB_DAT
+	//                         // addendum is also not involved in calc
+	//value = sym->value;
+
+	//// write final RelSym address into the corresponding segment
+	//this->writeRelValue(target, value);
+	//return;
 }
 
 void ElfProcessLoader64::relocate(Elf64_Rel *rel) {
