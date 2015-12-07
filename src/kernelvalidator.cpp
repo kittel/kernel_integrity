@@ -1,35 +1,30 @@
-#include <iostream>
+#include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <iostream>
+#include <list>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <iostream>
-#include <iomanip>
-#include <chrono>
 
-
-#include <list>
-#include <algorithm>
-
+#include "kernelvalidator.h"
 #include "kernel_headers.h"
 
-#include <kernelvalidator.h>
 
-KernelValidator::KernelValidator(ElfKernelLoader* kernelLoader,
-                                 VMIInstance* vmi,
-                                 std::string targetsFile)
+KernelValidator::KernelValidator(ElfKernelLoader *kernelLoader,
+                                 const std::string &targetsFile)
 	:
-	vmi(vmi),
 	kernelLoader(kernelLoader),
 	stackAddresses() {
 
 	this->kernelLoader->loadAllModules();
 	this->kernelLoader->updateRevMaps();
 	this->kernelLoader->dumpSymbols();
-	this->kernelLoader->setVMIInstance(vmi);
 
-	if (targetsFile.compare("") != 0) {
+	if (targetsFile.length() > 0) {
 		// Read targets of calls
 		std::ifstream infile;
 		infile.open(targetsFile, std::ios::in|std::ios::binary);
@@ -48,12 +43,9 @@ KernelValidator::KernelValidator(ElfKernelLoader* kernelLoader,
 	}
 
 	this->setOptions();
-	KernelValidator::instance = this;
 }
 
-KernelValidator::~KernelValidator(){
-	KernelValidator::instance = nullptr;
-}
+KernelValidator::~KernelValidator() {}
 
 void KernelValidator::setOptions(bool lm, bool cv, bool pe){
 	this->options.loopMode = lm;
@@ -61,23 +53,21 @@ void KernelValidator::setOptions(bool lm, bool cv, bool pe){
 	this->options.pointerExamination = pe;
 }
 
-KernelValidator* KernelValidator::instance = nullptr;
-
-KernelValidator* KernelValidator::getInstance() {
-	return KernelValidator::instance;
-}
-
 ElfKernelLoader *KernelValidator::loadKernel(const std::string &dirName) {
 	std::string kernelName = dirName;
 	kernelName.append("/vmlinux");
-	ElfFile *kernelFile = ElfFile::loadElfFile(kernelName);
 
-	// This is really really a mess. The cast shouldn't even be necessary.
-	ElfKernelLoader *kernelLoader = dynamic_cast<ElfKernelLoader *>(kernelFile->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEKERNEL));
+	SymbolManager symspace;
+	ElfFile *kernelFile = ElfFile::loadElfFile(kernelName, &symspace);
+
+	ElfKernelLoader *kernelLoader = kernelFile->parseKernel();
+
+	// store symbol namespace
+	kernelLoader->symbols.replaceBy(symspace);
 
 	kernelLoader->setKernelDir(dirName);
 	kernelLoader->parseSystemMap();
-	kernelLoader->parseElfFile();
+	kernelLoader->parse();
 
 	return kernelLoader;
 }
@@ -93,14 +83,14 @@ uint64_t KernelValidator::validatePages() {
 			//Validate all Stacks
 			this->updateStackAddresses();
 			for (auto &stack : this->stackAddresses) {
-				std::vector<uint8_t> pageInMem = vmi->readVectorFromVA(stack.first, 0x2000);
+				std::vector<uint8_t> pageInMem = this->kernelLoader->vmi->readVectorFromVA(stack.first, 0x2000);
 				this->validateStackPage(pageInMem.data(),
 				                        stack.first,
 				                        stack.second);
 			}
 		}
 
-		PageMap executablePageMap = vmi->getPages(0);
+		PageMap executablePageMap = this->kernelLoader->vmi->getPages(0);
 
 		for (auto &page : executablePageMap) {
 			if ((page.second->vaddr & 0xff0000000000) == 0x8800000000000){
@@ -113,7 +103,7 @@ uint64_t KernelValidator::validatePages() {
 		          << "Done validating pages"
 		          << COLOR_BOLD_OFF << COLOR_NORM << std::endl;
 
-		vmi->destroyMap(executablePageMap);
+		this->kernelLoader->vmi->destroyMap(executablePageMap);
 	} while (this->options.loopMode);
 
 	return iterations;
@@ -129,21 +119,21 @@ void KernelValidator::validatePage(page_info_t * page) {
 		return;
 	}
 
-	ElfLoader* elfloader = kernelLoader->getModuleForAddress(page->vaddr);
-	//assert(elfloader);
-	if (!elfloader) {
-		if(this->vmi->isPageExecutable(page)){
+	ElfLoader *module = kernelLoader->getModuleForAddress(page->vaddr);
+	//assert(module);
+	if (!module) {
+		if(this->kernelLoader->vmi->isPageExecutable(page)){
 			std::cout << COLOR_MARGENTA << COLOR_BOLD <<
 			"No Module found for address: " << std::hex <<
 			page->vaddr << std::dec << COLOR_RESET << std::endl;
 		}
 	} else if (this->options.codeValidation &&
-	           elfloader->isCodeAddress(page->vaddr)) {
-		this->validateCodePage(page, elfloader);
+	           module->isCodeAddress(page->vaddr)) {
+		this->validateCodePage(page, module);
 	}
 	else if (this->options.pointerExamination &&
-	         elfloader->isDataAddress(page->vaddr)) {
-		if (this->vmi->isPageExecutable(page)) {
+	         module->isDataAddress(page->vaddr)) {
+		if (this->kernelLoader->vmi->isPageExecutable(page)) {
 			static bool execData = false;
 			if (!execData) {
 				std::cout << COLOR_RED << COLOR_BOLD <<
@@ -153,7 +143,7 @@ void KernelValidator::validatePage(page_info_t * page) {
 			}
 		}
 
-		this->validateDataPage(page, elfloader);
+		this->validateDataPage(page, module);
 	}
 }
 
@@ -224,7 +214,7 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 		uint64_t offset =
 		retAddr.second - (uint64_t)elfloader->textSegment.memindex;
 
-		std::vector<uint8_t> pageInMem = vmi->readVectorFromVA(
+		std::vector<uint8_t> pageInMem = this->kernelLoader->vmi->readVectorFromVA(
 			(uint64_t)elfloader->textSegment.memindex, offset + 0x40);
 
 		uint64_t callAddr =
@@ -338,8 +328,8 @@ bool KernelValidator::isValidJmpLabel(uint8_t* pageInMem,
 
 	if (entry != elf->jumpEntries.end()) {
 		// Check if the entry is currently disabled
-		if ((memcmp(pageInMem + i, kernelLoader->ideal_nops[5], 5) == 0 ||
-		     memcmp(pageInMem + i, kernelLoader->ideal_nops[9], 5) == 0)) {
+		if ((memcmp(pageInMem + i, this->kernelLoader->pvpatcher.pvstate->ideal_nops[5], 5) == 0 ||
+		     memcmp(pageInMem + i, this->kernelLoader->pvpatcher.pvstate->ideal_nops[9], 5) == 0)) {
 			return true;
 		}
 		// Otherwise check if the destination matches
@@ -353,16 +343,14 @@ bool KernelValidator::isValidJmpLabel(uint8_t* pageInMem,
 	return false;
 }
 
-void KernelValidator::validateCodePage(page_info_t* page, ElfLoader* elf) {
+void KernelValidator::validateCodePage(page_info_t *page, ElfLoader *elf) {
 	assert(page);
 	assert(elf);
 
 	uint32_t pageOffset = 0;
 	uint32_t pageIndex = 0;
-	pageOffset =
-	(page->vaddr - ((uint64_t)elf->textSegment.memindex & 0xffffffffffff));
-	pageIndex =
-	(page->vaddr - ((uint64_t)elf->textSegment.memindex & 0xffffffffffff)) /
+	pageOffset = (page->vaddr - ((uint64_t)elf->textSegment.memindex & 0xffffffffffff));
+	pageIndex = (page->vaddr - ((uint64_t)elf->textSegment.memindex & 0xffffffffffff)) /
 	page->size;
 
 	// std::cout << "Validating: " << elf->getName() <<
@@ -378,10 +366,7 @@ void KernelValidator::validateCodePage(page_info_t* page, ElfLoader* elf) {
 	}
 	uint8_t* loadedPage = elf->textSegmentContent.data() + pageOffset;
 	// get Page from memdump
-	// const auto time1_start = std::chrono::system_clock::now();
-	std::vector<uint8_t> pageInMem =
-	vmi->readVectorFromVA(page->vaddr, page->size);
-	// const auto time1_stop = std::chrono::system_clock::now();
+	std::vector<uint8_t> pageInMem = this->kernelLoader->vmi->readVectorFromVA(page->vaddr, page->size);
 
 	uint32_t changeCount = 0;
 
@@ -396,16 +381,17 @@ void KernelValidator::validateCodePage(page_info_t* page, ElfLoader* elf) {
 			continue;
 		}
 
-		uint64_t unkCodeAddress =
-		(uint64_t)elf->textSegment.memindex + pageOffset + i;
+		uint64_t unkCodeAddress = (uint64_t)elf->textSegment.memindex + pageOffset + i;
 		// Ignore hypercall_page for now
 		if ((unkCodeAddress & 0xfffffffffffff000) == 0xffffffff81001000) {
 			continue;
 		}
 
 		// Check for ATOMIC_NOP
-		if (i > 1 && memcmp(loadedPage + i - 2, elf->ideal_nops[5], 5) == 0 &&
-		    memcmp(pageInMem.data() + i - 2, elf->ideal_nops[9], 5) == 0) {
+		if (i > 1 && memcmp(loadedPage + i - 2,
+		                    this->kernelLoader->pvpatcher.pvstate->ideal_nops[5], 5) == 0 &&
+		    memcmp(pageInMem.data() + i - 2,
+		           this->kernelLoader->pvpatcher.pvstate->ideal_nops[9], 5) == 0) {
 			i += 5;
 			continue;
 		}
@@ -473,7 +459,7 @@ void KernelValidator::validateCodePage(page_info_t* page, ElfLoader* elf) {
 
 		// TODO investigate
 		if (memcmp(loadedPage + i, "\xe9\x00\x00\x00\x00", 5) == 0 &&
-		    memcmp(pageInMem.data() + i, elf->ideal_nops[9], 5) == 0) {
+		    memcmp(pageInMem.data() + i, this->kernelLoader->pvpatcher.pvstate->ideal_nops[9], 5) == 0) {
 			i += 5;
 			continue;
 		}
@@ -483,7 +469,7 @@ void KernelValidator::validateCodePage(page_info_t* page, ElfLoader* elf) {
 		if (dynamic_cast<ElfKernelLoader *>(elf) &&
 		    i >= (int32_t) (elf->textSegmentContent.size() - pageOffset)) {
 			std::cout << COLOR_RED <<
-			             "Validating: " << elf->getName() << 
+			             "Validating: " << elf->getName() <<
 			             " Page: " << std::hex << pageIndex
 			                       << std::dec << std::endl;
 			std::cout << "Unknown code @ " << std::hex << unkCodeAddress <<
@@ -528,8 +514,7 @@ void KernelValidator::validateDataPage(page_info_t* page, ElfLoader* elf) {
 	assert(elf);
 
 	// get Page from memdump
-	std::vector<uint8_t> pageInMem =
-	vmi->readVectorFromVA(page->vaddr, page->size);
+	std::vector<uint8_t> pageInMem = this->kernelLoader->vmi->readVectorFromVA(page->vaddr, page->size);
 
 	if (page->vaddr == (kernelLoader->idt_tableAddress & 0xffffffffffff) ||
 	    page->vaddr == (kernelLoader->nmi_idt_tableAddress & 0xffffffffffff)) {
@@ -576,7 +561,7 @@ void KernelValidator::validateDataPage(page_info_t* page, ElfLoader* elf) {
 		return;
 	}
 
-	uint8_t* loadedPage;
+	uint8_t *loadedPage;
 
 	uint64_t roDataOffset =
 	((uint64_t)elf->roDataSection.memindex & 0xffffffffffff);
@@ -669,7 +654,7 @@ uint64_t KernelValidator::isReturnAddress(uint8_t* ptr,
 		// call qword [rel 0x6]
 		memcpy(&callOffset, ptr + offset - 4, 4);
 		uint64_t callAddr = index + offset + callOffset;
-		return vmi->read64FromVA(callAddr);
+		return this->kernelLoader->vmi->read64FromVA(callAddr);
 	}
 	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
 	    ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0x25) {
@@ -762,13 +747,13 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 			    elfloader->jumpEntries.end() ||
 			    elfloader->jumpDestinations.find(*longPtr) !=
 			    elfloader->jumpDestinations.end()) {
-				//    stats.jumpEntry++;
+				//stats.jumpEntry++;
 				continue;
 			}
 
 			// Exception Table
 			if (*longPtr > (uint64_t)exTable.memindex) {
-				//    stats.exPtr++;
+				//stats.exPtr++;
 				continue;
 			}
 
@@ -785,7 +770,7 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 				continue;
 			}
 
-			// if(*longPtr == 0xffffffff81412843){
+			//if (*longPtr == 0xffffffff81412843) {
 			//	continue;
 			//}
 
@@ -814,10 +799,9 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 
 void KernelValidator::updateStackAddresses() {
 	this->stackAddresses.clear();
-	// BaseType* ti_bt = BaseType::findBaseTypeByName("thread_info");
 
-	Instance init_task =
-	Variable::findVariableByName("init_task")->getInstance();
+	Instance init_task = this->kernelLoader->symbols.findVariableByName("init_task")->getInstance();
+
 	Instance task = init_task;
 	do {
 		Instance thread    = task.memberByName("thread");
@@ -834,19 +818,19 @@ void KernelValidator::updateStackAddresses() {
 
 		this->stackAddresses[stackBottom] = rsp;
 
-		// Instance ti = ti_bt->getInstance(stackAddr - 0x2000);
-		// Instance ti_task = ti.memberByName("task", true);
+		//Instance ti = ti_bt->getInstance(stackAddr - 0x2000);
+		//Instance ti_task = ti.memberByName("task", true);
 		//if (ti_task.getAddress() != task.getAddress()) {
 		//	assert(false);
 		//}
 		Instance tasks = task.memberByName("tasks");
-		task           = tasks.memberByName("next", true);
+		task = tasks.memberByName("next", true);
 		task = task.changeBaseType("task_struct", "tasks");
 	} while (task != init_task);
 }
 
-void KernelValidator::displayChange(uint8_t* memory,
-                                    uint8_t* reference,
+void KernelValidator::displayChange(uint8_t *memory,
+                                    uint8_t *reference,
                                     int32_t offset,
                                     int32_t size) {
 	std::cout << "First change"

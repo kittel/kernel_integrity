@@ -1,13 +1,12 @@
 #include "elfprocessloader64.h"
 
 ElfProcessLoader64::ElfProcessLoader64(ElfFile64 *file,
-                                       KernelManager *parent,
-                                       std::string name)
+                                       Kernel *kernel,
+                                       const std::string &name,
+                                       Process *proc)
 	:
-	ElfProcessLoader(file, parent, name),
+	ElfProcessLoader(file, kernel, name, proc),
 	bindLazy(true) {
-
-	this->execName = name;
 }
 
 ElfProcessLoader64::~ElfProcessLoader64() {
@@ -32,10 +31,6 @@ uint32_t ElfProcessLoader64::getTextSize() {
 	return this->textSegment.size;
 }
 
-std::vector<RelSym *> ElfProcessLoader64::getProvidedSyms() {
-	return this->providedSyms;
-}
-
 uint64_t ElfProcessLoader64::getDataOff() {
 	return this->dataSegmentInfo.offset;
 }
@@ -44,98 +39,6 @@ uint64_t ElfProcessLoader64::getTextOff() {
 	return this->textSegmentInfo.offset;
 }
 
-/* Initialize our providedSyms to prepare for relocation */
-void ElfProcessLoader64::initProvidedSymbols() {
-	// if this is a static exec we don't provide anything
-	if (!this->elffile->isDynamic()) {
-		return;
-	}
-
-	std::cout << "Initializing provided symbols of "
-	          << getNameFromPath(this->execName) << " ..." << std::endl;
-
-	ElfFile64 *elf      = dynamic_cast<ElfFile64 *>(this->elffile);
-	SectionInfo dynamic = elf->findSectionWithName(".dynamic");
-	// use symtab instead of dynsym?
-	SectionInfo symtab = elf->findSectionWithName(".dynsym");
-	SectionInfo strtab = elf->findSectionWithName(".dynstr");
-
-	Elf64_Dyn *dynsec     = (Elf64_Dyn *)dynamic.index;
-	Elf64_Sym *normsymtab = (Elf64_Sym *)symtab.index;
-
-	char *normstrtab     = (char *)strtab.index;
-	uint16_t symSize     = 0;  // size of a .dynsym entry
-	uint32_t normentries = 0;  // amount of entries in .symtab
-
-	for (int i = 0; dynsec[i].d_tag != DT_NULL; i++) {
-		if (dynsec[i].d_tag == DT_SYMENT) {
-			symSize = dynsec[i].d_un.d_val;
-			break;
-		}
-	}
-
-	if (symSize == 0) {
-		std::cout << "error:(initProvidedSymbols) Couldn't determine symbol"
-		          << " table entry size. Aborting." << std::endl;
-		return;
-	}
-
-	normentries = symtab.size / symSize;
-	std::string input;
-	uint64_t targetAddr;  // this is final memory address after loading
-
-	// initialize own symbols
-	for (unsigned int i = 0; i < normentries; i++) {
-		// if symbol is GLOBAL and _not_ UNDEFINED save it for announcement
-		if (ELF64_ST_BIND(normsymtab[i].st_info) == STB_GLOBAL &&
-		    normsymtab[i].st_shndx != SHN_UNDEF &&
-		    normsymtab[i].st_shndx != SHN_ABS &&
-		    normsymtab[i].st_shndx != SHN_COMMON) {
-			input.append(&normstrtab[normsymtab[i].st_name]);
-
-			targetAddr = this->getVAForAddr(normsymtab[i].st_value,
-			                                normsymtab[i].st_shndx);
-
-			RelSym *sym = new RelSym(input,
-			                         targetAddr,
-			                         normsymtab[i].st_info,
-			                         normsymtab[i].st_shndx,
-			                         this);
-
-			this->providedSyms.push_back(sym);
-
-#ifdef DEBUG
-			std::cout << "debug:(InitProvidedSymbols) Provided Symbol[GLOBAL]: "
-			          << input << ". Index: " << i << std::endl;
-#endif
-			input.clear();
-		}
-		if (ELF64_ST_BIND(normsymtab[i].st_info) == STB_WEAK &&
-		    normsymtab[i].st_shndx != SHN_UNDEF &&
-		    normsymtab[i].st_shndx != SHN_ABS &&
-		    normsymtab[i].st_shndx != SHN_COMMON) {
-
-			input.append(&normstrtab[normsymtab[i].st_name]);
-
-			targetAddr = this->getVAForAddr(normsymtab[i].st_value,
-			                                normsymtab[i].st_shndx);
-
-			RelSym *sym = new RelSym(input,
-			                         targetAddr,
-			                         normsymtab[i].st_info,
-			                         normsymtab[i].st_shndx,
-			                         this);
-
-			this->providedSyms.push_back(sym);
-
-#ifdef DEBUG
-			std::cout << "debug:(InitProvidedSymbols) Provided Symbol[WEAK]: "
-			          << input << ". Index: " << i << std::endl;
-#endif
-			input.clear();
-		}
-	}
-}
 
 /* Return the final memory address in the procImg for the given addr
  *
@@ -185,6 +88,17 @@ uint64_t ElfProcessLoader64::getVAForAddr(uint64_t addr, uint32_t shtID) {
  *         - return 0
  * - return 1
  */
+int ElfProcessLoader64::evalLazy(uint64_t addr, std::unordered_map<std::string, RelSym> *map) {
+	// TODO XXX applyRelocations und evalLazy geht noch nicht
+	// Die Relocations müssen noch von dem Kommentar unten in die
+	// ElfFile Klasse portiert werden.
+	UNUSED(addr);
+	UNUSED(map);
+	return -1;
+}
+
+
+/*
 int ElfProcessLoader64::evalLazy(uint64_t addr, std::unordered_map<std::string, RelSym *> *map) {
 	std::string debug;
 
@@ -192,10 +106,8 @@ int ElfProcessLoader64::evalLazy(uint64_t addr, std::unordered_map<std::string, 
 	if (this->bindLazy == false)
 		return 1;
 
-	uint64_t off =
-	0;  // offset of symbol into corresponding segment (independent)
-	uint64_t relOff =
-	0;  // r_offset which should correspond to the right rel/a entry
+	uint64_t off = 0;  // offset of symbol into corresponding segment (independent)
+	uint64_t relOff = 0;  // r_offset which should correspond to the right rel/a entry
 	// FILE REPRESENTATION!
 	uint64_t dataVecBaseAddr;  // starting address (FILE REPRESENTATION) of data
 	                           // vector content (including padding)
@@ -263,6 +175,7 @@ int ElfProcessLoader64::evalLazy(uint64_t addr, std::unordered_map<std::string, 
 
 	return 1;
 }
+*/
 
 /* Apply all load-time relocations to the loader
  *
@@ -270,6 +183,15 @@ int ElfProcessLoader64::evalLazy(uint64_t addr, std::unordered_map<std::string, 
  *      - look up needed symbol in map
  *      - process relocation of the entry
  */
+void ElfProcessLoader64::applyLoadRel(ProcessValidator *val) {
+	// TODO XXX TOM
+	// Das kompiliert noch nicht. Die applyRelocations muss noch für den
+	// ProcessLoader angepasst werden
+	UNUSED(val);
+	// this->elffile->applyRelocations(this);
+}
+
+/*
 void ElfProcessLoader64::applyLoadRel(std::unordered_map<std::string, RelSym *> *map) {
 
 	std::cout << "Applying loadtime relocs to "
@@ -329,6 +251,7 @@ void ElfProcessLoader64::applyLoadRel(std::unordered_map<std::string, RelSym *> 
 		std::cout << "No .rela entries!" << std::endl;
 	}
 }
+*/
 
 // TODO maybe write templates instead of second function for rel
 /* Process the given relocation entry rel using symbol information from map
@@ -340,36 +263,31 @@ void ElfProcessLoader64::applyLoadRel(std::unordered_map<std::string, RelSym *> 
  * -> R_X86_64_GLOB_DAT
  *
  */
-void ElfProcessLoader64::relocate(Elf64_Rela *rel, std::unordered_map<std::string, RelSym *> *map) {
+void ElfProcessLoader64::relocate(Elf64_Rela *rel) {
 	uint64_t target;  // this is where to make the change in the loader
 	                  // the address is given as LOCAL address (SHT-VAddr)
 	uint64_t value;   // this is the value which gets inserted
 
+	// abort if not related to GOT or PLT
+	if (ELF64_R_TYPE(rel->r_info) != R_X86_64_JUMP_SLOT &&
+	    ELF64_R_TYPE(rel->r_info) != R_X86_64_GLOB_DAT &&
+	    ELF64_R_TYPE(rel->r_info) != R_X86_64_64) {
+		return;
+	}
+
 	// if .data.rel.ro relocation
-	if ((ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE) ||
+	if (ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE ||
 	    ELF64_R_TYPE(rel->r_info) == R_X86_64_IRELATIVE) {
 
 		/* as this entries are only unique identifiable in their contained
 		 * libraries, we only have to stupidly write relative memory addresses
 		 * without needing to look up any RelSyms
 		 */
-#ifdef DEBUG
-		std::cout
-		<< "debug:(relocate@" << getNameFromPath(this->getName())
-		<< ") Found dynamic linking relocation for .data.rel.ro./.got.plt"
-		<< std::endl;
-#endif
 
 		target = rel->r_offset;
 
 		// sanity check for signed->unsigned conversion
-		if (rel->r_addend < 0) {
-			std::cout << "error:(relocate@" << getNameFromPath(this->getName())
-			          << ") Found negative addendum [" << std::hex
-			          << rel->r_addend << "] destined for address ["
-			          << (void *)target << "]. Skipping." << std::endl;
-			return;
-		}
+		assert(rel->r_addend >= 0);
 
 		if (ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE) {
 			value = this->getTextStart() + ((uint64_t)rel->r_addend);
@@ -384,14 +302,6 @@ void ElfProcessLoader64::relocate(Elf64_Rela *rel, std::unordered_map<std::strin
 		return;
 	}
 
-	// abort if not related to GOT or PLT
-	if (ELF64_R_TYPE(rel->r_info) != R_X86_64_JUMP_SLOT &&
-	    ELF64_R_TYPE(rel->r_info) != R_X86_64_GLOB_DAT &&
-	    ELF64_R_TYPE(rel->r_info) != R_X86_64_64) {
-
-		return;
-	}
-
 	ElfFile64 *elf        = dynamic_cast<ElfFile64 *>(this->elffile);
 	SectionInfo dynsymseg = elf->findSectionWithName(".dynsym");
 	SectionInfo dynstrseg = elf->findSectionWithName(".dynstr");
@@ -399,21 +309,19 @@ void ElfProcessLoader64::relocate(Elf64_Rela *rel, std::unordered_map<std::strin
 	char *dynstr          = (char *)dynstrseg.index;
 
 	std::string name = &dynstr[dynsym[ELF64_R_SYM(rel->r_info)].st_name];
-	RelSym *sym;
+
+	RelSym *sym = this->proc->findSymbolByName(name);
 
 	// retrieve needed, corresponding RelSym
-	try {
-		sym = (*map).at(name);
-	} catch (const std::out_of_range &oor) {
+	if (!sym) {
 		std::cout << "error:(relocate) Couldn't retrieve symbol " << name
 		          << " from symbolMap! Skipping..." << std::endl;
 		return;
 	}
 
 	std::cout << "Trying to relocate " << name << " in "
-	          << getNameFromPath(this->execName) << " <<-- " << sym->name
-	          << " from " << getNameFromPath(sym->parent->getName()) << "."
-	          << std::endl;
+	          << this->name << " <<-- " << sym->name
+	          << "." << std::endl;
 
 	// parse relocation entry
 	target = rel->r_offset;  // always direct value for JUMP_SLOT/GLOB_DAT
@@ -425,12 +333,12 @@ void ElfProcessLoader64::relocate(Elf64_Rela *rel, std::unordered_map<std::strin
 	return;
 }
 
-void ElfProcessLoader64::relocate(
-	Elf64_Rel *rel, std::unordered_map<std::string, RelSym *> *map) {
-	std::cout << "Relocation for .rel sections not yet implemented!"
-	          << std::endl;
-	(void)rel;
-	(void)map;
+void ElfProcessLoader64::relocate(Elf64_Rel *rel) {
+	std::cout << COLOR_RED << COLOR_BOLD
+	          << "Relocation for .rel sections not yet implemented!"
+	          << COLOR_RESET << std::endl;
+	UNUSED(rel);
+	assert(false);
 	return;
 }
 

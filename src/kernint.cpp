@@ -9,19 +9,15 @@
 #include <getopt.h>
 #include <memory>
 
-#include <kernelvalidator.h>
-#include <processvalidator.h>
+#include "kernelvalidator.h"
+#include "processvalidator.h"
+#include "process.h"
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
 
-void signalHandler(int signum) {
-	UNUSED(signum);
-	KernelValidator *instance = KernelValidator::getInstance();
-	if (instance) {
-		instance->setOptions(false, false, false);
-	}
-}
+// used in the signal handler
+KernelValidator *validator = nullptr;
 
 void validateKernel(KernelValidator *val) {
 	const auto time_start = std::chrono::system_clock::now();
@@ -37,8 +33,6 @@ void validateKernel(KernelValidator *val) {
 }
 
 void validateUserspace(ProcessValidator *val) {
-	
-
 	// whitelisted values for environment
 	// if LD_BIND_NOW = "" -> lazyBinding is off
 	// if LD_BIND_NOW = "nope" or LD_BIND_NOW is nonexistant -> lazyBinding is on
@@ -50,7 +44,6 @@ void validateUserspace(ProcessValidator *val) {
 
 	val->checkEnvironment(configEnv);
 	val->validateProcess();
-
 }
 
 const char *helpString = R"EOF(
@@ -114,6 +107,7 @@ int main(int argc, char **argv) {
 
 	std::string kerndir;
 	bool codeValidation     = true;
+	bool kernelValidation   = false;
 	bool pointerExamination = true;
 	std::string targetsFile;
 
@@ -134,14 +128,15 @@ int main(int argc, char **argv) {
 		{"guest(File)", required_argument, 0, 'g'},
 		{"loop", no_argument, 0, 'l'},
 
-		{"checkKernel", required_argument, 0, 'k'},
-		{"codeValidation", no_argument, 0, 'c'},
-		{"pointerExamination", no_argument, 0, 'e'},
-		{"targetsFile", required_argument, 0, 't'},
+		{"check-kernel", required_argument, 0, 'k'},
+		{"kernel-validation", no_argument, 0, 'a'},
+		{"code-validation", no_argument, 0, 'c'},
+		{"pointer-examination", no_argument, 0, 'e'},
+		{"targets-file", required_argument, 0, 't'},
 
-		{"checkUserspace", required_argument, 0, 'u'},
+		{"check-userspace", required_argument, 0, 'u'},
 		{"pid", required_argument, 0, 'p'},
-		{"libraryPath", required_argument, 0, 'b'},
+		{"library-path", required_argument, 0, 'b'},
 		{0, 0, 0, 0}
 	};
 
@@ -165,6 +160,10 @@ int main(int argc, char **argv) {
 
 		case 'k':
 			kerndir.assign(optarg);
+			break;
+
+		case 'a':
+			kernelValidation = true;
 			break;
 
 		case 'c':
@@ -222,9 +221,6 @@ int main(int argc, char **argv) {
 		vmPath.assign("insight");
 	}
 
-	signal(SIGINT, signalHandler);
-	signal(SIGTERM, signalHandler);
-
 	VMIInstance vmi(vmPath, hypflag | VMI_INIT_COMPLETE);
 
 	if (kerndir.empty()) {
@@ -249,10 +245,11 @@ int main(int argc, char **argv) {
 	}
 
 	std::cout << COLOR_GREEN << "Loading Kernel" << COLOR_NORM << std::endl;
+
 	ElfKernelLoader *kl = KernelValidator::loadKernel(kerndir);
 	kl->setVMIInstance(&vmi);
 
-	if (false /* option to validate kernel */) {
+	if (kernelValidation) {
 		if (!fexists(targetsFile)) {
 			std::cout << COLOR_RED << COLOR_BOLD
 			          << "Wrong Path given for Targets File: " << targetsFile
@@ -260,17 +257,30 @@ int main(int argc, char **argv) {
 			exit(0);
 		}
 
-		KernelValidator val{kl, &vmi, targetsFile};
+		KernelValidator val{kl, targetsFile};
 		val.setOptions(loopMode, codeValidation, pointerExamination);
+
+		validator = &val;
+
+		auto signalHandler = [](int /*signalnumber*/) {
+			if (validator) {
+				validator->setOptions(false, false, false);
+			}
+		};
+
+		signal(SIGINT, signalHandler);
+		signal(SIGTERM, signalHandler);
+
 		std::cout << "Starting Kernel Validation" << std::endl;
 		validateKernel(&val);
 	}
 
 	if (!binaryName.empty() && pid != 0) {
+		Process proc{binaryName, kl};
 		// Ensure that all arguments make sense at this point
 		std::cout << "Starting Process Validation..." << std::endl;
-		kl->setLibraryDir(libraryDir);
-		ProcessValidator val{kl, binaryName, &vmi, pid};
+		proc.setLibraryDir(libraryDir);
+		ProcessValidator val{kl, &proc, &vmi, pid};
 		validateUserspace(&val);
 	}
 }

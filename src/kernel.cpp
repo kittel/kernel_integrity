@@ -1,4 +1,4 @@
-#include "kernelmanager.h"
+#include "kernel.h"
 
 #include "helpers.h"
 
@@ -27,39 +27,20 @@ namespace fs = boost::filesystem;
 //#include <filesystem>
 //namespace fs = std::filesystem;
 
-KernelManager::KernelManager()
+Kernel::Kernel()
 	:
-	moduleMapMutex(),
-	moduleMap(),
-	kernelDirName(),
-	moduleInstanceMap(),
-	symbolMap(),
-	privSymbolMap(),
-	moduleSymbolMap(),
-	functionSymbolMap() {}
+	paravirt{this, true} {}
 
-void KernelManager::setVMIInstance(VMIInstance *vmi) {
+void Kernel::setVMIInstance(VMIInstance *vmi) {
 	this->vmi = vmi;
 }
 
-void KernelManager::setKernelDir(const std::string &dirName) {
+void Kernel::setKernelDir(const std::string &dirName) {
 	this->kernelDirName = dirName;
 }
 
-void KernelManager::setLibraryDir(const std::string &dirName) {
-	const std::string delimiters = ":";
-	std::string::size_type lastPos = dirName.find_first_not_of(delimiters, 0);
-	std::string::size_type pos = dirName.find_first_of(delimiters, lastPos);
-
-	while (std::string::npos != pos || std::string::npos != lastPos)
-	{
-		libDirName.push_back(dirName.substr(lastPos, pos - lastPos));
-		lastPos = dirName.find_first_not_of(delimiters, pos);
-		pos = dirName.find_first_of(delimiters, lastPos);
-	}
-}
-
-ElfLoader *KernelManager::loadModule(std::string moduleName) {
+ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
+	std::string moduleName{moduleNameOrig};
 	std::replace(moduleName.begin(), moduleName.end(), '-', '_');
 
 	moduleMapMutex.lock();
@@ -80,8 +61,9 @@ ElfLoader *KernelManager::loadModule(std::string moduleName) {
 		std::cout << moduleName << ": Module File not found" << std::endl;
 		return nullptr;
 	}
-	ElfFile *file = ElfFile::loadElfFile(filename);
-	auto module = file->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEMODULE, moduleName, this);
+	ElfFile *file = ElfFile::loadElfFile(filename, &this->symbols);
+
+	auto module = file->parseKernelModule(moduleName, this);
 
 	moduleMapMutex.lock();
 	moduleMap[moduleName] = module;
@@ -90,7 +72,7 @@ ElfLoader *KernelManager::loadModule(std::string moduleName) {
 	return moduleMap[moduleName];
 }
 
-void KernelManager::loadModuleThread(std::list<std::string> &modList,
+void Kernel::loadModuleThread(std::list<std::string> &modList,
                                      std::mutex &modMutex) {
 	while (true) {
 		modMutex.lock();
@@ -105,7 +87,7 @@ void KernelManager::loadModuleThread(std::list<std::string> &modList,
 	}
 }
 
-void KernelManager::loadAllModules() {
+void Kernel::loadAllModules() {
 	uint32_t concurentThreadsSupported = std::thread::hardware_concurrency();
 
 	std::list<std::string> moduleNames = this->getKernelModules();
@@ -113,7 +95,7 @@ void KernelManager::loadAllModules() {
 	std::vector<std::thread *> threads;
 
 	for (uint32_t i = 0; i < concurentThreadsSupported; i++) {
-		std::thread *t = new std::thread(&KernelManager::loadModuleThread,
+		std::thread *t = new std::thread(&Kernel::loadModuleThread,
 		                                 this,
 		                                 std::ref(moduleNames),
 		                                 std::ref(modMutex));
@@ -125,17 +107,17 @@ void KernelManager::loadAllModules() {
 		delete (thread);
 	}
 
-	Array::cleanArrays();
-	Function::cleanFunctions();
+	this->symbols.cleanArrays();
+	this->symbols.cleanFunctions();
 }
 
-Instance KernelManager::nextModule(Instance &instance) {
+Instance Kernel::nextModule(Instance &instance) {
 	Instance next = instance.memberByName("list").memberByName("next", true);
 	next          = next.changeBaseType("module");
 	return next;
 }
 
-std::string KernelManager::findModuleFile(std::string modName) {
+std::string Kernel::findModuleFile(std::string modName) {
 	std::replace(modName.begin(), modName.end(), '-', '_');
 	size_t start_pos = 0;
 	while ((start_pos = modName.find("_", start_pos)) != std::string::npos) {
@@ -157,7 +139,7 @@ std::string KernelManager::findModuleFile(std::string modName) {
 	return "";
 }
 
-std::list<std::string> KernelManager::getKernelModules() {
+std::list<std::string> Kernel::getKernelModules() {
 	if (this->moduleInstanceMap.size() == 0) {
 		this->loadKernelModules();
 	}
@@ -168,7 +150,7 @@ std::list<std::string> KernelManager::getKernelModules() {
 	return strList;
 }
 
-Instance KernelManager::getKernelModuleInstance(std::string modName) {
+Instance Kernel::getKernelModuleInstance(std::string modName) {
 	std::replace(modName.begin(), modName.end(), '-', '_');
 	auto moduleInstance = this->moduleInstanceMap.find(modName);
 	if (moduleInstance != this->moduleInstanceMap.end()) {
@@ -178,23 +160,21 @@ Instance KernelManager::getKernelModuleInstance(std::string modName) {
 	return Instance();
 }
 
-void KernelManager::loadKernelModules() {
-	moduleInstanceMap.clear();
-	Instance modules = Variable::findVariableByName("modules")->getInstance();
+void Kernel::loadKernelModules() {
+	this->moduleInstanceMap.clear();
+	Instance modules = this->symbols.findVariableByName("modules")->getInstance();
 	Instance module  = modules.memberByName("next", true);
 	modules          = modules.changeBaseType("module");
 	module           = module.changeBaseType("module");
 
 	while (module != modules) {
-		std::string moduleName =
-		module.memberByName("name").getRawValue<std::string>();
-		// std::cout << "Module " << moduleName << std::endl;
-		moduleInstanceMap[moduleName] = module;
-		module                        = this->nextModule(module);
+		std::string moduleName = module.memberByName("name").getRawValue<std::string>();
+		this->moduleInstanceMap[moduleName] = module;
+		module = this->nextModule(module);
 	}
 }
 
-uint64_t KernelManager::getSystemMapAddress(const std::string &name,
+uint64_t Kernel::getSystemMapAddress(const std::string &name,
                                             bool priv) {
 	auto symbol = this->symbolMap.find(name);
 	if (symbol != this->symbolMap.end()) {
@@ -210,7 +190,7 @@ uint64_t KernelManager::getSystemMapAddress(const std::string &name,
 	}
 	return 0;
 }
-void KernelManager::addSymbolAddress(const std::string &name,
+void Kernel::addSymbolAddress(const std::string &name,
                                      uint64_t address) {
 	std::string newName = name;
 	while (this->moduleSymbolMap.find(newName) != this->moduleSymbolMap.end()) {
@@ -219,7 +199,7 @@ void KernelManager::addSymbolAddress(const std::string &name,
 	this->moduleSymbolMap[newName] = address;
 }
 
-uint64_t KernelManager::getSymbolAddress(const std::string &name) {
+uint64_t Kernel::getSymbolAddress(const std::string &name) {
 	auto symbol = this->moduleSymbolMap.find(name);
 	if (symbol != this->moduleSymbolMap.end()) {
 		return symbol->second;
@@ -227,7 +207,7 @@ uint64_t KernelManager::getSymbolAddress(const std::string &name) {
 	return 0;
 }
 
-std::string KernelManager::getSymbolName(uint64_t address) {
+std::string Kernel::getSymbolName(uint64_t address) {
 	auto symbol = this->moduleSymbolRevMap.find(address);
 	if (symbol != this->moduleSymbolRevMap.end()) {
 		return symbol->second;
@@ -235,7 +215,7 @@ std::string KernelManager::getSymbolName(uint64_t address) {
 	return "";
 }
 
-bool KernelManager::isSymbol(uint64_t address) {
+bool Kernel::isSymbol(uint64_t address) {
 	if (this->moduleSymbolRevMap.find(address) !=
 	    this->moduleSymbolRevMap.end()) {
 
@@ -244,7 +224,7 @@ bool KernelManager::isSymbol(uint64_t address) {
 	return false;
 }
 
-uint64_t KernelManager::getContainingSymbol(uint64_t address) {
+uint64_t Kernel::getContainingSymbol(uint64_t address) {
 	auto iter = this->moduleSymbolRevMap.upper_bound(address);
 	if (iter != this->moduleSymbolRevMap.end() &&
 	    iter-- != this->moduleSymbolRevMap.begin()) {
@@ -254,7 +234,7 @@ uint64_t KernelManager::getContainingSymbol(uint64_t address) {
 	return 0;
 }
 
-void KernelManager::dumpSymbols() {
+void Kernel::dumpSymbols() {
 	//std::ofstream outfile
 	//("/home/kittel/linux-symbols-3.16.txt",std::ofstream::binary);
 	//for (auto &symbol : this->moduleSymbolRevMap) {
@@ -264,7 +244,7 @@ void KernelManager::dumpSymbols() {
 	//outfile.close();
 }
 
-void KernelManager::addFunctionAddress(const std::string &name,
+void Kernel::addFunctionAddress(const std::string &name,
                                        uint64_t address) {
 	std::string newName = name;
 	while (this->functionSymbolMap.find(newName) !=
@@ -275,7 +255,7 @@ void KernelManager::addFunctionAddress(const std::string &name,
 	this->functionSymbolMap[newName] = address;
 }
 
-uint64_t KernelManager::getFunctionAddress(const std::string &name) {
+uint64_t Kernel::getFunctionAddress(const std::string &name) {
 	auto function = this->functionSymbolMap.find(name);
 	if (function != this->functionSymbolMap.end()) {
 		return function->second;
@@ -283,7 +263,7 @@ uint64_t KernelManager::getFunctionAddress(const std::string &name) {
 	return 0;
 }
 
-std::string KernelManager::getFunctionName(uint64_t address) {
+std::string Kernel::getFunctionName(uint64_t address) {
 	auto function = this->functionSymbolRevMap.find(address);
 	if (function != this->functionSymbolRevMap.end()) {
 		return function->second;
@@ -291,7 +271,7 @@ std::string KernelManager::getFunctionName(uint64_t address) {
 	return "";
 }
 
-bool KernelManager::isFunction(uint64_t address) {
+bool Kernel::isFunction(uint64_t address) {
 	if (this->functionSymbolRevMap.find(address) !=
 	    this->functionSymbolRevMap.end()) {
 		return true;
@@ -299,7 +279,7 @@ bool KernelManager::isFunction(uint64_t address) {
 	return false;
 }
 
-void KernelManager::updateRevMaps() {
+void Kernel::updateRevMaps() {
 	this->moduleSymbolRevMap.clear();
 	this->functionSymbolRevMap.clear();
 
@@ -311,7 +291,7 @@ void KernelManager::updateRevMaps() {
 	}
 }
 
-void KernelManager::parseSystemMap() {
+void Kernel::parseSystemMap() {
 	std::string sysMapFileName = this->kernelDirName;
 	sysMapFileName.append("/System.map");
 	std::string line;
@@ -338,94 +318,7 @@ void KernelManager::parseSystemMap() {
 	}
 }
 
-ElfLoader *KernelManager::loadLibrary(std::string libraryName) {
-	std::string filename = findLibraryFile(libraryName);
-	if (filename.empty()) {
-		std::cout << libraryName << ": Library File not found" << std::endl;
-		return NULL;
-	}
 
-	fs::path file = fs::canonical(filename);
-	filename = file.string();
-	libraryName = file.filename().string();
-
-	//moduleMapMutex.lock();
-	// Check if module is already loaded
-	if (this->libraryMap.find(libraryName) != this->libraryMap.end()) {
-		// This might be NULL! Think about
-		//moduleMapMutex.unlock();
-		//while (moduleMap[moduleName] == NULL) {
-		//	std::this_thread::yield();
-		//}
-		return this->libraryMap[libraryName];
-	}
-	//moduleMap[moduleName] = NULL;
-	//moduleMapMutex.unlock();
-
-	// create ELF Object
-	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
-	auto library = dynamic_cast<ElfProcessLoader64 *>(libraryFile->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEEXEC,
-	                                                                        libraryName, this));
-	//this->execLoader->supplyVDSO(dynamic_cast<ElfProcessLoader64*>(this->vdsoLoader));
-	library->parseElfFile();
-	// moduleMapMutex.lock();
-	this->libraryMap[libraryName] = library;
-	// moduleMapMutex.unlock();
-
-	return library;
-}
-
-ElfProcessLoader *KernelManager::findLibByName(std::string name) {
-	if (this->libraryMap.find(name) == this->libraryMap.end()) {
-		return nullptr;
-	}
-	return dynamic_cast<ElfProcessLoader *>(libraryMap[name]);
-}
-
-std::string KernelManager::findLibraryFile(std::string libName) {
-	std::regex regex = std::regex(libName);
-	for (auto& directory : this->libDirName){
-		for (fs::recursive_directory_iterator end, dir(directory); dir != end; dir++) {
-			if (std::regex_match((*dir).path().filename().string(), regex)) {
-				return (*dir).path().native();
-			}
-		}
-	}
-	return "";
-}
-
-ElfLoader *KernelManager::loadVDSO() {
-	// Symbols in Kernel that point to the vdso page
-	// ... the size is currently unknown
-	// TODO Find out the correct archirecture of the binary.
-	//
-	// vdso_image_64
-	// vdso_image_x32
-	// vdso_image_32_int80
-	// vdso_image_32_syscall
-	// vdso_image_32_sysenter
-
-	std::string vdsoString = std::string("[vdso]");
-	if (this->libraryMap.find(vdsoString) != this->libraryMap.end()) {
-		return this->libraryMap[vdsoString];
-	}
-
-	auto vdsoVar = Variable::findVariableByName("vdso_image_64");
-	assert(vdsoVar);
-
-	auto vdsoImage = vdsoVar->getInstance();
-
-	assert(vmi);
-	auto vdso = vmi->readVectorFromVA(
-		vdsoImage.memberByName("data").getRawValue<uint64_t>(false),
-		vdsoImage.memberByName("size").getValue<uint64_t>());
-
-	// Load VDSO page
-	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(vdso.data(), vdso.size());
-
-	auto vdsoLoader = dynamic_cast<ElfProcessLoader64 *>(vdsoFile->parseElf(ElfFile::ElfProgramType::ELFPROGRAMTYPEEXEC, "[vdso]", this));
-	vdsoLoader->parseElfFile();
-
-	this->libraryMap[vdsoString] = vdsoLoader;
-	return vdsoLoader;
+ParavirtState *Kernel::getParavirtState() {
+	return &this->paravirt;
 }

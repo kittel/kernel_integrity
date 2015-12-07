@@ -8,21 +8,20 @@
 #include <mutex>
 #include <vector>
 
+#include "libdwarfparser/symbolmanager.h"
 #include "libdwarfparser/instance.h"
 #include "libvmiwrapper/libvmiwrapper.h"
+#include "paravirt_state.h"
 
 class ElfLoader;
-class ElfProcessLoader;
 
-class KernelManager {
+class Kernel {
 public:
-	KernelManager();
-	virtual ~KernelManager() = default;
+	Kernel();
+	virtual ~Kernel() = default;
 
 	void setKernelDir(const std::string &dirName);
-	void setLibraryDir(const std::string &dirName);
 
-	VMIInstance *vmi;
 	void setVMIInstance(VMIInstance *vmi);
 
 	void loadKernelModules();
@@ -32,7 +31,7 @@ public:
 	void loadAllModules();
 	void loadModuleThread(std::list<std::string> &modList,
 	                      std::mutex &modMutex);
-	ElfLoader *loadModule(std::string moduleName);
+	ElfLoader *loadModule(const std::string &moduleName);
 	void parseSystemMap();
 
 	/*
@@ -58,28 +57,26 @@ public:
 
 	void updateRevMaps();
 
-	// Functions related to userspace
-	ElfLoader *loadLibrary(std::string libraryName);
+	ParavirtState *getParavirtState();
 
-	std::string findLibraryFile(std::string libName);
-	ElfProcessLoader* findLibByName(std::string name);
+	VMIInstance *vmi;
 
-	ElfLoader *loadVDSO();
+	/**
+	 * Symbol position tracking and querying.
+	 */
+	SymbolManager symbols;
 
 protected:
+	ParavirtState paravirt;
+
 	std::mutex moduleMapMutex;
-	typedef std::map<std::string, ElfLoader*> ModuleMap;
+	typedef std::unordered_map<std::string, ElfLoader*> ModuleMap;
 	ModuleMap moduleMap;
-
-	typedef std::map<std::string, ElfLoader*> LibraryMap;
-	LibraryMap libraryMap;
-
 
 private:
 	std::string kernelDirName;
-	std::vector<std::string> libDirName;
 
-	typedef std::map<std::string, Instance> ModuleInstanceMap;
+	typedef std::unordered_map<std::string, Instance> ModuleInstanceMap;
 	ModuleInstanceMap moduleInstanceMap;
 
 	Instance nextModule(Instance &instance);

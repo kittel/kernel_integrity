@@ -5,11 +5,10 @@
 
 #include "elffile.h"
 #include "elfloader.h"
-
-#include "libvmiwrapper/libvmiwrapper.h"
-#include "libdwarfparser/libdwarfparser.h"
-
 #include "helpers.h"
+#include "libdwarfparser/libdwarfparser.h"
+#include "libvmiwrapper/libvmiwrapper.h"
+#include "process.h"
 #include "taskmanager.h"
 
 /**
@@ -23,63 +22,65 @@
  * getStackContent: Read the given amount of bytes from the program stack
  * printVMAs:       print the memory mapping for the main binary
  */
-class ProcessValidator{
+class ProcessValidator {
 public:
-	ProcessValidator(ElfKernelLoader *kl, const std::string &binaryName,
-	                 VMIInstance *vmi, int32_t pid);
+	ProcessValidator(ElfKernelLoader *kl,
+	                 Process *process,
+	                 VMIInstance *vmi,
+	                 int32_t pid);
 	virtual ~ProcessValidator();
+
 	std::vector<uint8_t> getStackContent(size_t readAmount) const;
 	void printVMAs();
 
 	int checkEnvironment(const std::map<std::string, std::string> &inputMap);
 	int validateProcess();
 	int validatePage(page_info_t *page);
-protected:
 
+protected:
 private:
-	VMIInstance* vmi;
-	ElfKernelLoader* kl;
+	VMIInstance *vmi;
+	ElfKernelLoader *kl;
 	int32_t pid;
 
 	ElfProcessLoader *execLoader;
-	std::string binaryName;
+	Process *process;
 
-	ElfProcessLoader* vdsoLoader;
+	ElfProcessLoader *vdsoLoader;
 	TaskManager tm;
 
 	std::vector<VMAInfo> mappedVMAs;
-	std::map<VMAInfo*, ElfProcessLoader*> vmaToLoaderMap;
-	// contains only start-addresses
-	std::unordered_map<uint64_t, ElfProcessLoader*> addrToLoaderMap;
-	std::unordered_map<std::string, RelSym*> relSymMap;
+	std::unordered_map<uint64_t, ElfProcessLoader *> addrToLoaderMap;
+	std::unordered_map<std::string, RelSym> relSymMap;
 
 	ElfProcessLoader *lastLoader;
 
-	const uint64_t stdStackTop = 0x7ffffffdd000;
-	const uint64_t stdStackBot = 0x7ffffffff000;
-	const uint64_t dynVDSOAddr = 0x7ffff7ffa000;
-	const uint64_t statVDSOAddr = 0x7ffff7ffd000;
-	const uint16_t stdPageSize = 0x1000;
+	constexpr static uint64_t stdStackTop  = 0x7ffffffdd000;
+	constexpr static uint64_t stdStackBot  = 0x7ffffffff000;
+	constexpr static uint64_t dynVDSOAddr  = 0x7ffff7ffa000;
+	constexpr static uint64_t statVDSOAddr = 0x7ffff7ffd000;
+	constexpr static uint16_t stdPageSize  = 0x1000;
 
 	int evalLazy(uint64_t start, uint64_t addr);
 	int _validatePage(page_info_t *page);
 
-	ElfProcessLoader *loadExec(const std::string &pathName);
-
 	void processLoadRel();
-	void announceSyms(ElfProcessLoader* lib);
+	void announceSyms(ElfProcessLoader *lib);
 
-	ElfProcessLoader* getLoaderForAddress(uint64_t addr,
-	                                      ElfProcessLoader* backup);
+	ElfProcessLoader *findLoaderByAddress(const uint64_t addr) const;
 	ElfProcessLoader *findLoaderByName(const std::string &name) const;
-	const VMAInfo* findVMAByName(const std::string &name) const;
-	const VMAInfo* findVMAByAddress(const uint64_t address) const;
+	const VMAInfo *findVMAByName(const std::string &name) const;
+	const VMAInfo *findVMAByAddress(const uint64_t address) const;
+	RelSym *findSymbolByName(const std::string &name);
 
-	std::set<ElfProcessLoader *> getMappedLibs();
-	SectionInfo* getSegmentForAddress(uint64_t addr);
+	const std::set<ElfProcessLoader *> getMappedLibs() const;
+	SectionInfo *getSegmentForAddress(uint64_t addr);
 
-	void validateCodePage(VMAInfo* vma);
-	void validateDataPage(VMAInfo* vma);
+	void validateCodePage(VMAInfo *vma);
+	void validateDataPage(VMAInfo *vma);
+
+	std::unordered_map<std::basic_string<char>, RelSym>* getSymMap();
+
 };
 
 #endif /* PROCESSVALIDATOR_H */

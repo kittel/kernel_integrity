@@ -17,50 +17,54 @@
 
 class ElfFile64 : public ElfFile {
 public:
-	ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent);
+	ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent,
+	          SymbolManager *symspace);
 	virtual ~ElfFile64();
 
-	SectionInfo findSectionWithName(std::string sectionName);
-	SectionInfo findSectionByID(uint32_t sectionID);
-	bool isCodeAddress(uint64_t address);
-	bool isDataAddress(uint64_t address);
+	int getNrOfSections() override;
 
-	std::string sectionName(int sectionID);
-	uint8_t *sectionAddress(int sectionID);
-	uint64_t sectionAlign(int sectionID);
+	SectionInfo findSectionWithName(const std::string &sectionName) override;
+	SectionInfo findSectionByID(uint32_t sectionID) override;
+	bool isCodeAddress(uint64_t address) override;
+	bool isDataAddress(uint64_t address) override;
 
-	SegmentInfo findCodeSegment();
-	SegmentInfo findDataSegment();
+	std::string sectionName(int sectionID) override;
+	uint8_t *sectionAddress(int sectionID) override;
+	uint64_t sectionAlign(int sectionID) override;
 
-	std::string symbolName(uint32_t index);
+	SegmentInfo findCodeSegment() override;
+	SegmentInfo findDataSegment() override;
 
-	uint64_t findAddressOfVariable(std::string symbolName);
+	std::string symbolName(uint32_t index) override;
 
-	ElfLoader *parseElf(ElfFile::ElfProgramType type,
-	                    std::string name="",
-	                    KernelManager *parent=0);
+	uint64_t findAddressOfVariable(const std::string &symbolName) override;
 
-	bool isRelocatable();
-	void applyRelocations(ElfModuleLoader *loader);
-	virtual bool isDynamic();
-	std::vector<std::string> getDependencies();
+	ElfKernelLoader *parseKernel() override;
+	ElfModuleLoader *parseKernelModule(const std::string &name,
+	                                   Kernel *kernel) override;
+	ElfProcessLoader *parseProcess(const std::string &name,
+	                               Process *process,
+	                               Kernel *kernel) override;
 
-	virtual bool isExecutable();
 
-	Elf64_Ehdr * elf64Ehdr;
-	Elf64_Shdr * elf64Shdr;
-	Elf64_Phdr * elf64Phdr;
+	bool isRelocatable() override;
+	void applyRelocations(ElfModuleLoader *loader) override;
+	bool isDynamic() override;
+	bool isExecutable() override;
 
-	int getNrOfSections();
+	std::vector<RelSym> getSymbols() override;
+
+	std::vector<std::string> getDependencies() override;
+
+
+	Elf64_Ehdr *elf64Ehdr;
+	Elf64_Shdr *elf64Shdr;
+	Elf64_Phdr *elf64Phdr;
 
 	template<typename T>
 	void getRelEntries(std::vector<T> &ret, uint32_t type);
-	void getRelEntries(std::vector<Elf64_Rel> &ret);
-	void getRelaEntries(std::vector<Elf64_Rela> &ret);
-
-protected:
-
-private:
+	void getRelEntries(std::vector<Elf64_Rel> &ret) override;
+	void getRelaEntries(std::vector<Elf64_Rela> &ret) override;
 };
 
 #endif /* ELFFILE64_H */

@@ -13,6 +13,8 @@
 #include <map>
 #include <set>
 
+class ParavirtPatcher;
+
 
 /**
  * An ElfLoader is a memory representation we construct from the whitelisted
@@ -26,15 +28,15 @@ class ElfLoader {
 	friend class KernelValidator;
 	friend class ElfProcessLoader;
 	friend class ProcessValidator;
+	friend class ParavirtPatcher;
 
 public:
 	virtual ~ElfLoader();
 
-	virtual std::string getName() = 0;
-	ParavirtState *getPVState();
+	virtual const std::string &getName() = 0;
 
 protected:
-	ElfLoader(ElfFile *elffile, ParavirtState *para);
+	ElfLoader(ElfFile *elffile);
 
 	ElfFile *elffile;         // Wrapped ElfFile, provides to file and seg
 	Instance *debugInstance;  // Wrapped debug instance of the file
@@ -53,58 +55,24 @@ protected:
 	SectionInfo bssSection;   // The last memory segment
 	SectionInfo roDataSection;
 
-	const unsigned char *const *ideal_nops;
-	void add_nops(void *insns, uint8_t len);
-
-	ParavirtState *paravirtState;
-
-	uint8_t paravirt_patch_nop(void);
-	uint8_t paravirt_patch_ignore(unsigned len);
-	uint8_t paravirt_patch_insns(void *insnbuf,
-	                             unsigned len,
-	                             const char *start,
-	                             const char *end);
-	uint8_t paravirt_patch_jmp(void *insnbuf,
-	                           uint64_t target,
-	                           uint64_t addr,
-	                           uint8_t len);
-	uint8_t paravirt_patch_call(void *insnbuf,
-	                            uint64_t target,
-	                            uint16_t tgt_clobbers,
-	                            uint64_t addr,
-	                            uint16_t site_clobbers,
-	                            uint8_t len);
-	uint8_t paravirt_patch_default(uint32_t type,
-	                               uint16_t clobbers,
-	                               void *insnbuf,
-	                               uint64_t addr,
-	                               uint8_t len);
-	uint32_t paravirtNativePatch(uint32_t type,
-	                             uint16_t clobbers,
-	                             void *ibuf,
-	                             unsigned long addr,
-	                             unsigned len);
-
-	uint64_t get_call_destination(uint32_t type);
-
-	void applyAltinstr();
-	void applyParainstr();
+	void applyMcount(const SectionInfo &info, ParavirtPatcher *patcher);
+	void applyAltinstr(ParavirtPatcher *patcher);
 	void applySmpLocks();
-	void applyMcount(SectionInfo &info);
-	//void applyTracepoints(SectionInfo tracePoint, SectionInfo rodata,
-	//QByteArray &segmentData);
-	void applyJumpEntries(uint64_t jumpStart, uint32_t numberOfEntries);
-
-	//static QList<uint64_t> _paravirtJump;
-	//static QList<uint64_t> _paravirtCall;
+	void applyJumpEntries(uint64_t jumpStart,
+	                      uint32_t numberOfEntries,
+	                      ParavirtPatcher *patcher);
 
 	virtual void updateSectionInfoMemAddress(SectionInfo &info) = 0;
-	virtual void parseElfFile();
+
+	/**
+	 * Load sections of this elf file.
+	 */
+	virtual void parse();
 	virtual void initText() = 0;
 	virtual void initData() = 0;
 	virtual void addSymbols() = 0;
 
-	bool isCodeAddress(uint64_t addr);
+	virtual bool isCodeAddress(uint64_t addr);
 	virtual bool isDataAddress(uint64_t addr) = 0;
 };
 

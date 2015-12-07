@@ -45,8 +45,8 @@
 
 extern const unsigned char p6nops[];
 extern const unsigned char k8nops[];
-extern const unsigned char * const p6_nops[];
-extern const unsigned char * const k8_nops[];
+extern const unsigned char *const p6_nops[];
+extern const unsigned char *const k8_nops[];
 
 extern const char ud2a[];
 
@@ -107,36 +107,5 @@ DEF_NATIVE(pv_cpu_ops, swapgs, "swapgs");
 
 DEF_NATIVE(, mov32, "mov %edi, %eax");
 DEF_NATIVE(, mov64, "mov %rdi, %rax");
-
-#include "libdwarfparser/instance.h"
-
-class ParavirtState {
-public:
-	static ParavirtState *getInstance();
-
-	ParavirtState(bool hasParavirt = true);  // For ordinary use
-	virtual ~ParavirtState();
-
-	void updateState();
-
-	Instance pv_init_ops;
-	Instance pv_time_ops;
-	Instance pv_cpu_ops;
-	Instance pv_irq_ops;
-	Instance pv_apic_ops;
-	Instance pv_mmu_ops;
-	Instance pv_lock_ops;
-
-	uint64_t nopFuncAddress;
-	uint64_t ident32NopFuncAddress;
-	uint64_t ident64NopFuncAddress;
-
-	uint32_t pv_irq_opsOffset;
-	uint32_t pv_cpu_opsOffset;
-	uint32_t pv_mmu_opsOffset;
-
-private:
-	static ParavirtState *instance;
-};
 
 #endif  /* KERNELHEADERS_H */

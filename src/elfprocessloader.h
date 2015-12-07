@@ -1,6 +1,7 @@
 #ifndef ELFPROCESSLOADER_H
 #define ELFPROCESSLOADER_H
 
+#include "elffile.h"
 #include "elfloader.h"
 
 #include "taskmanager.h"
@@ -10,35 +11,24 @@
 // The beauty of forward declarations
 class ElfProcessLoader;
 class ElfKernelLoader;
-
-/* This class represents a symbol a loader may export for relocation */
-class RelSym {
-public:
-	std::string name;          // name of the symbol
-	uint64_t value;            // final vaddr after loading
-	uint8_t info;              // corresponding type and sym in parent
-	uint32_t shndx;            // linked section index in parent
-	ElfProcessLoader* parent;  // lib in which this sym is defined
-
-	RelSym(std::string, uint64_t, uint8_t, uint32_t, ElfProcessLoader *);
-	~RelSym();
-};
+class Process;
 
 class ElfProcessLoader : public ElfLoader {
 	friend class ProcessValidator;
 
 public:
-	ElfProcessLoader(ElfFile* elffile, KernelManager* parent, std::string name);
+	ElfProcessLoader(ElfFile *elffile, Kernel *kernel,
+	                 const std::string &name, Process *proc);
 
 	virtual ~ElfProcessLoader();
 
-	virtual void parseElfFile();  // Initialize the complete image
-
-	virtual std::string getName();
+	void parse() override;  // Initialize the complete image
 
 protected:
-	std::string execName;
-	KernelManager *kernel;
+	Kernel *kernel;
+	Process *proc;
+
+	std::string name;
 
 	void loadDependencies();
 
@@ -46,19 +36,15 @@ protected:
 	SegmentInfo dataSegmentInfo;
 
 	SectionInfo heapSection;  // handler for optional heap segment
-
 	std::vector<uint8_t> dataSegmentContent;  // actual dataSegment data
 
-	ElfFile *getLibraryWithName(std::string name);
-	//virtual std::vector<uint8_t> *buildSegfromLib(ElfFile *lib);
+	std::vector<RelSym> providedSyms; // symbols provided by this loader
+	virtual std::vector<RelSym> getProvidedSyms();
 
-	virtual void initProvidedSymbols() = 0;
+	void initText() override;
+	void initData() override;
 
-	void initText();
-	void initData();
-
-	virtual void applyLoadRel(std::unordered_map<std::string, RelSym*>* map) = 0;
-	virtual std::vector<RelSym*> getProvidedSyms() = 0;
+	virtual void applyLoadRel(class ProcessValidator *val) = 0;
 
 	virtual uint64_t getTextStart() = 0;
 	virtual uint64_t getDataStart() = 0;
@@ -67,19 +53,21 @@ protected:
 	virtual uint32_t getTextSize() = 0;
 	virtual uint32_t getDataSize() = 0;
 
-	SectionInfo* getSegmentForAddress(uint64_t addr);
+	SectionInfo *getSegmentForAddress(uint64_t addr);
 
-	virtual bool isCodeAddress(uint64_t addr);
-	virtual bool isDataAddress(uint64_t addr);
+	bool isCodeAddress(uint64_t addr) override;
+	bool isDataAddress(uint64_t addr) override;
 
 	virtual bool isTextOffset(uint64_t off);
 	virtual bool isDataOffset(uint64_t off);
 
 	virtual int evalLazy(uint64_t addr,
-	                     std::unordered_map<std::string, RelSym*>* map) = 0;
+	                     std::unordered_map<std::string, RelSym> *map) = 0;
 
 	virtual void updateSectionInfoMemAddress(SectionInfo& info);
 	virtual void addSymbols();
+
+	const std::string &getName() override;
 };
 
 #include "elfprocessloader64.h"
