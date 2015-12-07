@@ -31,6 +31,7 @@ AC_LIBTOOL_DLOPEN
 
 # use the C++ compiler for the following checks
 AC_LANG([C++])
+AM_CXXFLAGS="$AM_CXXFLAGS --std=c++14"
 
 
 # Checks for libraries.
@@ -111,31 +112,31 @@ AC_SUBST([AM_LDFLAGS])
 AC_SUBST([LIBS])
 
 
-AC_CHECK_LIB(vmi, vmi_init, [], 
+AC_CHECK_LIB([vmi], [vmi_init], [],
 			 [AC_MSG_ERROR(["Error! You need to have libvmi around."])]
 )
-AC_CHECK_HEADERS([libvmi/libvmi.h], [], 
+AC_CHECK_HEADERS([libvmi/libvmi.h], [],
 				 [AC_MSG_ERROR(["Error! You need to have libvmi headers around."])]
 )
-AC_CHECK_LIB(elf, elf_begin, [], 
-			 [AC_MSG_ERROR(["Error! You need to have libel around."])]
+AC_CHECK_LIB([elf], [elf_begin], [],
+			 [AC_MSG_ERROR(["Error! You need to have libelf around."])]
 )
-AC_CHECK_LIB(dwarf, dwarf_init, [], 
-			 [AC_MSG_ERROR(["Error! You need to have libdwarf around."])], 
+AC_CHECK_LIB([dwarf], [dwarf_init], [],
+			 [AC_MSG_ERROR(["Error! You need to have libdwarf around."])],
 			 ["-lelf"]
 )
-AC_CHECK_HEADERS([libdwarf/libdwarf.h], [], 
+AC_CHECK_HEADERS([libdwarf/libdwarf.h], [],
 				 [AC_MSG_ERROR(["Error! You need to have libdwarf headers around."])]
 )
 
 # Checks for libraries.
 OLD_CPPFLAGS=$CPPFLAGS
 CPPFLAGS="$CPPFLAGS  $GLIB_CFLAGS"
-AC_CHECK_HEADERS([libdwarfparser/libdwarfparser.h], [], 
+AC_CHECK_HEADERS([libdwarfparser/libdwarfparser.h], [],
 				 [AC_MSG_ERROR(["Error! You need to have libdwarfparser headers around."])]
 )
 
-AC_CHECK_HEADERS([libvmiwrapper/libvmiwrapper.h], [], 
+AC_CHECK_HEADERS([libvmiwrapper/libvmiwrapper.h], [],
 				 [AC_MSG_ERROR(["Error! You need to have libvmiwrapper headers around."])]
 )
 CPPFLAGS=$OLD_CPPFLAGS
