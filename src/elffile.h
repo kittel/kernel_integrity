@@ -130,14 +130,12 @@ public:
 	/**
 	 * Elffile-from-buffer factory method.
 	 */
-	static ElfFile *loadElfFileFromBuffer(uint8_t *buf, size_t size,
-	                                      SymbolManager *symspace) throw();
+	static ElfFile *loadElfFileFromBuffer(uint8_t *buf, size_t size);
 
 	/**
 	 * Main elffile factory method.
 	 */
-	static ElfFile *loadElfFile(const std::string &filename,
-	                            SymbolManager *symspace) throw();
+	static ElfFile *loadElfFile(const std::string &filename);
 
 	/**
 	 * Parse this elf file as a kernel blob.
@@ -180,8 +178,7 @@ protected:
 	        size_t fileSize,
 	        uint8_t *fileContent,
 	        ElfType type,
-	        ElfProgramType programType,
-	        SymbolManager *symspace);
+	        ElfProgramType programType);
 
 	FILE *fd;
 	size_t fileSize;
@@ -193,6 +190,8 @@ protected:
 
 	typedef std::map<std::string, uint64_t> SymbolNameMap;
 	SymbolNameMap symbolNameMap;
+
+	void parseDwarf();
 };
 
 #include "elffile64.h"

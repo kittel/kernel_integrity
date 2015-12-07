@@ -106,29 +106,17 @@ SegmentInfo::~SegmentInfo() {}
 
 ElfFile::ElfFile(FILE *fd, size_t fileSize, uint8_t *fileContent,
                  ElfType type,
-                 ElfProgramType programType,
-                 SymbolManager *symspace)
+                 ElfProgramType programType)
 	:
-	shstrindex(0),
-	symindex(0),
-	strindex(0),
-	symbols{symspace},
-	fd(fd),
-	fileSize(fileSize),
-	fileContent(fileContent),
-	type(type),
-	programType(programType),
-	filename("") {
-
-	try {
-		DwarfParser::parseDwarfFromFD(this->getFD(), this->symbols);
-	} catch(DwarfException &e) {
-		std::cout << e.what() << std::endl;
-	}
-#ifdef DEBUG
-	std::cout << "Done loading elfFile" << std::endl;
-#endif
-}
+	shstrindex{0},
+	symindex{0},
+	strindex{0},
+	fd{fd},
+	fileSize{fileSize},
+	fileContent{fileContent},
+	type{type},
+	programType{programType},
+	filename{""} {}
 
 ElfFile::~ElfFile(){
 	if(this->fileContent != nullptr){
@@ -137,8 +125,15 @@ ElfFile::~ElfFile(){
 	fclose(this->fd);
 }
 
-ElfFile* ElfFile::loadElfFile(const std::string &filename,
-                              SymbolManager *symspace) throw(){
+void ElfFile::parseDwarf() {
+	try {
+		DwarfParser::parseDwarfFromFD(this->getFD(), this->symbols);
+	} catch(DwarfException &e) {
+		std::cout << e.what() << std::endl;
+	}
+}
+
+ElfFile* ElfFile::loadElfFile(const std::string &filename){
 	FILE* fd = nullptr;
 	fd = fopen(filename.c_str(), "rb");
 
@@ -176,7 +171,7 @@ ElfFile* ElfFile::loadElfFile(const std::string &filename,
 
 
 	if(fileContent[4] == ELFCLASS64) {
-		elfFile = new ElfFile64(fd, fileSize, fileContent, symspace);
+		elfFile = new ElfFile64(fd, fileSize, fileContent);
 	}
 	elfFile->fd = fd;
 	elfFile->fileSize = fileSize;
@@ -185,8 +180,7 @@ ElfFile* ElfFile::loadElfFile(const std::string &filename,
 	return elfFile;
 }
 
-ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size,
-                                        SymbolManager *symspace) throw() {
+ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) {
 
 	ElfFile* elfFile = 0;
 
@@ -195,7 +189,7 @@ ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size,
 	FILE* fd = fmemopen(fileContent, fileSize, "rb");
 
 	if(fileContent[4] == ELFCLASS64) {
-		elfFile = new ElfFile64(fd, fileSize, fileContent, symspace);
+		elfFile = new ElfFile64(fd, fileSize, fileContent);
 	}
 	elfFile->fd = fd;
 

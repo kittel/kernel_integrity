@@ -29,7 +29,7 @@ namespace fs = boost::filesystem;
 
 Kernel::Kernel()
 	:
-	paravirt{this, true} {}
+	paravirt{this} {}
 
 void Kernel::setVMIInstance(VMIInstance *vmi) {
 	this->vmi = vmi;
@@ -61,7 +61,7 @@ ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
 		std::cout << moduleName << ": Module File not found" << std::endl;
 		return nullptr;
 	}
-	ElfFile *file = ElfFile::loadElfFile(filename, &this->symbols);
+	ElfFile *file = ElfFile::loadElfFile(filename);
 
 	auto module = file->parseKernelModule(moduleName, this);
 

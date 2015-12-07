@@ -53,7 +53,7 @@ ElfLoader *Process::loadLibrary(const std::string &libraryNameOrig) {
 	}
 
 	// create ELF Object
-	ElfFile *libraryFile = ElfFile::loadElfFile(filename, &this->symbols);
+	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
 
 	auto library = dynamic_cast<ElfProcessLoader64 *>(
 		libraryFile->parseProcess(libraryName, this, this->kernel));
@@ -85,7 +85,7 @@ std::string Process::findLibraryFile(const std::string &libName) {
 
 ElfProcessLoader *Process::loadExec() {
 	// Create ELF Object
-	ElfFile *execFile = ElfFile::loadElfFile(this->binaryName, &this->symbols);
+	ElfFile *execFile = ElfFile::loadElfFile(this->binaryName);
 
 	std::string name = this->binaryName.substr(this->binaryName.rfind("/", std::string::npos) + 1, std::string::npos);
 
@@ -122,7 +122,7 @@ ElfLoader *Process::loadVDSO() {
 		vdsoImage.memberByName("size").getValue<uint64_t>());
 
 	// Load VDSO page
-	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(vdso.data(), vdso.size(), &this->symbols);
+	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(vdso.data(), vdso.size());
 
 	auto vdsoLoader = dynamic_cast<ElfProcessLoader64 *>(vdsoFile->parseProcess("[vdso]", this, this->kernel));
 	vdsoLoader->parse();

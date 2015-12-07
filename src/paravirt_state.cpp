@@ -7,29 +7,24 @@
 #include "libdwarfparser/variable.h"
 
 
-ParavirtState::ParavirtState(Kernel *kernel, bool hasParavirt)
+ParavirtState::ParavirtState(Kernel *kernel)
 	:
-	kernel{kernel} {
-
-	if (hasParavirt) {
-		this->updateState();
-
-		// get the current cpu architecture to adapt nops
-		Instance ideal_nops_instance = this->kernel->symbols.findVariableByName("ideal_nops")->getInstance();
-		uint64_t p6_address = this->kernel->symbols.findVariableByName("p6_nops")->getInstance().getAddress();
-		uint64_t k8_address = this->kernel->symbols.findVariableByName("k8_nops")->getInstance().getAddress();
-
-		uint64_t nopaddr = ideal_nops_instance.getRawValue<uint64_t>(false);
-
-		if (nopaddr == p6_address) {
-			this->ideal_nops = p6_nops;
-		} else if (nopaddr == k8_address) {
-			this->ideal_nops = k8_nops;
-		}
-	}
-}
+	kernel{kernel} {}
 
 void ParavirtState::updateState() {
+	// get the current cpu architecture to adapt nops
+	Instance ideal_nops_instance = this->kernel->symbols.findVariableByName("ideal_nops")->getInstance();
+	uint64_t p6_address = this->kernel->symbols.findVariableByName("p6_nops")->getInstance().getAddress();
+	uint64_t k8_address = this->kernel->symbols.findVariableByName("k8_nops")->getInstance().getAddress();
+
+	uint64_t nopaddr = ideal_nops_instance.getRawValue<uint64_t>(false);
+
+	if (nopaddr == p6_address) {
+		this->ideal_nops = p6_nops;
+	} else if (nopaddr == k8_address) {
+		this->ideal_nops = k8_nops;
+	}
+
 	std::unordered_map<Instance *, std::string> pv_ops = {
 		{&this->pv_init_ops, "pv_init_ops"},
 		{&this->pv_time_ops, "pv_time_ops"},
@@ -42,7 +37,9 @@ void ParavirtState::updateState() {
 
 	for (auto &it : pv_ops) {
 		Variable *var = this->kernel->symbols.findVariableByName(it.second);
-		*it.first = var->getInstance();
+		if(var){
+			*it.first = var->getInstance();
+		}
 	}
 
 	std::unordered_map<uint64_t *, std::string> pv_funcs = {

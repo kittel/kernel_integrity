@@ -7,7 +7,7 @@ class Kernel;
 
 class ParavirtState {
 public:
-	ParavirtState(Kernel *kernel, bool hasParavirt=true);
+	ParavirtState(Kernel *kernel);
 	virtual ~ParavirtState() = default;
 
 	void updateState();

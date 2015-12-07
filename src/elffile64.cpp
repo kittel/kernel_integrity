@@ -11,15 +11,13 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent,
-                     SymbolManager *symspace)
+ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 	:
 	ElfFile(fd,
 	        fileSize,
 	        fileContent,
 	        ElfType::ELFTYPE64,
-	        ElfProgramType::ELFPROGRAMTYPEEXEC,
-	        symspace) {  // TODO make this general
+	        ElfProgramType::ELFPROGRAMTYPEEXEC) {  // TODO make this general
 
 	uint8_t *elfEhdr = this->fileContent;
 	this->elf64Ehdr  = (Elf64_Ehdr *)elfEhdr;
@@ -50,18 +48,28 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent,
 ElfFile64::~ElfFile64() {}
 
 ElfKernelLoader *ElfFile64::parseKernel() {
-	return new ElfKernelLoader64(this);
+	auto kernel = new ElfKernelLoader64(this);
+	this->symbols = &kernel->symbols;
+	this->parseDwarf();
+	kernel->getParavirtState()->updateState();
+	return kernel;
 }
 
 ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
                                               Kernel *kernel) {
-	return new ElfModuleLoader64(this, name, kernel);
+	auto mod = new ElfModuleLoader64(this, name, kernel);
+	this->symbols = &kernel->symbols;
+	this->parseDwarf();
+	return mod;
 }
 
 ElfProcessLoader *ElfFile64::parseProcess(const std::string &name,
                                           Process *process,
                                           Kernel *kernel) {
-	return new ElfProcessLoader64(this, kernel, name, process);
+	auto proc = new ElfProcessLoader64(this, kernel, name, process);
+	this->symbols = &process->symbols;
+	this->parseDwarf();
+	return proc;
 }
 
 int ElfFile64::getNrOfSections() {

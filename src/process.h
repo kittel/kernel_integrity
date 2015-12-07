@@ -41,9 +41,10 @@ public:
 	 * Return the pointer to the associated kernel
 	 */
 	Kernel *getKernel() const;
+	
+	SymbolManager symbols;
 
 protected:
-	SymbolManager symbols;
 	Kernel *kernel;
 
 	typedef std::unordered_map<std::string, ElfLoader*> LibraryMap;

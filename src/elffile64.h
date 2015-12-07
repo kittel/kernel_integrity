@@ -17,8 +17,7 @@
 
 class ElfFile64 : public ElfFile {
 public:
-	ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent,
-	          SymbolManager *symspace);
+	ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent);
 	virtual ~ElfFile64();
 
 	int getNrOfSections() override;

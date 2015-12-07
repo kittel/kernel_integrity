@@ -5,7 +5,7 @@
 
 class ElfKernelLoader64 : public ElfKernelLoader {
 public:
-	ElfKernelLoader64(ElfFile64* elffile);
+	ElfKernelLoader64(ElfFile64 *elffile);
 	virtual ~ElfKernelLoader64();
 
 protected:

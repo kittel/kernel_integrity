@@ -57,13 +57,9 @@ ElfKernelLoader *KernelValidator::loadKernel(const std::string &dirName) {
 	std::string kernelName = dirName;
 	kernelName.append("/vmlinux");
 
-	SymbolManager symspace;
-	ElfFile *kernelFile = ElfFile::loadElfFile(kernelName, &symspace);
+	ElfFile *kernelFile = ElfFile::loadElfFile(kernelName);
 
 	ElfKernelLoader *kernelLoader = kernelFile->parseKernel();
-
-	// store symbol namespace
-	kernelLoader->symbols.replaceBy(symspace);
 
 	kernelLoader->setKernelDir(dirName);
 	kernelLoader->parseSystemMap();
