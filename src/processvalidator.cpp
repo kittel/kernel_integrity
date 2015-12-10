@@ -42,7 +42,9 @@ ProcessValidator::~ProcessValidator() {}
 
 int ProcessValidator::validateProcess() {
 	// check if all mapped pages are known
-	std::cout << "Starting page validation ..." << std::endl;
+	std::cout << COLOR_GREEN
+	    << "Starting page validation ..."
+	    COLOR_RESET << std::endl;
 
 	PageMap executablePageMap = vmi->getPages(pid);
 	for (auto &page : executablePageMap) {

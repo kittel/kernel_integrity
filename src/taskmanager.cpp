@@ -33,26 +33,18 @@ void VMAInfo::print() {
  */
 TaskManager::TaskManager(Kernel *kernel)
 	:
-	initTask(),
-	kernel(kernel) {
+	initTask{},
+	kernel{kernel} {
 
 	auto var = this->kernel->symbols.findVariableByName("init_task");
 	assert(var->getLocation());
 
 	auto init = var->getInstance();
 	// get the real init task by looking at the next list_head in tasks
-	init           = init.memberByName("tasks").memberByName("next", true);
+	init           = init.memberByName("tasks");
+	init           = init.memberByName("next", true);
 	init           = init.changeBaseType("task_struct", "tasks");
 	this->initTask = init;
-
-#ifdef DEBUG
-	std::cout << "debug:(TaskManager()) initTaskStruct: addr = " << std::hex
-	          << (void *)this->initTask.getAddress()
-	          << ", length = " << (void *)this->initTask.getLength()
-	          << ", type = "
-	          << this->initTask.getType()->getNameForType(this->initTask.getType())
-	          << std::endl;
-#endif
 }
 
 TaskManager::~TaskManager() {}
