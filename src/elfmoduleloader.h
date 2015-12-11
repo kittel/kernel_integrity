@@ -11,7 +11,6 @@ public:
 	                Kernel *kernel=nullptr);
 	virtual ~ElfModuleLoader();
 
-	virtual void applyRelocationsOnSection(uint32_t relSectionID) = 0;
 	const std::string &getName() override;
 
 protected:

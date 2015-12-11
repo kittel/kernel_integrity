@@ -47,7 +47,9 @@ public:
 
 
 	bool isRelocatable() override;
-	void applyRelocations(ElfModuleLoader *loader) override;
+	void applyRelocations(ElfLoader *loader,
+	                      Kernel *kernel,
+	                      Process *process) override;
 	bool isDynamic() override;
 	bool isExecutable() override;
 
@@ -64,6 +66,12 @@ public:
 	void getRelEntries(std::vector<T> &ret, uint32_t type);
 	void getRelEntries(std::vector<Elf64_Rel> &ret) override;
 	void getRelaEntries(std::vector<Elf64_Rela> &ret) override;
+
+private:
+	void applyRelocationsOnSection(uint32_t relSectionID,
+	                               ElfLoader *loader,
+	                               Kernel *kernel,
+	                               Process *process);
 };
 
 #endif /* ELFFILE64_H */

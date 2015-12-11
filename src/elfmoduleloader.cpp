@@ -67,7 +67,7 @@ void ElfModuleLoader::initText(void) {
 	std::cout << COLOR_GREEN "Loading module " << this->modName;
 	std::cout << COLOR_NORM << std::endl;
 
-	this->elffile->applyRelocations(this);
+	this->elffile->applyRelocations(this, kernel);
 
 	this->textSegment = this->elffile->findSectionWithName(".text");
 	this->updateSectionInfoMemAddress(this->textSegment);

@@ -34,6 +34,8 @@ public:
 	virtual ~ElfLoader();
 
 	virtual const std::string &getName() = 0;
+	virtual void updateSectionInfoMemAddress(SectionInfo &info) = 0;
+
 
 protected:
 	ElfLoader(ElfFile *elffile);
@@ -62,7 +64,6 @@ protected:
 	                      uint32_t numberOfEntries,
 	                      ParavirtPatcher *patcher);
 
-	virtual void updateSectionInfoMemAddress(SectionInfo &info) = 0;
 
 	/**
 	 * Load sections of this elf file.

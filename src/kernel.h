@@ -55,6 +55,8 @@ public:
 	uint64_t getContainingSymbol(uint64_t address);
 	bool isFunction(uint64_t address);
 
+	virtual uint64_t findAddressOfSymbol(const std::string &symbolName);
+
 	void updateRevMaps();
 
 	ParavirtState *getParavirtState();
@@ -80,7 +82,7 @@ private:
 	ModuleInstanceMap moduleInstanceMap;
 
 	Instance nextModule(Instance &instance);
-	std::string findModuleFile(std::string modName);
+	std::string findModuleFile(std::string modName) const;
 
 	typedef std::unordered_map<std::string, uint64_t> SymbolMap;
 	typedef std::map<uint64_t, std::string> SymbolRevMap;

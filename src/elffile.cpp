@@ -33,7 +33,7 @@ RelSym::~RelSym() {}
 SectionInfo::SectionInfo()
 	:
 	segName(),
-	segID(0),
+	segID(-1),
 	index(0),
 	memindex(0),
 	size(0) {}

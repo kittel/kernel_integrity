@@ -172,7 +172,9 @@ bool ElfFile64::isExecutable() {
 	return (elf64Ehdr->e_type == ET_EXEC);
 }
 
-void ElfFile64::applyRelocations(ElfModuleLoader *loader) {
+void ElfFile64::applyRelocations(ElfLoader *loader,
+                                 Kernel *kernel,
+                                 Process *process) {
 	if (!this->isRelocatable()) {
 		return;
 	}
@@ -194,8 +196,117 @@ void ElfFile64::applyRelocations(ElfModuleLoader *loader) {
 		//	//TODO this is only in the i386 case!
 		//	//apply_relocate(fileContent, elf64Shdr, symindex, strindex, i);
 		//}
-		if (elf64Shdr[i].sh_type == SHT_RELA) {
-			loader->applyRelocationsOnSection(i);
+		if (this->elf64Shdr[i].sh_type == SHT_RELA) {
+			this->applyRelocationsOnSection(i, loader, kernel, process);
+		}
+	}
+	return;
+}
+
+void ElfFile64::applyRelocationsOnSection(uint32_t relSectionID,
+                                          ElfLoader* loader,
+                                          Kernel *kernel,
+                                          Process *process) {
+
+	Elf32_Word sectionID    = this->elf64Shdr[relSectionID].sh_info;
+	std::string sectionName = this->sectionName(sectionID);
+	bool isAltinstrSection = false;
+	if (sectionName.compare(".altinstructions") == 0) {
+		isAltinstrSection = true;
+	}
+
+	SectionInfo sectionInfo = this->findSectionByID(sectionID);
+	loader->updateSectionInfoMemAddress(sectionInfo);
+
+	SectionInfo relSectionInfo = this->findSectionByID(relSectionID);
+
+	Elf64_Rela *rel = (Elf64_Rela *)relSectionInfo.index;
+	Elf64_Sym *symBase = (Elf64_Sym *)this->sectionAddress(this->symindex);
+
+	// TODO move this to a dedicated function if used with kernel modules
+	SectionInfo percpuDataSegment = this->findSectionWithName(".data..percpu");
+
+	// static member within the for loop
+	SectionInfo symRelSectionInfo;
+
+	for (uint32_t i = 0; i < relSectionInfo.size / sizeof(*rel); i++) {
+		void *locInElf             = 0;
+		void *locInMem             = 0;
+		void *locOfRelSectionInMem = 0;
+		void *locOfRelSectionInElf = 0;
+
+		/* This is where to make the change */
+		locInElf = (void *)((char *)sectionInfo.index + rel[i].r_offset);
+		locInMem = (void *)((char *)sectionInfo.memindex + rel[i].r_offset);
+
+		Elf64_Sym *sym = symBase + ELF64_R_SYM(rel[i].r_info);
+
+		if (symRelSectionInfo.segID != sym->st_shndx) {
+			symRelSectionInfo =
+			    this->findSectionByID(sym->st_shndx);
+			loader->updateSectionInfoMemAddress(symRelSectionInfo);
+		}
+
+		if(sym->st_shndx == percpuDataSegment.segID) {
+		//if (sym->st_shndx == percpuDataSegment.segID) {
+			assert(false); // TODO handle percpuDataSegment
+			// Instance currentModule = this->kernel->getKernelModuleInstance(this->modName);
+			//symRelSectionInfo.memindex =
+			//    (void *)currentModule.memberByName("percpu")
+			//        .getRawValue<uint64_t>(false);
+		}
+
+		switch (sym->st_shndx) {
+		case SHN_COMMON:
+			assert(false);
+			break;
+		case SHN_ABS:
+			break;
+		case SHN_UNDEF:
+			if (process) {
+				//sym->st_value = loader->findAddressOfSymbol(
+				//                            this->symbolName(sym->st_name));
+			} else {
+				sym->st_value = kernel->findAddressOfSymbol(
+				                            this->symbolName(sym->st_name));
+			}
+			break;
+		default:
+			locOfRelSectionInElf = (void *)symRelSectionInfo.index;
+			locOfRelSectionInMem = (void *)symRelSectionInfo.memindex;
+
+			if (sym->st_value < (long unsigned int)locOfRelSectionInMem) {
+				sym->st_value += (long unsigned int)locOfRelSectionInMem;
+			}
+			break;
+		}
+
+		uint64_t val = sym->st_value + rel[i].r_addend;
+
+		switch (ELF64_R_TYPE(rel[i].r_info)) {
+		case R_X86_64_NONE: break;
+		case R_X86_64_64: *(uint64_t *)locInElf = val; break;
+		case R_X86_64_32:
+			*(uint64_t *)locInElf = val;
+			assert(val == *(uint64_t *)locInElf);
+			break;
+		case R_X86_64_32S:
+			*(uint32_t *)locInElf = val;
+			assert(val == (uint64_t) *(int32_t *)locInElf);
+			break;
+		case R_X86_64_PC32:
+			if (isAltinstrSection) {
+				// This is later used to copy some memory
+				val = val - (uint64_t)locOfRelSectionInMem +
+				      (uint64_t)locOfRelSectionInElf - (uint64_t)locInElf;
+			} else {
+				val -= (uint64_t)locInMem;
+			}
+			*(uint32_t *)locInElf = val;
+			break;
+		default:
+			assert(false);
+			return;
 		}
 	}
 	return;

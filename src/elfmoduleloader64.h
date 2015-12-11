@@ -10,10 +10,7 @@ public:
 	                  Kernel *kernel=nullptr);
 	virtual ~ElfModuleLoader64();
 
-	void applyRelocationsOnSection(uint32_t relSectionID);
-
 protected:
-	uint64_t relocateShnUndef(const std::string &symbolName);
 	void addSymbols();
 };
 

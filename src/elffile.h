@@ -20,6 +20,7 @@ class ElfModuleLoader;
 class ElfKernelLoader;
 class ElfProcessLoader;
 class Kernel;
+class Process;
 class SymbolManager;
 class Process;
 
@@ -157,7 +158,9 @@ public:
 	                                       Kernel *kernel) = 0;
 
 	virtual bool isRelocatable() = 0;
-	virtual void applyRelocations(ElfModuleLoader *loader) = 0;
+	virtual void applyRelocations(ElfLoader *loader,
+	                              Kernel *kernel,
+	                              Process *process = NULL) = 0;
 	virtual bool isDynamic() = 0;
 	virtual bool isExecutable() = 0;
 

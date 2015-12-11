@@ -117,7 +117,7 @@ Instance Kernel::nextModule(Instance &instance) {
 	return next;
 }
 
-std::string Kernel::findModuleFile(std::string modName) {
+std::string Kernel::findModuleFile(std::string modName) const {
 	std::replace(modName.begin(), modName.end(), '-', '_');
 	size_t start_pos = 0;
 	while ((start_pos = modName.find("_", start_pos)) != std::string::npos) {
@@ -322,3 +322,40 @@ void Kernel::parseSystemMap() {
 ParavirtState *Kernel::getParavirtState() {
 	return &this->paravirt;
 }
+
+uint64_t Kernel::findAddressOfSymbol(const std::string &symbolName) {
+	// First look into the system map.
+	// As we depend on dwarf anyway we use that information to find
+	// a variable.
+
+	uint64_t address = this->getSystemMapAddress(symbolName);
+	if (address != 0) {
+		return address;
+	}
+	address = this->getSymbolAddress(symbolName);
+	if (address != 0) {
+		return address;
+	}
+	address = this->getFunctionAddress(symbolName);
+	if (address != 0) {
+		return address;
+	}
+
+	// Variable not found in system.map
+	// Try to find the variable by name in insight.
+	Function *func = this->symbols.findFunctionByName(symbolName);
+	if (func && func->getAddress()) {
+		return func->getAddress();
+	}
+
+	Variable *var = this->symbols.findVariableByName(symbolName);
+	if (var && var->getLocation()) {
+		return var->getLocation();
+	}
+	std::cout << COLOR_RED << COLOR_BOLD
+	          << "Could not find address for variable " << symbolName
+	          << COLOR_NORM << COLOR_BOLD_OFF << std::endl;
+	assert(false);
+	return 0;
+}
+

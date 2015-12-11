@@ -96,7 +96,8 @@ void Process::loadExec() {
 	// Create ELF Object
 	ElfFile *execFile = ElfFile::loadElfFile(this->binaryName);
 
-	std::string name = this->binaryName.substr(this->binaryName.rfind("/", std::string::npos) + 1, std::string::npos);
+	std::string name = this->binaryName.substr(
+	    this->binaryName.rfind("/", std::string::npos) + 1, std::string::npos);
 
 	this->execLoader = execFile->parseProcess(name, this, this->kernel);
 	execLoader->parse();

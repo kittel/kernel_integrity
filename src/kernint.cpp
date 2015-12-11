@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 		{0, 0, 0, 0}
 	};
 
-	while ((c = getopt_long(argc, argv, ":hg:lk:cet:u:p:b:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, ":hg:lk:acet:u:p:b:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 0: break;
 
