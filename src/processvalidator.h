@@ -17,7 +17,6 @@
  * TaskManager, ElfProcessLoader and VMIInstance
  *
  * validatePage:    Check the given page for mutations.
- * loadExec:        Load the trusted Executable for validation
  * checkEnv:        Validate the envVars, using the given default values
  * getStackContent: Read the given amount of bytes from the program stack
  * printVMAs:       print the memory mapping for the main binary
@@ -43,7 +42,6 @@ private:
 	ElfKernelLoader *kl;
 	int32_t pid;
 
-	ElfProcessLoader *execLoader;
 	Process *process;
 
 	ElfProcessLoader *vdsoLoader;

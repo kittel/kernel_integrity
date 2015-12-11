@@ -21,7 +21,7 @@ public:
 
 	void setLibraryDir(const std::string &dirName);
 
-	ElfProcessLoader *loadExec();
+	ElfProcessLoader *getExecLoader();
 	ElfLoader *loadVDSO();
 
 	const std::string &getName();
@@ -46,6 +46,9 @@ public:
 
 protected:
 	Kernel *kernel;
+
+	ElfProcessLoader *execLoader;
+	void loadExec();
 
 	typedef std::unordered_map<std::string, ElfLoader*> LibraryMap;
 	LibraryMap libraryMap;

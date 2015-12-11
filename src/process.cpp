@@ -17,6 +17,7 @@ namespace fs = boost::filesystem;
 Process::Process(const std::string &binaryName, Kernel *kernel)
 	:
 	kernel{kernel},
+	execLoader{0},
 	binaryName{binaryName} {}
 
 
@@ -83,16 +84,23 @@ std::string Process::findLibraryFile(const std::string &libName) {
 	return "";
 }
 
-ElfProcessLoader *Process::loadExec() {
+ElfProcessLoader *Process::getExecLoader() {
+	if (!this->execLoader) {
+		this->loadExec();
+	}
+	assert(this->execLoader);
+	return this->execLoader;
+}
+
+void Process::loadExec() {
 	// Create ELF Object
 	ElfFile *execFile = ElfFile::loadElfFile(this->binaryName);
 
 	std::string name = this->binaryName.substr(this->binaryName.rfind("/", std::string::npos) + 1, std::string::npos);
 
-	ElfProcessLoader *execLoader = execFile->parseProcess(name, this, this->kernel);
+	this->execLoader = execFile->parseProcess(name, this, this->kernel);
 	execLoader->parse();
-
-	return execLoader;
+	return;
 }
 
 

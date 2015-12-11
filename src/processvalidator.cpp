@@ -29,8 +29,6 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 	std::cout << "ProcessValidator got: " << this->process->getName() << std::endl;
 
-	this->process->loadExec();
-
 	this->mappedVMAs = tm.getVMAInfo(pid);
 
 	// process load-time relocations
@@ -80,12 +78,10 @@ void ProcessValidator::validateCodePage(VMAInfo *vma) {
 	ElfProcessLoader *binary = nullptr;
 
 	if (this->process->getName().length() >= vma->name.length() &&
-	    this->process->getName().compare(this->process->getName().length()
-	                                     - vma->name.length(),
-	                                     vma->name.length(),
-	                                     vma->name) == 0) {
-		binary = this->execLoader;
-
+	    this->process->getName().compare(
+	        this->process->getName().length() - vma->name.length(),
+	        vma->name.length(), vma->name) == 0) {
+		binary = this->process->getExecLoader();
 	} else {
 		ElfProcessLoader *lib = this->findLoaderByName(vma->name);
 		if (!lib) {
@@ -98,6 +94,8 @@ void ProcessValidator::validateCodePage(VMAInfo *vma) {
 		}
 		binary = lib;
 	}
+
+	assert(binary);
 
 	const uint8_t *fileContent = 0;
 	const uint8_t *memContent  = 0;
@@ -363,7 +361,7 @@ int ProcessValidator::_validatePage(page_info_t *page) {
 	// address here everytime
 	if (page->vaddr >= this->stdStackTop && page->vaddr <= this->stdStackBot) {
 		std::cout << "Located in stack of "
-		          << getNameFromPath(this->execLoader->getName()) << std::endl;
+		          << getNameFromPath(this->process->getExecLoader()->getName()) << std::endl;
 		return 0;
 	}
 
