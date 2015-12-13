@@ -4,8 +4,7 @@ kernint_CXXFLAGS=$(AM_CXXFLAGS) $(GLIB_CFLAGS) $(LIBS)
 kernint_LDFLAGS=$(GLIB_LIBS) \
 				-ldwarfparser -ldwarf -lelf \
 				-lvmiwrapper \
-				-lboost_system -lboost_filesystem -lpthread \
-				-lCppUTest -lCppUTestExt
+				-lboost_system -lboost_filesystem -lpthread
 
 bin_PROGRAMS=kernint
 

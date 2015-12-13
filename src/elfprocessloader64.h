@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <elf.h>
 
-#include "helpers.h"
 #include "elfprocessloader.h"
+#include "helpers.h"
 
 #ifndef ASLROFFTYPE_M
 #define ASLROFFTYPE_M

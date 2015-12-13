@@ -11,7 +11,9 @@ public:
 	                Kernel *kernel=nullptr);
 	virtual ~ElfModuleLoader();
 
-	const std::string &getName() override;
+	const std::string &getName() const override;
+	Kernel *getKernel() override;
+
 
 protected:
 	void updateSectionInfoMemAddress(SectionInfo &info);

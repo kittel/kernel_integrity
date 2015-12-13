@@ -312,7 +312,8 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 		oldRetFuncName = retFuncName;
 	}
 	if (stackInteresting) {
-		std::cout << ss.rdbuf();
+		// TODO Output disabled as currently unneccessary
+		//std::cout << ss.rdbuf();
 	}
 }
 

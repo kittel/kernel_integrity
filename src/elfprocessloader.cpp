@@ -149,8 +149,12 @@ bool ElfProcessLoader::isDataOffset(uint64_t off) {
 	        off <= this->dataSegmentInfo.filesz);
 }
 
-const std::string &ElfProcessLoader::getName() {
+const std::string &ElfProcessLoader::getName() const {
 	return this->name;
+}
+
+Kernel *ElfProcessLoader::getKernel() {
+	return this->kernel;
 }
 
 std::vector<RelSym> ElfProcessLoader::getProvidedSyms() {

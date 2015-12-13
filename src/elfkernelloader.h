@@ -16,7 +16,8 @@ public:
 	ElfLoader *getModuleForAddress(uint64_t address);
 	ElfLoader *getModuleForCodeAddress(uint64_t address);
 
-	const std::string &getName() override;
+	const std::string &getName() const override;
+	Kernel *getKernel() override;
 
 protected:
 	std::string name;

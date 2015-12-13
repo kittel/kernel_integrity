@@ -16,8 +16,12 @@ ElfModuleLoader::ElfModuleLoader(ElfFile *elffile,
 
 ElfModuleLoader::~ElfModuleLoader() {}
 
-const std::string &ElfModuleLoader::getName() {
+const std::string &ElfModuleLoader::getName() const {
 	return this->modName;
+}
+
+Kernel *ElfModuleLoader::getKernel() {
+	return this->kernel;
 }
 
 void ElfModuleLoader::loadDependencies(void) {

@@ -58,7 +58,9 @@ ElfKernelLoader *ElfFile64::parseKernel() {
 ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
                                               Kernel *kernel) {
 	auto mod = new ElfModuleLoader64(this, name, kernel);
+	assert(kernel);
 	this->symbols = &kernel->symbols;
+	mod->parse();
 	this->parseDwarf();
 	return mod;
 }
@@ -248,12 +250,11 @@ void ElfFile64::applyRelocationsOnSection(uint32_t relSectionID,
 		}
 
 		if(sym->st_shndx == percpuDataSegment.segID) {
-		//if (sym->st_shndx == percpuDataSegment.segID) {
-			assert(false); // TODO handle percpuDataSegment
-			// Instance currentModule = this->kernel->getKernelModuleInstance(this->modName);
-			//symRelSectionInfo.memindex =
-			//    (void *)currentModule.memberByName("percpu")
-			//        .getRawValue<uint64_t>(false);
+			Instance currentModule = loader->getKernel()->
+			                getKernelModuleInstance(loader->getName());
+			symRelSectionInfo.memindex =
+			    (uint8_t *) currentModule.memberByName("percpu")
+			                          .getRawValue<uint64_t>(false);
 		}
 
 		switch (sym->st_shndx) {

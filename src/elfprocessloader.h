@@ -24,6 +24,9 @@ public:
 
 	void parse() override;  // Initialize the complete image
 
+	const std::string &getName() const override;
+	Kernel *getKernel() override;
+
 protected:
 	Kernel *kernel;
 	Process *proc;
@@ -67,7 +70,6 @@ protected:
 	virtual void updateSectionInfoMemAddress(SectionInfo& info);
 	virtual void addSymbols();
 
-	const std::string &getName() override;
 };
 
 #include "elfprocessloader64.h"

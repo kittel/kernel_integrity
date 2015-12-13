@@ -147,6 +147,7 @@ ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address) {
 
 	for (auto &modulePair : moduleMap) {
 		ElfLoader *module = dynamic_cast<ElfLoader*>(modulePair.second);
+		assert(module);
 		if (module->isCodeAddress(address) || module->isDataAddress(address)) {
 			return module;
 		}
@@ -154,6 +155,11 @@ ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address) {
 	return 0;
 }
 
-const std::string &ElfKernelLoader::getName() {
+const std::string &ElfKernelLoader::getName() const {
 	return this->name;
 }
+
+Kernel *ElfKernelLoader::getKernel() {
+	return this;
+}
+

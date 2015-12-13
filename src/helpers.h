@@ -14,9 +14,14 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
 
 #define COLOR_RESET         "\033[0m"
 #define COLOR_NORM          "\033[39m"
@@ -146,6 +151,35 @@ inline uint32_t appendDataToVector(const void *data, uint32_t len,
 inline bool fexists(const std::string &filename) {
 	std::ifstream ifile(filename);
 	return ifile.good();
+}
+
+inline std::string findFileInDir(std::string dirName,
+            std::string fileName,
+            std::string extension,
+            std::vector<std::string> exclude = std::vector<std::string>()) {
+	//static std::mutex mutex;
+	//std::lock_guard<std::mutex> lock(mutex);
+	boost::system::error_code ec;
+	std::regex regex = std::regex(fileName);
+	for (fs::recursive_directory_iterator end, dir(dirName, ec);
+	       dir != end; dir.increment(ec)) {
+		assert(ec.value() == 0);
+		if(dir.level() == 0) {
+			for ( auto& string : exclude ) {
+				if (dir->path().filename() == string) {
+					dir.no_push();
+					continue;
+				}
+			}
+		}
+		if (!is_directory(*dir) &&
+		    extension.compare(dir->path().extension().string()) == 0) {
+			if (std::regex_match(std::string(dir->path().stem().string()), regex)) {
+				return std::string(dir->path().native());
+			}
+		}
+	}
+	return "";
 }
 
 template<typename T>

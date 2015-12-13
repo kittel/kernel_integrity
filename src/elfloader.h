@@ -14,7 +14,7 @@
 #include <set>
 
 class ParavirtPatcher;
-
+class Kernel;
 
 /**
  * An ElfLoader is a memory representation we construct from the whitelisted
@@ -33,9 +33,11 @@ class ElfLoader {
 public:
 	virtual ~ElfLoader();
 
-	virtual const std::string &getName() = 0;
+	virtual const std::string &getName() const = 0;
+	virtual Kernel *getKernel() = 0;
 	virtual void updateSectionInfoMemAddress(SectionInfo &info) = 0;
 
+	virtual void parse();
 
 protected:
 	ElfLoader(ElfFile *elffile);
@@ -68,7 +70,6 @@ protected:
 	/**
 	 * Load sections of this elf file.
 	 */
-	virtual void parse();
 	virtual void initText() = 0;
 	virtual void initData() = 0;
 	virtual void addSymbols() = 0;

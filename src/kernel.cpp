@@ -21,12 +21,6 @@
 #include "libdwarfparser/function.h"
 #include "libdwarfparser/array.h"
 
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
-//The following should replace boost filesystem once it is available in gcc
-//#include <filesystem>
-//namespace fs = std::filesystem;
-
 Kernel::Kernel()
 	:
 	paravirt{this} {}
@@ -124,19 +118,9 @@ std::string Kernel::findModuleFile(std::string modName) const {
 		modName.replace(start_pos, 1, "[_|-]");
 		start_pos += 5;
 	}
-	std::regex regex = std::regex(modName);
-	for (fs::recursive_directory_iterator end, dir(this->kernelDirName); dir != end; dir++) {
-		if (fs::extension(*dir) == ".ko") {
-			if (std::string((*dir).path().string()).find("debian") !=
-			    std::string::npos) {
-				continue;
-			}
-			if (std::regex_match((*dir).path().stem().string(), regex)) {
-				return (*dir).path().native();
-			}
-		}
-	}
-	return "";
+	std::vector<std::string> exclude;
+	exclude.push_back(std::string("debian"));
+	return findFileInDir(this->kernelDirName, modName, ".ko", exclude);
 }
 
 std::list<std::string> Kernel::getKernelModules() {
