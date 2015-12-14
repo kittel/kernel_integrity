@@ -101,8 +101,8 @@ public:
 
 	virtual int getNrOfSections() = 0;
 
-	virtual SectionInfo findSectionWithName(const std::string &sectionName) = 0;
-	virtual SectionInfo findSectionByID(uint32_t sectionID) = 0;
+	virtual SectionInfo findSectionWithName(const std::string &sectionName) const = 0;
+	virtual SectionInfo findSectionByID(uint32_t sectionID) const = 0;
 	virtual bool isCodeAddress(uint64_t address) = 0;
 	virtual bool isDataAddress(uint64_t address) = 0;
 	virtual std::string sectionName(int sectionID) = 0;
@@ -157,12 +157,13 @@ public:
 	                                       Process *process,
 	                                       Kernel *kernel) = 0;
 
-	virtual bool isRelocatable() = 0;
+	virtual bool isRelocatable() const = 0;
 	virtual void applyRelocations(ElfLoader *loader,
 	                              Kernel *kernel,
 	                              Process *process = NULL) = 0;
-	virtual bool isDynamic() = 0;
-	virtual bool isExecutable() = 0;
+	virtual bool isDynamic() const = 0;
+	virtual bool isDynamicLibrary() const = 0;
+	virtual bool isExecutable() const = 0;
 
 	virtual std::vector<std::string> getDependencies() = 0;
 	virtual std::vector<RelSym> getSymbols() = 0;

@@ -176,6 +176,7 @@ ElfFile* ElfFile::loadElfFile(const std::string &filename){
 	elfFile->fd = fd;
 	elfFile->fileSize = fileSize;
 	elfFile->fileContent = fileContent;
+	elfFile->filename = filename;
 
 	return elfFile;
 }

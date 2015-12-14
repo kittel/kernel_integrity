@@ -22,8 +22,8 @@ public:
 
 	int getNrOfSections() override;
 
-	SectionInfo findSectionWithName(const std::string &sectionName) override;
-	SectionInfo findSectionByID(uint32_t sectionID) override;
+	SectionInfo findSectionWithName(const std::string &sectionName) const override;
+	SectionInfo findSectionByID(uint32_t sectionID) const override;
 	bool isCodeAddress(uint64_t address) override;
 	bool isDataAddress(uint64_t address) override;
 
@@ -46,12 +46,13 @@ public:
 	                               Kernel *kernel) override;
 
 
-	bool isRelocatable() override;
+	bool isRelocatable() const override;
 	void applyRelocations(ElfLoader *loader,
 	                      Kernel *kernel,
 	                      Process *process) override;
-	bool isDynamic() override;
-	bool isExecutable() override;
+	bool isDynamic() const override;
+	bool isDynamicLibrary() const override;
+	bool isExecutable() const override;
 
 	std::vector<RelSym> getSymbols() override;
 
@@ -68,10 +69,10 @@ public:
 	void getRelaEntries(std::vector<Elf64_Rela> &ret) override;
 
 private:
-	void applyRelocationsOnSection(uint32_t relSectionID,
-	                               ElfLoader *loader,
-	                               Kernel *kernel,
-	                               Process *process);
+	void applyRelaOnSection(uint32_t relSectionID,
+	                        ElfLoader *loader,
+	                        Kernel *kernel,
+	                        Process *process);
 };
 
 #endif /* ELFFILE64_H */

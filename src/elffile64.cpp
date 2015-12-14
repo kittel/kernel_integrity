@@ -79,7 +79,7 @@ int ElfFile64::getNrOfSections() {
 }
 
 /* This function actually searches for a _section_ in the ELF file */
-SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) {
+SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const {
 	char *tempBuf = 0;
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
 		tempBuf = (char *)this->fileContent +
@@ -98,7 +98,7 @@ SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) {
 	return SectionInfo();
 }
 
-SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) {
+SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
 	if (sectionID < elf64Ehdr->e_shnum) {
 		std::string sectionName = toString(
 		    this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
@@ -162,53 +162,68 @@ uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
 	return symbolNameMap[symbolName];
 }
 
-bool ElfFile64::isRelocatable() {
+bool ElfFile64::isRelocatable() const {
 	return (elf64Ehdr->e_type == ET_REL);
 }
 
-bool ElfFile64::isDynamic() {
+bool ElfFile64::isDynamic() const {
 	return (elf64Ehdr->e_type == ET_DYN);
 }
 
-bool ElfFile64::isExecutable() {
+bool ElfFile64::isDynamicLibrary() const {
+	// if this is a static exec we don't have any dependencies
+	if (!this->isDynamic() && !this->isExecutable())
+		return false;
+
+	// get .dynamic section
+	SectionInfo dynamic       = this->findSectionWithName(".dynamic");
+	Elf64_Dyn *dynamicEntries = (Elf64_Dyn *)(dynamic.index);
+
+	for (int i = 0; (dynamicEntries[i].d_tag != DT_NULL); i++) {
+		if (dynamicEntries[i].d_tag == DT_SONAME) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ElfFile64::isExecutable() const {
 	return (elf64Ehdr->e_type == ET_EXEC);
 }
 
 void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
-	if (!this->isRelocatable()) {
-		return;
-	}
+	switch(elf64Ehdr->e_type) {
+	case ET_REL:
+	case ET_DYN:
+		for (unsigned int i = 0; i < this->elf64Ehdr->e_shnum; i++) {
+			unsigned int infosec = this->elf64Shdr[i].sh_info;
+			if (infosec >= this->elf64Ehdr->e_shnum)
+				continue;
 
-	///* loop through every section */
-	for (unsigned int i = 0; i < this->elf64Ehdr->e_shnum; i++) {
-		/* if Elf64_Shdr.sh_addr isn't 0 the section will appear in memory*/
-		unsigned int infosec = this->elf64Shdr[i].sh_info;
+			/* Don't bother with non-allocated sections */
+			if (!(this->elf64Shdr[infosec].sh_flags & SHF_ALLOC))
+				continue;
 
-		/* Not a valid relocation section? */
-		if (infosec >= this->elf64Ehdr->e_shnum)
-			continue;
-
-		/* Don't bother with non-allocated sections */
-		if (!(this->elf64Shdr[infosec].sh_flags & SHF_ALLOC))
-			continue;
-
-		// if (this->elf64Shdr[i].sh_type == SHT_REL){
-		//	//TODO this is only in the i386 case!
-		//	//apply_relocate(fileContent, elf64Shdr, symindex, strindex, i);
-		//}
-		if (this->elf64Shdr[i].sh_type == SHT_RELA) {
-			this->applyRelocationsOnSection(i, loader, kernel, process);
+			if (this->elf64Shdr[i].sh_type == SHT_REL){
+				assert(false);
+			}
+			if (this->elf64Shdr[i].sh_type == SHT_RELA) {
+				this->applyRelaOnSection(i, loader, kernel, process);
+			}
 		}
+		break;
+	default:
+		std::cout << "Not relocatable: " << this->getFilename() << std::endl;
+		std::cout << std::hex << elf64Ehdr->e_type << std::dec << std::endl;
 	}
-	return;
 }
 
-void ElfFile64::applyRelocationsOnSection(uint32_t relSectionID,
-                                          ElfLoader* loader,
-                                          Kernel *kernel,
-                                          Process *process) {
+void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
+                                   ElfLoader* loader,
+                                   Kernel *kernel,
+                                   Process *process) {
 
 	Elf32_Word sectionID    = this->elf64Shdr[relSectionID].sh_info;
 	std::string sectionName = this->sectionName(sectionID);
