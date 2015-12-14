@@ -26,26 +26,79 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 
 	this->shstrindex = elf64Ehdr->e_shstrndx;
 
+	uint32_t symindex = 0;
+	uint32_t strindex = 0;
+
 	/* find sections SHT_SYMTAB, SHT_STRTAB  */
-	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
-		if ((elf64Shdr[i].sh_type == SHT_SYMTAB)) {
-			this->symindex = i;
-			this->strindex = elf64Shdr[i].sh_link;
+	for (unsigned int i = 0; i < this->elf64Ehdr->e_shnum; i++) {
+		if ((elf64Shdr[i].sh_type == SHT_SYMTAB )) {
+			symindex = i;
+			strindex = elf64Shdr[i].sh_link;
 		}
 	}
 
-	uint32_t symSize = elf64Shdr[this->symindex].sh_size;
-	Elf64_Sym *symBase = (Elf64_Sym *)(this->fileContent + elf64Shdr[this->symindex].sh_offset);
+	if (!symindex) return;
+
+	uint32_t symSize = elf64Shdr[symindex].sh_size;
+	Elf64_Sym *symBase = (Elf64_Sym *)(this->fileContent + elf64Shdr[symindex].sh_offset);
 
 	for (Elf64_Sym *sym = symBase;
 	     sym < (Elf64_Sym *)(((uint8_t *)symBase) + symSize);
 	     sym++) {
-		std::string currentSymbolName = toString(&((this->fileContent + elf64Shdr[this->strindex].sh_offset)[sym->st_name]));
-		symbolNameMap[currentSymbolName] = sym->st_value;
+		if(!sym->st_name) continue;
+
+		std::string symbolName = this->symbolName(sym->st_name, strindex);
+		uint64_t symbolAddress = sym->st_value;
+
+		symbolNameMap[symbolName] = symbolAddress;
 	}
 }
 
 ElfFile64::~ElfFile64() {}
+
+void ElfFile64::addSymbolsToKernel(Kernel *kernel, uint64_t memindex) const {
+	uint32_t symindex = 0;
+	uint32_t strindex = 0;
+
+	/* find sections SHT_SYMTAB, SHT_STRTAB  */
+	for (unsigned int i = 0; i < this->elf64Ehdr->e_shnum; i++) {
+		if ((elf64Shdr[i].sh_type == SHT_SYMTAB )) {
+			symindex = i;
+			strindex = elf64Shdr[i].sh_link;
+		}
+	}
+
+	if (!symindex) return;
+
+	uint32_t symSize = elf64Shdr[symindex].sh_size;
+	Elf64_Sym *symBase = (Elf64_Sym *)(this->fileContent + elf64Shdr[symindex].sh_offset);
+
+	for (Elf64_Sym *sym = symBase;
+	     sym < (Elf64_Sym *)(((uint8_t *)symBase) + symSize);
+	     sym++) {
+		if(!sym->st_name) continue;
+
+		std::string symbolName = this->symbolName(sym->st_name, strindex);
+		uint64_t symbolAddress = sym->st_value;
+
+		if (ELF64_ST_BIND(sym->st_info) == STB_LOCAL) {
+			// Store local variables with uniq names
+			symbolName.append("@@").append("kernel");
+			std::string newSymName = symbolName;
+			symbolName = newSymName;
+		}
+		kernel->addSymbolAddress(symbolName, symbolAddress);
+
+		// We also have to consider local functions
+		// if((ELF64_ST_TYPE(sym->st_info) & STT_FUNC) &&
+		// ELF64_ST_BIND(sym->st_info) & STB_GLOBAL)
+		if ((ELF64_ST_TYPE(sym->st_info) == STT_FUNC)) {
+			if (symbolAddress < memindex) symbolAddress += memindex;
+			kernel->addFunctionAddress(symbolName, symbolAddress);
+		}
+	}
+
+}
 
 ElfKernelLoader *ElfFile64::parseKernel() {
 	auto kernel = new ElfKernelLoader64(this);
@@ -154,8 +207,8 @@ uint64_t ElfFile64::sectionAlign(int sectionID) {
 	return this->elf64Shdr[sectionID].sh_addralign;
 }
 
-std::string ElfFile64::symbolName(Elf64_Word index) {
-	return toString(&((this->fileContent + elf64Shdr[this->strindex].sh_offset)[index]));
+std::string ElfFile64::symbolName(Elf64_Word index, uint32_t strindex) const {
+	return toString(&((this->fileContent + elf64Shdr[strindex].sh_offset)[index]));
 }
 
 uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
@@ -216,7 +269,6 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
 		break;
 	default:
 		std::cout << "Not relocatable: " << this->getFilename() << std::endl;
-		std::cout << std::hex << elf64Ehdr->e_type << std::dec << std::endl;
 	}
 }
 
@@ -226,6 +278,9 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
                                    Process *process) {
 
 	Elf32_Word sectionID    = this->elf64Shdr[relSectionID].sh_info;
+	Elf32_Word symindex     = this->elf64Shdr[relSectionID].sh_link;
+	Elf32_Word strindex     = this->elf64Shdr[symindex].sh_link;
+
 	std::string sectionName = this->sectionName(sectionID);
 	bool isAltinstrSection = false;
 	if (sectionName.compare(".altinstructions") == 0) {
@@ -238,7 +293,8 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	SectionInfo relSectionInfo = this->findSectionByID(relSectionID);
 
 	Elf64_Rela *rel = (Elf64_Rela *)relSectionInfo.index;
-	Elf64_Sym *symBase = (Elf64_Sym *)this->sectionAddress(this->symindex);
+	assert(symindex);
+	Elf64_Sym *symBase = (Elf64_Sym *)this->sectionAddress(symindex);
 
 	// TODO move this to a dedicated function if used with kernel modules
 	SectionInfo percpuDataSegment = this->findSectionWithName(".data..percpu");
@@ -280,11 +336,13 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			break;
 		case SHN_UNDEF:
 			if (process) {
-				//sym->st_value = loader->findAddressOfSymbol(
-				//                            this->symbolName(sym->st_name));
+				std::cout << "Need to find address of symbol: " <<
+				this->symbolName(sym->st_name, strindex) << std::endl;
+			//	sym->st_value = process->findAddressOfSymbol(
+			//	                            this->symbolName(sym->st_name));
 			} else {
 				sym->st_value = kernel->findAddressOfSymbol(
-				                            this->symbolName(sym->st_name));
+				                    this->symbolName(sym->st_name, strindex));
 			}
 			break;
 		default:
@@ -296,6 +354,8 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			}
 			break;
 		}
+
+		if(process) return;
 
 		uint64_t val = sym->st_value + rel[i].r_addend;
 
@@ -320,7 +380,15 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			}
 			*(uint32_t *)locInElf = val;
 			break;
+		case R_X86_64_GLOB_DAT:   /* Create GOT entry */
+		case R_X86_64_JUMP_SLOT:  /* Create PLT entry */
+		case R_X86_64_RELATIVE:   /* Adjust by program base */
+		case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
+			*(uint64_t *)locInElf = val; break;
 		default:
+			std::cout << COLOR_RED << "Unknown RELA: "
+			          << "Requested Type: " << ELF64_R_TYPE(rel[i].r_info)
+			          << COLOR_NORM << std::endl;
 			assert(false);
 			return;
 		}

@@ -109,8 +109,6 @@ ElfFile::ElfFile(FILE *fd, size_t fileSize, uint8_t *fileContent,
                  ElfProgramType programType)
 	:
 	shstrindex{0},
-	symindex{0},
-	strindex{0},
 	fd{fd},
 	fileSize{fileSize},
 	fileContent{fileContent},
@@ -206,7 +204,7 @@ ElfFile::ElfProgramType ElfFile::getProgramType() { return this->programType;}
 
 int ElfFile::getFD() { return fileno(this->fd); }
 
-void ElfFile::printSymbols(){
+void ElfFile::printSymbols(uint32_t symindex){
 	uint8_t *elfEhdr = this->fileContent;
 
 	if (elfEhdr[4] == ELFCLASS32) {
@@ -219,17 +217,18 @@ void ElfFile::printSymbols(){
 		elf64Ehdr = (Elf64_Ehdr *) elfEhdr;
 		elf64Shdr = (Elf64_Shdr *) (elfEhdr + elf64Ehdr->e_shoff);
 
-		uint32_t symSize = elf64Shdr[this->symindex].sh_size;
-		Elf64_Sym *symBase = (Elf64_Sym *) (elfEhdr + elf64Shdr[this->symindex].sh_offset);
+		uint32_t symSize = elf64Shdr[symindex].sh_size;
+		Elf64_Sym *symBase = (Elf64_Sym *) (elfEhdr + elf64Shdr[symindex].sh_offset);
 
 		std::string symbolName;
 		std::string sectionName;
+		uint32_t strindex = elf64Shdr[symindex].sh_link;
 
 		for(Elf64_Sym * sym = symBase;
 		    sym < (Elf64_Sym *) (((char*) symBase) + symSize) ;
 		    sym++) {
 
-			symbolName = this->symbolName(sym->st_name);
+			symbolName = this->symbolName(sym->st_name, strindex);
 			if (sym->st_shndx < SHN_LORESERVE) {
 				sectionName =  this->sectionName(sym->st_shndx);
 			} else {

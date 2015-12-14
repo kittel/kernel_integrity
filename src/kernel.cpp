@@ -41,11 +41,14 @@ ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
 	// Check if module is already loaded
 	if (moduleMap.find(moduleName) != moduleMap.end()) {
 		// This might be nullptr! Think about
-		moduleMapMutex.unlock();
 		while (moduleMap[moduleName] == nullptr) {
+			moduleMapMutex.unlock();
 			std::this_thread::yield();
+			moduleMapMutex.lock();
 		}
-		return moduleMap[moduleName];
+		auto module = moduleMap[moduleName];
+		moduleMapMutex.unlock();
+		return module;
 	}
 	moduleMap[moduleName] = nullptr;
 	moduleMapMutex.unlock();
@@ -53,17 +56,19 @@ ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
 	std::string filename = findModuleFile(moduleName);
 	if (filename.empty()) {
 		std::cout << moduleName << ": Module File not found" << std::endl;
+		assert(false);
 		return nullptr;
 	}
 	ElfFile *file = ElfFile::loadElfFile(filename);
 
 	auto module = file->parseKernelModule(moduleName, this);
+	assert(module);
 
 	moduleMapMutex.lock();
 	moduleMap[moduleName] = module;
 	moduleMapMutex.unlock();
 
-	return moduleMap[moduleName];
+	return module;
 }
 
 void Kernel::loadModuleThread(std::list<std::string> &modList,

@@ -115,13 +115,14 @@ public:
 	virtual uint8_t *sectionAddress(int sectionID) = 0;
 	virtual uint64_t sectionAlign(int sectionID) = 0;
 
-	virtual std::string symbolName(uint32_t index) = 0;
+	virtual std::string symbolName(uint32_t index, uint32_t strindex) const = 0;
+	virtual void addSymbolsToKernel(Kernel *kernel, uint64_t memindex) const = 0;
 
 	virtual ElfType getType();
 	virtual ElfProgramType getProgramType();
 
 	std::string getFilename();
-	void printSymbols();
+	void printSymbols(uint32_t symindex);
 
 	uint8_t *getFileContent();
 	size_t getFileSize();
@@ -172,8 +173,6 @@ public:
 	virtual void getRelaEntries(std::vector<Elf64_Rela> &ret) = 0;
 
 	uint32_t shstrindex;
-	uint32_t symindex;
-	uint32_t strindex;
 
 	SymbolManager *symbols;
 

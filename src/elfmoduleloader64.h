@@ -11,7 +11,6 @@ public:
 	virtual ~ElfModuleLoader64();
 
 protected:
-	void addSymbols();
 };
 
 #endif  /* ELFMODULELOADER64_H */

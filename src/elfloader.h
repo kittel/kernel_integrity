@@ -72,7 +72,6 @@ protected:
 	 */
 	virtual void initText() = 0;
 	virtual void initData() = 0;
-	virtual void addSymbols() = 0;
 
 	virtual bool isCodeAddress(uint64_t addr);
 	virtual bool isDataAddress(uint64_t addr) = 0;

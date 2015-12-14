@@ -9,7 +9,6 @@ public:
 	virtual ~ElfKernelLoader64();
 
 protected:
-	void addSymbols();
 };
 
 

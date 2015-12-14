@@ -118,64 +118,9 @@ void ElfModuleLoader::initText(void) {
 	this->updateSectionInfoMemAddress(info);
 	this->applyMcount(info, &this->pvpatcher);
 
-	// TODO resume here
-
-	// Save the jump_labels section for later reference.
-	//
-	// info = findElfSegmentWithName(fileContent, "__jump_table");
-	// if(info.index != 0) context.jumpTable.append(info.index, info.size);
-	//
-	// updateKernelModule(context);
-
 	// Initialize the symTable in the context for later reference
-	this->addSymbols();
-
-	//    context.rodataSection =
-	//    this->findElfSegmentWithName(context.fileContent,
-	//    QString(".note.gnu.build-id"));
-	//    context.rodataSection.address =
-	//    (this->findMemAddressOfSegment(context,
-	//    QString(".note.gnu.build-id")));
-	//
-	//    context.rodataContent.clear();
-	//
-	//    // Populate rodata
-	//    Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
-	//    Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent +
-	//    elf64Ehdr->e_shoff);
-	//    for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
-	//    {
-	//        if(((elf64Shdr[i].sh_flags == SHF_ALLOC  || elf64Shdr[i].sh_flags
-	//        == (uint64_t) 0x32) &&
-	//                ( elf64Shdr[i].sh_type == SHT_PROGBITS )) ||
-	//             (elf64Shdr[i].sh_flags == SHF_ALLOC && elf64Shdr[i].sh_type
-	//             == SHT_NOTE))
-	//        {
-	//            QString sectionName = QString(fileContent +
-	//            elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
-	//            elf64Shdr[i].sh_name);
-	//            if(sectionName.compare(QString(".modinfo")) == 0 ||
-	//                   sectionName.compare(QString("__versions")) == 0 ||
-	//                   sectionName.startsWith(".init") ) continue;
-	//            uint64_t align = (elf64Shdr[i].sh_addralign ?: 1) - 1;
-	//            uint64_t alignmentSize = (context.rodataContent.size() +
-	//            align) & ~align;
-	//            context.rodataContent =
-	//            context.rodataContent.leftJustified(alignmentSize, 0);
-	//            context.rodataContent.append(fileContent +
-	//            elf64Shdr[i].sh_offset, elf64Shdr[i].sh_size);
-	//
-	////            std::cout << hex << "Adding Section "
-	////                           <<
-	///context.currentModule.member("name").toString() << " / " << sectionName
-	////                           << " Align: " << alignmentSize << " Size: "
-	///<< elf64Shdr[i].sh_size
-	////                           << dec << std::endl;
-	//        }
-	//    }
-	//
-	//    //writeModuleToFile(fileName, currentModule, fileContent );
-	//    return context;
+	this->elffile->addSymbolsToKernel(this->kernel,
+	                                  (uint64_t)this->textSegment.memindex);
 }
 
 void ElfModuleLoader::initData(void) {

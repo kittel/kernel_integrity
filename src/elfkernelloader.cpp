@@ -90,7 +90,8 @@ void ElfKernelLoader::initText(void) {
 	uint32_t fill = 0x200000 - (this->textSegmentContent.size() % 0x200000);
 	this->textSegmentContent.insert(this->textSegmentContent.end(), fill, 0);
 
-	this->addSymbols();
+	this->elffile->addSymbolsToKernel(this,
+	                                  (uint64_t)this->textSegment.memindex);
 }
 
 void ElfKernelLoader::initData(void) {
@@ -130,7 +131,7 @@ ElfLoader* ElfKernelLoader::getModuleForCodeAddress(uint64_t address) {
 		return this;
 	}
 
-	for (auto &modulePair : moduleMap) {
+	for (auto &modulePair : this->moduleMap) {
 		ElfLoader *module = dynamic_cast<ElfLoader*>(modulePair.second);
 		if (module->isCodeAddress(address)) {
 			return module;
@@ -145,7 +146,8 @@ ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address) {
 		return this;
 	}
 
-	for (auto &modulePair : moduleMap) {
+	for (auto &modulePair : this->moduleMap) {
+		assert(modulePair.second);
 		ElfLoader *module = dynamic_cast<ElfLoader*>(modulePair.second);
 		assert(module);
 		if (module->isCodeAddress(address) || module->isDataAddress(address)) {
