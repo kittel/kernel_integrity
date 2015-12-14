@@ -121,6 +121,39 @@ inline void printHexDump(const std::vector<uint8_t> *bytes){
 	return;
 }
 
+inline void displayChange(const uint8_t *memory,
+                          const uint8_t *reference,
+                          int32_t offset,
+                          int32_t size) {
+	std::cout << "First change"
+	          << " in byte 0x" << std::hex << offset << " is 0x"
+	          << (uint32_t)reference[offset] << " should be 0x"
+	          << (uint32_t)memory[offset] << std::dec << std::endl;
+	// Print 40 Bytes from should be
+
+	std::cout << "The loaded block is: " << std::hex << std::endl;
+	for (int32_t k = offset - 15; (k < offset + 15) && (k < size); k++) {
+		if (k < 0 || k >= size)
+			continue;
+		if (k == offset)
+			std::cout << " # ";
+		std::cout << std::setfill('0') << std::setw(2) << (uint32_t)reference[k]
+		          << " ";
+	}
+
+	std::cout << std::endl << "The block in mem is: " << std::hex << std::endl;
+	for (int32_t k = offset - 15; (k < offset + 15) && (k < size); k++) {
+		if (k < 0 || k >= size)
+			continue;
+		if (k == offset)
+			std::cout << " # ";
+		std::cout << std::setfill('0') << std::setw(2) << (uint32_t)memory[k]
+		          << " ";
+	}
+
+	std::cout << std::dec << std::endl << std::endl;
+}
+
 /* Convert a C-String into a std::string for gdb use (don't use elsewhere) */
 inline std::string& toSTDstring(const char *input) {
 	return *(new std::string(input));
