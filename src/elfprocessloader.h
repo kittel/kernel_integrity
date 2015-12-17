@@ -18,7 +18,7 @@ class ElfProcessLoader : public ElfLoader {
 
 public:
 	ElfProcessLoader(ElfFile *elffile, Kernel *kernel,
-	                 const std::string &name, Process *proc);
+	                 const std::string &name);
 
 	virtual ~ElfProcessLoader();
 
@@ -29,14 +29,12 @@ public:
 
 protected:
 	Kernel *kernel;
-	Process *proc;
 
 	std::string name;
 
 	void loadDependencies();
 
 	SegmentInfo textSegmentInfo;
-	SegmentInfo dataSegmentInfo;
 
 	SectionInfo heapSection;  // handler for optional heap segment
 	std::vector<uint8_t> dataSegmentContent;  // actual dataSegment data
@@ -46,23 +44,19 @@ protected:
 
 	void initText() override;
 	void initData() override;
+	void initData(Process *proc);
 
 	virtual void applyLoadRel(class ProcessValidator *val) = 0;
-
-	virtual uint64_t getTextStart() = 0;
-	virtual uint64_t getDataStart() = 0;
-	virtual uint64_t getDataOff() = 0;
-	virtual uint64_t getTextOff() = 0;
-	virtual uint32_t getTextSize() = 0;
-	virtual uint32_t getDataSize() = 0;
 
 	SectionInfo *getSegmentForAddress(uint64_t addr);
 
 	bool isCodeAddress(uint64_t addr) override;
 	bool isDataAddress(uint64_t addr) override;
+	bool isDataAddress(uint64_t addr, Process *process);
 
 	virtual bool isTextOffset(uint64_t off);
 	virtual bool isDataOffset(uint64_t off);
+	bool isDataOffset(uint64_t off, Process *process);
 
 	virtual int evalLazy(uint64_t addr,
 	                     std::unordered_map<std::string, RelSym> *map) = 0;

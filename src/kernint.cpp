@@ -276,10 +276,10 @@ int main(int argc, char **argv) {
 	}
 
 	if (!binaryName.empty() && pid != 0) {
+		kl->getUserspace()->setLibraryDir(libraryDir);
 		Process proc{binaryName, kl};
 		// Ensure that all arguments make sense at this point
 		std::cout << "Starting Process Validation..." << std::endl;
-		proc.setLibraryDir(libraryDir);
 		ProcessValidator val{kl, &proc, &vmi, pid};
 		validateUserspace(&val);
 	}

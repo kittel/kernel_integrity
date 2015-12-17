@@ -4,12 +4,10 @@
 
 ElfProcessLoader::ElfProcessLoader(ElfFile *file,
                                    Kernel *kernel,
-                                   const std::string &name,
-                                   Process *proc)
+                                   const std::string &name)
 	:
 	ElfLoader(file),
 	kernel{kernel},
-	proc{proc},
 	name{name} {
 
 	this->providedSyms = this->elffile->getSymbols();
@@ -21,7 +19,7 @@ void ElfProcessLoader::loadDependencies() {
 	auto dependencies = this->elffile->getDependencies();
 
 	for (auto &dep : dependencies) {
-		this->proc->loadLibrary(dep);
+		this->kernel->getUserspace()->loadLibrary(dep);
 	}
 }
 
@@ -35,14 +33,19 @@ void ElfProcessLoader::initText() {
 }
 
 void ElfProcessLoader::initData() {
-	this->dataSegmentInfo = this->elffile->findDataSegment();
+	// This has to be done once per process.
+	assert(false);
+	// this->dataSegmentInfo = this->elffile->findDataSegment();
 
-	auto index = this->elffile->getFileContent() + this->dataSegmentInfo.offset;
-	this->dataSegmentContent.insert(this->dataSegmentContent.end(),
-	                                index,
-	                                index + this->dataSegmentInfo.filesz);
+	// auto index = this->elffile->getFileContent() + this->dataSegmentInfo.offset;
+	// this->dataSegmentContent.insert(this->dataSegmentContent.end(),
+	//                                 index,
+	//                                 index + this->dataSegmentInfo.filesz);
 }
 
+void ElfProcessLoader::initData(Process *process) {
+	this->elffile->applyRelocations(this, kernel, process);
+}
 /*
  * Initialize a complete memory image for validation. Relocations are not yet
  * processed
@@ -59,11 +62,9 @@ void ElfProcessLoader::parse() {
 
 	// Load Dependencies
 	this->loadDependencies();
-
-	// init the first memory segment
 	this->initText();
-	// init the second memeory segment
-	this->initData();
+	
+	// init the first memory segment
 }
 
 /* Return the SectionInfo, in which the given addr is contained. */
@@ -116,18 +117,24 @@ bool ElfProcessLoader::isCodeAddress(uint64_t addr) {
 	}
 }
 
-
 /* Check if the given virtual address is located in the dataSection */
 bool ElfProcessLoader::isDataAddress(uint64_t addr) {
+	UNUSED(addr);
+	assert(false);
+}
 
+bool ElfProcessLoader::isDataAddress(uint64_t addr, Process *process) {
+
+	auto dataSection = process->getSectionInfoForLib(this->name);
+	auto dataSegmentInfo = process->getSegmentInfoForLib(this->name);
 	// get offset to last page border
-	uint64_t endAddr = ((uint64_t)this->dataSection.memindex)
-	                    + (this->dataSegmentInfo.offset & 0xfff)
-	                    + this->dataSegmentInfo.memsz;
+	uint64_t endAddr = ((uint64_t)dataSection->memindex)
+	                    + (dataSegmentInfo->offset & 0xfff)
+	                    + dataSegmentInfo->memsz;
 	// off = 0x1000 - (endAddr & 0xfff)
 	uint64_t offset = 0x1000 - (endAddr & 0xfff);
 
-	if (addr >= ((uint64_t)this->dataSection.memindex)
+	if (addr >= ((uint64_t)dataSection->memindex)
 	    && addr < (endAddr + offset)) {
 		return true;
 	}
@@ -145,8 +152,14 @@ bool ElfProcessLoader::isTextOffset(uint64_t off) {
 
 /* Check if the given fileOffset (in bytes) lays in the dataSection */
 bool ElfProcessLoader::isDataOffset(uint64_t off) {
-	return (off >= this->dataSegmentInfo.offset &&
-	        off <= this->dataSegmentInfo.filesz);
+	UNUSED(off);
+	assert(false);
+}
+
+bool ElfProcessLoader::isDataOffset(uint64_t off, Process *process) {
+	auto dataSegmentInfo = process->getSegmentInfoForLib(this->name);
+	return (off >= dataSegmentInfo->offset &&
+	        off <= dataSegmentInfo->filesz);
 }
 
 const std::string &ElfProcessLoader::getName() const {

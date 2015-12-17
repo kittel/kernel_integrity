@@ -2,43 +2,14 @@
 
 ElfProcessLoader64::ElfProcessLoader64(ElfFile64 *file,
                                        Kernel *kernel,
-                                       const std::string &name,
-                                       Process *proc)
+                                       const std::string &name)
 	:
-	ElfProcessLoader(file, kernel, name, proc),
+	ElfProcessLoader(file, kernel, name),
 	bindLazy(true) {
 }
 
 ElfProcessLoader64::~ElfProcessLoader64() {
 }
-
-/* Get the vmem address of the first memory segment */
-uint64_t ElfProcessLoader64::getTextStart() {
-	return (uint64_t) this->textSegment.memindex;
-}
-
-uint64_t ElfProcessLoader64::getDataStart() {
-	return (uint64_t) this->dataSection.memindex;
-}
-
-/* Get the size of the dataSection */
-uint32_t ElfProcessLoader64::getDataSize() {
-	return this->dataSection.size;
-}
-
-/* Get the size of the textSegment */
-uint32_t ElfProcessLoader64::getTextSize() {
-	return this->textSegment.size;
-}
-
-uint64_t ElfProcessLoader64::getDataOff() {
-	return this->dataSegmentInfo.offset;
-}
-
-uint64_t ElfProcessLoader64::getTextOff() {
-	return this->textSegmentInfo.offset;
-}
-
 
 /* Return the final memory address in the procImg for the given addr
  *
@@ -48,28 +19,32 @@ uint64_t ElfProcessLoader64::getTextOff() {
  *
  */
 uint64_t ElfProcessLoader64::getVAForAddr(uint64_t addr, uint32_t shtID) {
-	ElfFile64 *elf = dynamic_cast<ElfFile64 *>(this->elffile);
-	uint64_t off   = elf->elf64Shdr[shtID].sh_offset;  // offset to cont. section
-	// offset to symbol address from section start
-	uint64_t symOff = addr - elf->elf64Shdr[shtID].sh_addr;
-	uint64_t va     = 0;
-
-	if (this->isTextOffset(off)) {
-		va = (((uint64_t) this->textSegment.memindex) + off + symOff);
-	} else if (this->isDataOffset(off)) {
-		va = (((uint64_t) this->dataSection.memindex) +
-		      (off - this->dataSegmentInfo.offset)  // offset into dataSection
-		      +
-		      symOff);  // offset to target symbol
-	} else {
-		std::cout << "error:(getVAForAddr) Couldn't find VA for addr "
-		          << (void *)addr << ", offset " << (void *)off << " in SHT ["
-		          << std::dec << shtID << "]. "
-		          << "Returning dataSection..." << std::endl;
-		return (uint64_t) this->dataSection.memindex;
-	}
-
-	return va;
+	UNUSED(addr);
+	UNUSED(shtID);
+	assert(false);
+	return 0;
+//	ElfFile64 *elf = dynamic_cast<ElfFile64 *>(this->elffile);
+//	uint64_t off   = elf->elf64Shdr[shtID].sh_offset;  // offset to cont. section
+//	// offset to symbol address from section start
+//	uint64_t symOff = addr - elf->elf64Shdr[shtID].sh_addr;
+//	uint64_t va     = 0;
+//
+//	if (this->isTextOffset(off)) {
+//		va = (((uint64_t) this->textSegment.memindex) + off + symOff);
+//	} else if (this->isDataOffset(off)) {
+//		va = (((uint64_t) this->dataSection.memindex) +
+//		      (off - this->dataSegmentInfo.offset)  // offset into dataSection
+//		      +
+//		      symOff);  // offset to target symbol
+//	} else {
+//		std::cout << "error:(getVAForAddr) Couldn't find VA for addr "
+//		          << (void *)addr << ", offset " << (void *)off << " in SHT ["
+//		          << std::dec << shtID << "]. "
+//		          << "Returning dataSection..." << std::endl;
+//		return (uint64_t) this->dataSection.memindex;
+//	}
+//
+//	return va;
 }
 
 /* Try to process relocation for the given (final) virtual addr.
@@ -264,74 +239,77 @@ void ElfProcessLoader64::applyLoadRel(std::unordered_map<std::string, RelSym *> 
  *
  */
 void ElfProcessLoader64::relocate(Elf64_Rela *rel) {
-	uint64_t target;  // this is where to make the change in the loader
-	                  // the address is given as LOCAL address (SHT-VAddr)
-	uint64_t value;   // this is the value which gets inserted
-
-	// abort if not related to GOT or PLT
-	if (ELF64_R_TYPE(rel->r_info) != R_X86_64_JUMP_SLOT &&
-	    ELF64_R_TYPE(rel->r_info) != R_X86_64_GLOB_DAT &&
-	    ELF64_R_TYPE(rel->r_info) != R_X86_64_64) {
-		return;
-	}
-
-	// if .data.rel.ro relocation
-	if (ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE ||
-	    ELF64_R_TYPE(rel->r_info) == R_X86_64_IRELATIVE) {
-
-		/* as this entries are only unique identifiable in their contained
-		 * libraries, we only have to stupidly write relative memory addresses
-		 * without needing to look up any RelSyms
-		 */
-
-		target = rel->r_offset;
-
-		// sanity check for signed->unsigned conversion
-		assert(rel->r_addend >= 0);
-
-		if (ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE) {
-			value = this->getTextStart() + ((uint64_t)rel->r_addend);
-		} else {
-			if (!this->elffile->isExecutable())
-				value = this->getTextStart() + ((uint64_t)rel->r_addend);
-			else
-				value = (uint64_t)rel->r_addend;
-		}
-
-		this->writeRelValue(target, value);
-		return;
-	}
-
-	ElfFile64 *elf        = dynamic_cast<ElfFile64 *>(this->elffile);
-	SectionInfo dynsymseg = elf->findSectionWithName(".dynsym");
-	SectionInfo dynstrseg = elf->findSectionWithName(".dynstr");
-	Elf64_Sym *dynsym     = (Elf64_Sym *)dynsymseg.index;
-	char *dynstr          = (char *)dynstrseg.index;
-
-	std::string name = &dynstr[dynsym[ELF64_R_SYM(rel->r_info)].st_name];
-	// XXX TODO make that shit better!
+	UNUSED(rel);
+	assert(false);
 	return;
-	//RelSym *sym = this->proc->findSymbolByName(name);
-
-	//// retrieve needed, corresponding RelSym
-	//if (!sym) {
-	//	std::cout << "error:(relocate) Couldn't retrieve symbol " << name
-	//	          << " from symbolMap! Skipping..." << std::endl;
-	//	return;
-	//}
-
-	//std::cout << "Trying to relocate " << name << " in "
-	//          << this->name << " <<-- " << sym->name
-	//          << "." << std::endl;
-
-	//// parse relocation entry
-	//target = rel->r_offset;  // always direct value for JUMP_SLOT/GLOB_DAT
-	//                         // addendum is also not involved in calc
-	//value = sym->value;
-
-	//// write final RelSym address into the corresponding segment
-	//this->writeRelValue(target, value);
-	//return;
+//	uint64_t target;  // this is where to make the change in the loader
+//	                  // the address is given as LOCAL address (SHT-VAddr)
+//	uint64_t value;   // this is the value which gets inserted
+//
+//	// abort if not related to GOT or PLT
+//	if (ELF64_R_TYPE(rel->r_info) != R_X86_64_JUMP_SLOT &&
+//	    ELF64_R_TYPE(rel->r_info) != R_X86_64_GLOB_DAT &&
+//	    ELF64_R_TYPE(rel->r_info) != R_X86_64_64) {
+//		return;
+//	}
+//
+//	// if .data.rel.ro relocation
+//	if (ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE ||
+//	    ELF64_R_TYPE(rel->r_info) == R_X86_64_IRELATIVE) {
+//
+//		/* as this entries are only unique identifiable in their contained
+//		 * libraries, we only have to stupidly write relative memory addresses
+//		 * without needing to look up any RelSyms
+//		 */
+//
+//		target = rel->r_offset;
+//
+//		// sanity check for signed->unsigned conversion
+//		assert(rel->r_addend >= 0);
+//
+//		if (ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE) {
+//			value = this->getTextStart() + ((uint64_t)rel->r_addend);
+//		} else {
+//			if (!this->elffile->isExecutable())
+//				value = this->getTextStart() + ((uint64_t)rel->r_addend);
+//			else
+//				value = (uint64_t)rel->r_addend;
+//		}
+//
+//		this->writeRelValue(target, value);
+//		return;
+//	}
+//
+//	ElfFile64 *elf        = dynamic_cast<ElfFile64 *>(this->elffile);
+//	SectionInfo dynsymseg = elf->findSectionWithName(".dynsym");
+//	SectionInfo dynstrseg = elf->findSectionWithName(".dynstr");
+//	Elf64_Sym *dynsym     = (Elf64_Sym *)dynsymseg.index;
+//	char *dynstr          = (char *)dynstrseg.index;
+//
+//	std::string name = &dynstr[dynsym[ELF64_R_SYM(rel->r_info)].st_name];
+//	// XXX TODO make that shit better!
+//	return;
+//	//RelSym *sym = this->proc->findSymbolByName(name);
+//
+//	//// retrieve needed, corresponding RelSym
+//	//if (!sym) {
+//	//	std::cout << "error:(relocate) Couldn't retrieve symbol " << name
+//	//	          << " from symbolMap! Skipping..." << std::endl;
+//	//	return;
+//	//}
+//
+//	//std::cout << "Trying to relocate " << name << " in "
+//	//          << this->name << " <<-- " << sym->name
+//	//          << "." << std::endl;
+//
+//	//// parse relocation entry
+//	//target = rel->r_offset;  // always direct value for JUMP_SLOT/GLOB_DAT
+//	//                         // addendum is also not involved in calc
+//	//value = sym->value;
+//
+//	//// write final RelSym address into the corresponding segment
+//	//this->writeRelValue(target, value);
+//	//return;
 }
 
 void ElfProcessLoader64::relocate(Elf64_Rel *rel) {
@@ -354,33 +332,37 @@ void ElfProcessLoader64::relocate(Elf64_Rel *rel) {
  * GOT/PLT relocations.
  */
 void ElfProcessLoader64::writeRelValue(uint64_t locAddr, uint64_t symAddr) {
-	uint64_t offset;  // offset into dataSection
-	uint64_t
-	dataVecBaseAddr;  // base addr (FILE REPRESENTATION incl padding) of
-	// dataSegVector
-	dataVecBaseAddr = (uint64_t) this->dataSegmentInfo.vaddr -
-	                  ((uint64_t) this->dataSegmentInfo.vaddr & 0xfff);
-
-	if (locAddr > dataVecBaseAddr)
-		offset = locAddr - dataVecBaseAddr;
-	else {
-		std::cout
-		<< "error:(writeRelValue) Target address is not in dataSection!"
-		<< std::endl
-		<< "locAddr = " << (void *)locAddr << ", dataSegmentInfo.vaddr = "
-		<< (void *)this->dataSegmentInfo.vaddr << std::endl;
-		return;
-	}
-
-#ifdef VERBOSE
-	std::cout << "Writing " << (void *)symAddr << " at offset "
-	          << (void *)offset << " into dataSection. [" << (void *)(locAddr)
-	          << "]" << std::endl;
-#endif
-
-	// add sizeof(uint64_t) as the address lays after the offset and gets
-	// written in the direction of lower addresses
-
-	memcpy(this->dataSegmentContent.data() + offset, &symAddr, sizeof(symAddr));
+	UNUSED(locAddr);
+	UNUSED(symAddr);
+	assert(false);
 	return;
+//	uint64_t offset;  // offset into dataSection
+//	uint64_t
+//	dataVecBaseAddr;  // base addr (FILE REPRESENTATION incl padding) of
+//	// dataSegVector
+//	dataVecBaseAddr = (uint64_t) this->dataSegmentInfo.vaddr -
+//	                  ((uint64_t) this->dataSegmentInfo.vaddr & 0xfff);
+//
+//	if (locAddr > dataVecBaseAddr)
+//		offset = locAddr - dataVecBaseAddr;
+//	else {
+//		std::cout
+//		<< "error:(writeRelValue) Target address is not in dataSection!"
+//		<< std::endl
+//		<< "locAddr = " << (void *)locAddr << ", dataSegmentInfo.vaddr = "
+//		<< (void *)this->dataSegmentInfo.vaddr << std::endl;
+//		return;
+//	}
+//
+//#ifdef VERBOSE
+//	std::cout << "Writing " << (void *)symAddr << " at offset "
+//	          << (void *)offset << " into dataSection. [" << (void *)(locAddr)
+//	          << "]" << std::endl;
+//#endif
+//
+//	// add sizeof(uint64_t) as the address lays after the offset and gets
+//	// written in the direction of lower addresses
+//
+//	memcpy(this->dataSegmentContent.data() + offset, &symAddr, sizeof(symAddr));
+//	return;
 }

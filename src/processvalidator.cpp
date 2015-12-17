@@ -117,8 +117,10 @@ void ProcessValidator::validateCodePage(VMAInfo *vma) {
 		     j++) {
 			if (memContent[j] != fileContent[bytesChecked + j]) {
 				std::cout << COLOR_RED << COLOR_BOLD
-				          << "MISMATCH in code segment!" << COLOR_RESET
+				          << "MISMATCH in code segment! " << vma->name
+				          << COLOR_RESET
 				          << std::endl;
+				displayChange(memContent, fileContent + bytesChecked, j, textsize);
 				return;
 			}
 		}
@@ -295,7 +297,9 @@ ElfProcessLoader *ProcessValidator::findLoaderByAddress(const uint64_t addr) con
 
 ElfProcessLoader *ProcessValidator::findLoaderByName(const std::string &name) const {
 	std::string libname = fs::path(name).filename().string();
-	return this->process->findLibByName(libname);
+	return this->process
+	           ->getKernel()
+	           ->getUserspace()->findLibByName(libname);
 }
 
 const VMAInfo *ProcessValidator::findVMAByName(const std::string &name) const {

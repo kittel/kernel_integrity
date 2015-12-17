@@ -14,15 +14,7 @@ public:
 	Process(const std::string &binaryName, Kernel *kernel);
 	virtual ~Process() = default;
 
-	ElfLoader *loadLibrary(const std::string &libraryName);
-
-	std::string findLibraryFile(const std::string &libName);
-	ElfProcessLoader *findLibByName(const std::string &name);
-
-	void setLibraryDir(const std::string &dirName);
-
 	ElfProcessLoader *getExecLoader();
-	ElfLoader *loadVDSO();
 
 	const std::string &getName();
 
@@ -42,27 +34,38 @@ public:
 	 */
 	Kernel *getKernel() const;
 	
+	ElfLoader *loadLibrary(const std::string &libraryName);
 	SymbolManager symbols;
+
+	std::vector<uint8_t> *getDataSegmentForLib(const std::string &name);
+	SectionInfo *getSectionInfoForLib(const std::string &name);
+	SegmentInfo *getSegmentInfoForLib(const std::string &name);
+	
+	SectionInfo *setSectionInfoForLib(const std::string &name);
+	SegmentInfo *setSegmentInfoForLib(const std::string &name);
 
 protected:
 	Kernel *kernel;
+	Instance *task_struct;
+	pid_t pid;
 
 	ElfProcessLoader *execLoader;
-	void loadExec();
-
-	typedef std::unordered_map<std::string, ElfLoader*> LibraryMap;
-	LibraryMap libraryMap;
-
-	std::vector<std::string> libDirName;
-
 	std::string binaryName;
 
-	// TODO:
 	std::vector<std::string> getArgv();
 	std::unordered_map<std::string, std::string> getEnv();
 
-	Instance *task_struct;
-	pid_t pid;
+	ElfProcessLoader *findLibByName(const std::string &name);
+	typedef std::unordered_map<std::string, ElfLoader*> LibraryMap;
+	LibraryMap libraryMap;
+
+	typedef std::unordered_map<std::string, std::vector<uint8_t>> DataSegmentMap;
+	DataSegmentMap dataSegmentMap;
+	typedef std::unordered_map<std::string, SectionInfo> DataSectionInfoMap;
+	DataSectionInfoMap dataSectionInfoMap;
+	typedef std::unordered_map<std::string, SegmentInfo> DataSegmentInfoMap;
+	DataSegmentInfoMap dataSegmentInfoMap;
+	
 };
 
 #endif

@@ -119,11 +119,12 @@ ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
 }
 
 ElfProcessLoader *ElfFile64::parseProcess(const std::string &name,
-                                          Process *process,
                                           Kernel *kernel) {
-	auto proc = new ElfProcessLoader64(this, kernel, name, process);
-	this->symbols = &process->symbols;
-	this->parseDwarf();
+	auto proc = new ElfProcessLoader64(this, kernel, name);
+	
+	// TODO XXX Reenable Dwarf parsing
+	//this->symbols = &process->symbols;
+	//this->parseDwarf();
 	return proc;
 }
 
@@ -247,6 +248,8 @@ bool ElfFile64::isExecutable() const {
 void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
+	std::cout << COLOR_GREEN << "Relocating: " << this->filename << COLOR_NORM << std::endl;
+	
 	switch(elf64Ehdr->e_type) {
 	case ET_REL:
 	case ET_DYN:
@@ -327,6 +330,10 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			    (uint8_t *) currentModule.memberByName("percpu")
 			                          .getRawValue<uint64_t>(false);
 		}
+
+		std::cout << "Relocating: "
+		          << this->symbolName(sym->st_name, strindex) << " -> "
+		          << std::hex << sym->st_value << std::dec << std::endl;
 
 		switch (sym->st_shndx) {
 		case SHN_COMMON:

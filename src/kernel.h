@@ -11,7 +11,9 @@
 #include "libdwarfparser/symbolmanager.h"
 #include "libdwarfparser/instance.h"
 #include "libvmiwrapper/libvmiwrapper.h"
+
 #include "paravirt_state.h"
+#include "userspacemanager.h"
 
 class ElfLoader;
 
@@ -60,6 +62,7 @@ public:
 	void updateRevMaps();
 
 	ParavirtState *getParavirtState();
+	UserspaceManager* getUserspace();
 
 	VMIInstance *vmi;
 
@@ -70,6 +73,7 @@ public:
 
 protected:
 	ParavirtState paravirt;
+	UserspaceManager userspace;
 
 	std::mutex moduleMapMutex;
 	typedef std::unordered_map<std::string, ElfLoader*> ModuleMap;

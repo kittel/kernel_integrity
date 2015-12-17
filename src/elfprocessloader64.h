@@ -62,17 +62,9 @@ private:
 public:
 	ElfProcessLoader64(ElfFile64 *elffile,
 	                   Kernel *parent,
-	                   const std::string &name,
-	                   Process *proc);
+	                   const std::string &name);
 
 	virtual ~ElfProcessLoader64();
-
-	uint64_t getTextStart() override;
-	uint64_t getDataStart() override;
-	uint64_t getDataOff() override;
-	uint64_t getTextOff() override;
-	uint32_t getTextSize() override;
-	uint32_t getDataSize() override;
 
 protected:
 	virtual uint64_t getVAForAddr(uint64_t addr, uint32_t shtID);

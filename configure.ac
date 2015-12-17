@@ -104,13 +104,7 @@ AC_SUBST([GLIB_CFLAGS])
 AC_SUBST([GLIB_LIBS])
 
 
-# distribute additional compiler and linker flags
-# --> set these variables instead of CXXFLAGS or LDFLAGS
-AC_SUBST([AM_CPPFLAGS])
-AC_SUBST([AM_CXXFLAGS])
-AC_SUBST([AM_LDFLAGS])
-AC_SUBST([LIBS])
-
+OLDLIBS=$LIBS
 
 AC_CHECK_LIB([vmi], [vmi_init], [],
 			 [AC_MSG_ERROR(["Error! You need to have libvmi around."])]
@@ -128,6 +122,8 @@ AC_CHECK_LIB([dwarf], [dwarf_init], [],
 AC_CHECK_HEADERS([libdwarf/libdwarf.h], [],
 				 [AC_MSG_ERROR(["Error! You need to have libdwarf headers around."])]
 )
+
+LIBS=$OLDLIBS
 
 # Checks for libraries.
 OLD_CPPFLAGS=$CPPFLAGS

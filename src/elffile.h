@@ -155,7 +155,6 @@ public:
 	 * associated with a given process.
 	 */
 	virtual ElfProcessLoader *parseProcess(const std::string &name,
-	                                       Process *process,
 	                                       Kernel *kernel) = 0;
 
 	virtual bool isRelocatable() const = 0;

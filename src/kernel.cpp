@@ -23,7 +23,8 @@
 
 Kernel::Kernel()
 	:
-	paravirt{this} {}
+	paravirt{this},
+	userspace{this}{}
 
 void Kernel::setVMIInstance(VMIInstance *vmi) {
 	this->vmi = vmi;
@@ -31,6 +32,10 @@ void Kernel::setVMIInstance(VMIInstance *vmi) {
 
 void Kernel::setKernelDir(const std::string &dirName) {
 	this->kernelDirName = dirName;
+}
+
+UserspaceManager* Kernel::getUserspace() {
+	return &this->userspace;
 }
 
 ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
@@ -104,6 +109,14 @@ void Kernel::loadAllModules() {
 	for (auto &&thread : threads) {
 		thread->join();
 		delete (thread);
+	}
+
+	for ( auto &module : this->moduleMap ) {
+		if(!module.second) {
+			std::cout << "missing module for " << module.first << std::endl;
+		}
+		
+		assert(module.second);
 	}
 
 	this->symbols.cleanArrays();
