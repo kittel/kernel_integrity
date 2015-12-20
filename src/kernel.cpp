@@ -43,6 +43,10 @@ TaskManager *Kernel::getTaskManager() {
 	return &this->tm;
 }
 
+void Kernel::initTaskManager() {
+	this->tm.init();
+}
+
 ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
 	std::string moduleName{moduleNameOrig};
 	std::replace(moduleName.begin(), moduleName.end(), '-', '_');

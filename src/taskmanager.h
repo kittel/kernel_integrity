@@ -75,6 +75,8 @@ public:
 	TaskManager(Kernel *kernel);
 	~TaskManager();
 
+	void init();
+
 	Instance getTaskForPID(pid_t pid) const;
 	std::vector<VMAInfo> getVMAInfo(pid_t pid);
 

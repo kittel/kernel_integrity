@@ -34,9 +34,11 @@ void VMAInfo::print() const {
 TaskManager::TaskManager(Kernel *kernel)
 	:
 	initTask{},
-	kernel{kernel} {
+	kernel{kernel} {}
 
+void TaskManager::init() {
 	auto var = this->kernel->symbols.findVariableByName("init_task");
+	assert(var);
 	assert(var->getLocation());
 
 	auto init = var->getInstance();

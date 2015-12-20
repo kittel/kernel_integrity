@@ -66,6 +66,8 @@ public:
 	UserspaceManager* getUserspace();
 	TaskManager *getTaskManager();
 
+	void initTaskManager();
+
 	VMIInstance *vmi;
 
 	/**
@@ -76,13 +78,13 @@ public:
 protected:
 	ParavirtState paravirt;
 	UserspaceManager userspace;
+	TaskManager tm;
 
 	std::mutex moduleMapMutex;
 	typedef std::unordered_map<std::string, ElfLoader*> ModuleMap;
 	ModuleMap moduleMap;
 
 private:
-	TaskManager tm;
 	std::string kernelDirName;
 
 	typedef std::unordered_map<std::string, Instance> ModuleInstanceMap;

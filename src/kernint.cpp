@@ -247,7 +247,9 @@ int main(int argc, char **argv) {
 	std::cout << COLOR_GREEN << "Loading Kernel" << COLOR_NORM << std::endl;
 
 	ElfKernelLoader *kl = KernelValidator::loadKernel(kerndir);
+	kl->setKernelDir(kerndir);
 	kl->setVMIInstance(&vmi);
+	kl->initTaskManager();
 
 	if (kernelValidation) {
 		if (!fexists(targetsFile)) {
