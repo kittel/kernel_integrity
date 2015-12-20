@@ -14,7 +14,7 @@ VMAInfo::VMAInfo(uint64_t start, uint64_t end, uint64_t ino,
 
 VMAInfo::~VMAInfo() {}
 
-void VMAInfo::print() {
+void VMAInfo::print() const {
 	std::string _name;
 	(this->name.empty()) ? _name = std::string("<anonymous>") : _name = this->name;
 	std::cout << std::hex << "0x" << this->start << " - 0x" << this->end << "   "

@@ -9,6 +9,10 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libdwarfparser/variable.h"
 #include "libvmiwrapper/libvmiwrapper.h"
+
+class TaskManager;
+class VMAInfo;
+
 #include "process.h"
 #include "helpers.h"
 
@@ -41,7 +45,7 @@ public:
 	        std::string name);
 	~VMAInfo();
 
-	void print();
+	void print() const;
 
 	enum {
 		VM_READ     = 0x00000001,

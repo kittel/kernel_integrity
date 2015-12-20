@@ -18,19 +18,15 @@ namespace fs = boost::filesystem;
 // TODO: retrieve paths from command line parameters
 ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
                                    Process *process,
-                                   VMIInstance *vmi,
-                                   int32_t pid)
+                                   VMIInstance *vmi)
     :
 	vmi{vmi},
 	kl{kl},
-	pid{pid},
-	process{process},
-	tm{process->getKernel()} {
+	process{process} {
 
 	std::cout << "ProcessValidator got: " << this->process->getName() << std::endl;
 
-	this->mappedVMAs = tm.getVMAInfo(pid);
-
+	pid = process->getPID();
 	// process load-time relocations
 	std::cout << "Processing load-time relocations..." << std::endl;
 	this->processLoadRel();
@@ -48,7 +44,7 @@ int ProcessValidator::validateProcess() {
 	for (auto &page : executablePageMap) {
 		// check if page is contained in VMAs
 		if (!(page.second->vaddr & 0xffff800000000000) &&
-		    !this->findVMAByAddress(page.second->vaddr)) {
+		    !process->findVMAByAddress(page.second->vaddr)) {
 			std::cout << COLOR_RED << COLOR_BOLD
 			          << "Found page that has no corresponding VMA: "
 			          << std::hex << page.second->vaddr << std::dec
@@ -58,7 +54,7 @@ int ProcessValidator::validateProcess() {
 	vmi->destroyMap(executablePageMap);
 
 	// Check if all mapped VMAs are valid
-	for (auto &section : this->mappedVMAs) {
+	for (auto &section : this->process->getMappedVMAs()) {
 		if (section.name[0] == '[') {
 			continue;
 		} else if ((section.flags & VMAInfo::VM_EXEC)) {
@@ -73,7 +69,7 @@ int ProcessValidator::validateProcess() {
 	return 0;
 }
 
-void ProcessValidator::validateCodePage(VMAInfo *vma) {
+void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	std::vector<uint8_t> codevma;
 	ElfProcessLoader *binary = nullptr;
 
@@ -137,9 +133,9 @@ void ProcessValidator::validateCodePage(VMAInfo *vma) {
 	}
 }
 
-void ProcessValidator::validateDataPage(VMAInfo *vma) {
+void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	std::vector<VMAInfo> range;
-	for (auto &section : this->mappedVMAs) {
+	for (auto &section : this->process->getMappedVMAs()) {
 		if (CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)) {
 			range.push_back(section);
 		}
@@ -205,7 +201,7 @@ void ProcessValidator::processLoadRel() {
 const std::set<ElfProcessLoader*> ProcessValidator::getMappedLibs() const {
 	std::set<ElfProcessLoader *> ret;
 	ElfProcessLoader *loader = nullptr;
-	for (auto &vma : this->mappedVMAs) {
+	for (auto &vma : this->process->getMappedVMAs()) {
 		loader = this->findLoaderByName(vma.name);
 		if (loader) {
 			ret.insert(loader);
@@ -240,19 +236,9 @@ void ProcessValidator::announceSyms(ElfProcessLoader *lib) {
 	return;
 }
 
-/* Print the information for all mapped VMAs */
-void ProcessValidator::printVMAs() {
-	std::cout << "Currently mapped VMAs:" << std::endl;
-
-	for (auto &it : this->mappedVMAs) {
-		it.print();
-	}
-	return;
-}
-
 std::vector<uint8_t> ProcessValidator::getStackContent(
     size_t readAmount) const {
-	const VMAInfo *stack = this->findVMAByName("[stack]");
+	const VMAInfo *stack = process->findVMAByName("[stack]");
 	// get stack content from VM
 	// return vmi->readVectorFromVA(stack->start, readAmount, pid);
 
@@ -262,7 +248,7 @@ std::vector<uint8_t> ProcessValidator::getStackContent(
 
 int ProcessValidator::checkEnvironment(const std::map<std::string, std::string> &inputMap) {
 	int errors  = 0;
-	auto envMap = tm.getEnvForTask(pid);
+	auto envMap = this->kl->getTaskManager()->getEnvForTask(pid);
 
 	// check all input settings
 	for (auto &inputPair : inputMap) {
@@ -289,7 +275,7 @@ int ProcessValidator::checkEnvironment(const std::map<std::string, std::string> 
  * Find a corresponding ElfProcessLoader for the given vaddr
  */
 ElfProcessLoader *ProcessValidator::findLoaderByAddress(const uint64_t addr) const {
-	const VMAInfo *vma = findVMAByAddress(addr);
+	const VMAInfo *vma = process->findVMAByAddress(addr);
 	if (!vma)
 		return nullptr;
 	return this->findLoaderByName(vma->name);
@@ -300,25 +286,6 @@ ElfProcessLoader *ProcessValidator::findLoaderByName(const std::string &name) co
 	return this->process
 	           ->getKernel()
 	           ->getUserspace()->findLibByName(libname);
-}
-
-const VMAInfo *ProcessValidator::findVMAByName(const std::string &name) const {
-	for (auto &vma : this->mappedVMAs) {
-		if (vma.name.compare(name) == 0) {
-			return &vma;
-		}
-	}
-	return nullptr;
-}
-
-const VMAInfo *ProcessValidator::findVMAByAddress(
-    const uint64_t address) const {
-	for (auto &vma : this->mappedVMAs) {
-		if (address >= vma.start && address < vma.end) {
-			return &vma;
-		}
-	}
-	return nullptr;
 }
 
 /* Find a corresponding SectionInfo for the given vaddr */

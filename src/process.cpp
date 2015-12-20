@@ -14,14 +14,18 @@ namespace fs = boost::filesystem;
 //#include <filesystem>
 //namespace fs = std::filesystem;
 
-Process::Process(const std::string &binaryName, Kernel *kernel)
+Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	:
 	kernel{kernel},
+	pid{pid},
 	execLoader{0},
 	binaryName{binaryName},
 	libraryMap{},
 	dataSegmentMap{},
-	dataSegmentInfoMap{} {}
+	dataSegmentInfoMap{} {
+	
+	this->mappedVMAs = kernel->getTaskManager()->getVMAInfo(pid);
+}
 
 
 const std::string &Process::getName() {
@@ -38,6 +42,10 @@ ElfProcessLoader *Process::getExecLoader() {
 
 Kernel *Process::getKernel() const {
 	return this->kernel;
+}
+
+pid_t Process::getPID() const {
+	return this->pid;	
 }
 
 ElfLoader *Process::loadLibrary(const std::string &libraryName) {
@@ -83,5 +91,38 @@ SegmentInfo *Process::getSegmentInfoForLib(const std::string &name) {
 	//auto segmentInfo = this->findLibByName(name)->elffile->findDataSegment();
 	//this->dataSegmentInfoMap[name] = segmentInfo;
 	//return &this->dataSegmentInfoMap[name];
+}
+
+const std::vector<VMAInfo> &Process::getMappedVMAs() const {
+	return this->mappedVMAs;
+}
+
+/* Print the information for all mapped VMAs */
+void Process::printVMAs() const {
+	std::cout << "Currently mapped VMAs:" << std::endl;
+
+	for (auto &it : this->mappedVMAs) {
+		it.print();
+	}
+	return;
+}
+
+const VMAInfo *Process::findVMAByName(const std::string &name) const {
+	for (auto &vma : this->mappedVMAs) {
+		if (vma.name.compare(name) == 0) {
+			return &vma;
+		}
+	}
+	return nullptr;
+}
+
+const VMAInfo *Process::findVMAByAddress(
+    const uint64_t address) const {
+	for (auto &vma : this->mappedVMAs) {
+		if (address >= vma.start && address < vma.end) {
+			return &vma;
+		}
+	}
+	return nullptr;
 }
 

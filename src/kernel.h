@@ -14,6 +14,7 @@
 
 #include "paravirt_state.h"
 #include "userspacemanager.h"
+#include "taskmanager.h"
 
 class ElfLoader;
 
@@ -63,6 +64,7 @@ public:
 
 	ParavirtState *getParavirtState();
 	UserspaceManager* getUserspace();
+	TaskManager *getTaskManager();
 
 	VMIInstance *vmi;
 
@@ -80,6 +82,7 @@ protected:
 	ModuleMap moduleMap;
 
 private:
+	TaskManager tm;
 	std::string kernelDirName;
 
 	typedef std::unordered_map<std::string, Instance> ModuleInstanceMap;

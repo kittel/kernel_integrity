@@ -9,7 +9,6 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 #include "process.h"
-#include "taskmanager.h"
 
 /**
  * This is an instance of our Process Manager.
@@ -25,12 +24,10 @@ class ProcessValidator {
 public:
 	ProcessValidator(ElfKernelLoader *kl,
 	                 Process *process,
-	                 VMIInstance *vmi,
-	                 int32_t pid);
+	                 VMIInstance *vmi);
 	virtual ~ProcessValidator();
 
 	std::vector<uint8_t> getStackContent(size_t readAmount) const;
-	void printVMAs();
 
 	int checkEnvironment(const std::map<std::string, std::string> &inputMap);
 	int validateProcess();
@@ -45,9 +42,7 @@ private:
 	Process *process;
 
 	ElfProcessLoader *vdsoLoader;
-	TaskManager tm;
 
-	std::vector<VMAInfo> mappedVMAs;
 	std::unordered_map<uint64_t, ElfProcessLoader *> addrToLoaderMap;
 	std::unordered_map<std::string, RelSym> relSymMap;
 
@@ -67,15 +62,13 @@ private:
 
 	ElfProcessLoader *findLoaderByAddress(const uint64_t addr) const;
 	ElfProcessLoader *findLoaderByName(const std::string &name) const;
-	const VMAInfo *findVMAByName(const std::string &name) const;
-	const VMAInfo *findVMAByAddress(const uint64_t address) const;
 	RelSym *findSymbolByName(const std::string &name);
 
 	const std::set<ElfProcessLoader *> getMappedLibs() const;
 	SectionInfo *getSegmentForAddress(uint64_t addr);
 
-	void validateCodePage(VMAInfo *vma);
-	void validateDataPage(VMAInfo *vma);
+	void validateCodePage(const VMAInfo *vma) const;
+	void validateDataPage(const VMAInfo *vma) const;
 
 	std::unordered_map<std::basic_string<char>, RelSym>* getSymMap();
 

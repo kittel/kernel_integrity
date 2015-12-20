@@ -24,7 +24,8 @@
 Kernel::Kernel()
 	:
 	paravirt{this},
-	userspace{this}{}
+	userspace{this},
+	tm{this} {}
 
 void Kernel::setVMIInstance(VMIInstance *vmi) {
 	this->vmi = vmi;
@@ -36,6 +37,10 @@ void Kernel::setKernelDir(const std::string &dirName) {
 
 UserspaceManager* Kernel::getUserspace() {
 	return &this->userspace;
+}
+
+TaskManager *Kernel::getTaskManager() {
+	return &this->tm;
 }
 
 ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
