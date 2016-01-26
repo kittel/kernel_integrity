@@ -126,16 +126,16 @@ AC_CHECK_HEADERS([libdwarf/libdwarf.h], [],
 LIBS=$OLDLIBS
 
 # Checks for libraries.
-OLD_CPPFLAGS=$CPPFLAGS
-CPPFLAGS="$CPPFLAGS  $GLIB_CFLAGS"
+OLD_CXXFLAGS=$CXXFLAGS
+CXXFLAGS="$CXXFLAGS  $GLIB_CFLAGS"
 AC_CHECK_HEADERS([libdwarfparser/libdwarfparser.h], [],
-				 [AC_MSG_ERROR(["Error! You need to have libdwarfparser headers around."])]
+                 [AC_MSG_ERROR(["Error! You need to have libdwarfparser headers around."])]
 )
 
 AC_CHECK_HEADERS([libvmiwrapper/libvmiwrapper.h], [],
-				 [AC_MSG_ERROR(["Error! You need to have libvmiwrapper headers around."])]
+                 [AC_MSG_ERROR(["Error! You need to have libvmiwrapper headers around."])]
 )
-CPPFLAGS=$OLD_CPPFLAGS
+CXXFLAGS=$OLD_CXXFLAGS
 
 
 ##########################################################################

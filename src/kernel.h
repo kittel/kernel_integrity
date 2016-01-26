@@ -46,6 +46,7 @@ public:
 	 */
 	uint64_t getSystemMapAddress(const std::string &name, bool priv = false);
 
+	// TODO: remove and place to associated symbolmanager.
 	void addSymbolAddress(const std::string &name, uint64_t address);
 	uint64_t getSymbolAddress(const std::string &name);
 	std::string getSymbolName(uint64_t address);

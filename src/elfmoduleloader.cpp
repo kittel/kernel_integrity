@@ -8,7 +8,7 @@
 ElfModuleLoader::ElfModuleLoader(ElfFile *elffile,
                                  const std::string &name,
                                  Kernel *kernel)
-    :
+	:
 	ElfLoader(elffile),
 	modName(name),
 	kernel(kernel),

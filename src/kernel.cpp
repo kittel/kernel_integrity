@@ -186,7 +186,7 @@ void Kernel::loadKernelModules() {
 }
 
 uint64_t Kernel::getSystemMapAddress(const std::string &name,
-                                            bool priv) {
+                                     bool priv) {
 	auto symbol = this->symbolMap.find(name);
 	if (symbol != this->symbolMap.end()) {
 		return symbol->second;
@@ -201,8 +201,9 @@ uint64_t Kernel::getSystemMapAddress(const std::string &name,
 	}
 	return 0;
 }
+
 void Kernel::addSymbolAddress(const std::string &name,
-                                     uint64_t address) {
+                              uint64_t address) {
 	std::string newName = name;
 	while (this->moduleSymbolMap.find(newName) != this->moduleSymbolMap.end()) {
 		newName = newName.append("_");
@@ -324,7 +325,8 @@ void Kernel::parseSystemMap() {
 		}
 		sysMapFile.close();
 	} else {
-		std::cout << "Unable to open file" << std::endl;
+		std::cout << "Unable to open systemmap file at '"
+		          << sysMapFileName << "'" << std::endl;
 		return;
 	}
 }

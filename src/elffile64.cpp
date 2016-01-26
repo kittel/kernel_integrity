@@ -56,6 +56,7 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 
 ElfFile64::~ElfFile64() {}
 
+// memindex: base address of the module elf file .text section
 void ElfFile64::addSymbolsToKernel(Kernel *kernel, uint64_t memindex) const {
 	uint32_t symindex = 0;
 	uint32_t strindex = 0;
@@ -245,11 +246,14 @@ bool ElfFile64::isExecutable() const {
 	return (elf64Ehdr->e_type == ET_EXEC);
 }
 
+
 void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
-	std::cout << COLOR_GREEN << "Relocating: " << this->filename << COLOR_NORM << std::endl;
-	
+
+	std::cout << COLOR_GREEN << "Relocating: " << this->filename << COLOR_NORM
+	          << std::endl;
+
 	switch(elf64Ehdr->e_type) {
 	case ET_REL:
 	case ET_DYN:
@@ -362,6 +366,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			break;
 		}
 
+		// TODO: this function should also work for processes.
 		if(process) return;
 
 		uint64_t val = sym->st_value + rel[i].r_addend;
@@ -387,6 +392,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			}
 			*(uint32_t *)locInElf = val;
 			break;
+			// TODO: should work for process?
 		case R_X86_64_GLOB_DAT:   /* Create GOT entry */
 		case R_X86_64_JUMP_SLOT:  /* Create PLT entry */
 		case R_X86_64_RELATIVE:   /* Adjust by program base */
