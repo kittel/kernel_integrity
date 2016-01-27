@@ -427,6 +427,7 @@ void KernelValidator::validateCodePage(page_info_t *page, ElfLoader *elf) {
 				uint32_t jmpDestMemInt = 0;
 				memcpy(&jmpDestMemInt, pageInMem.data() + i + 1, 4);
 
+				// TODO Why is this commented out?
 				// uint64_t memDestAddress = (uint64_t)
 				// elf->textSegment.memindex + pageOffset + i + jmpDestMemInt + 5;
 				// std::cout << "Error: " << std::endl;
