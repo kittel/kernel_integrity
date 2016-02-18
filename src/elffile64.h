@@ -35,7 +35,8 @@ public:
 	SegmentInfo findDataSegment() override;
 
 	std::string symbolName(uint32_t index, uint32_t strindex) const override;
-	void addSymbolsToKernel(Kernel *kernel, uint64_t memindex) const override;
+
+	void addSymbolsToStore(SymbolManager *store, uint64_t memindex) const override;
 
 	uint64_t findAddressOfVariable(const std::string &symbolName) override;
 

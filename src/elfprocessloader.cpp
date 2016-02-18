@@ -30,6 +30,9 @@ void ElfProcessLoader::initText() {
 	size_t pages = (this->textSegmentInfo.filesz + PAGESIZE) / PAGESIZE;
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 	                                index, index + pages * PAGESIZE);
+
+	// TODO:
+	//library.addsymbolstostore(process)
 }
 
 void ElfProcessLoader::initData() {

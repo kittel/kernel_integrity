@@ -37,32 +37,6 @@ public:
 	ElfLoader *loadModule(const std::string &moduleName);
 	void parseSystemMap();
 
-	/*
-	 * @param name   Name of the symbol
-	 * @return       Address of the symbol
-	 *
-	 * Notice: This function only returns the address of public symbols
-	 *
-	 */
-	uint64_t getSystemMapAddress(const std::string &name, bool priv = false);
-
-	// TODO: remove and place to associated symbolmanager.
-	void addSymbolAddress(const std::string &name, uint64_t address);
-	uint64_t getSymbolAddress(const std::string &name);
-	std::string getSymbolName(uint64_t address);
-	bool isSymbol(uint64_t address);
-	void dumpSymbols();
-
-	void addFunctionAddress(const std::string &name, uint64_t address);
-	uint64_t getFunctionAddress(const std::string &name);
-	std::string getFunctionName(uint64_t address);
-	uint64_t getContainingSymbol(uint64_t address);
-	bool isFunction(uint64_t address);
-
-	virtual uint64_t findAddressOfSymbol(const std::string &symbolName);
-
-	void updateRevMaps();
-
 	ParavirtState *getParavirtState();
 	UserspaceManager* getUserspace();
 	TaskManager *getTaskManager();
@@ -93,16 +67,6 @@ private:
 
 	Instance nextModule(Instance &instance);
 	std::string findModuleFile(std::string modName) const;
-
-	typedef std::unordered_map<std::string, uint64_t> SymbolMap;
-	typedef std::map<uint64_t, std::string> SymbolRevMap;
-	SymbolMap symbolMap;
-	SymbolMap privSymbolMap;
-
-	SymbolMap moduleSymbolMap;
-	SymbolMap functionSymbolMap;
-	SymbolRevMap moduleSymbolRevMap;
-	SymbolRevMap functionSymbolRevMap;
 };
 
 

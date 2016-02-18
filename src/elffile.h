@@ -116,7 +116,7 @@ public:
 	virtual uint64_t sectionAlign(int sectionID) = 0;
 
 	virtual std::string symbolName(uint32_t index, uint32_t strindex) const = 0;
-	virtual void addSymbolsToKernel(Kernel *kernel, uint64_t memindex) const = 0;
+	virtual void addSymbolsToStore(SymbolManager *store, uint64_t memindex) const = 0;
 
 	virtual ElfType getType();
 	virtual ElfProgramType getProgramType();

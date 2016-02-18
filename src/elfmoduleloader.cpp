@@ -119,8 +119,8 @@ void ElfModuleLoader::initText(void) {
 	this->applyMcount(info, &this->pvpatcher);
 
 	// Initialize the symTable in the context for later reference
-	this->elffile->addSymbolsToKernel(this->kernel,
-	                                  (uint64_t)this->textSegment.memindex);
+	this->elffile->addSymbolsToStore(&this->kernel->symbols,
+	                                 (uint64_t)this->textSegment.memindex);
 }
 
 void ElfModuleLoader::initData(void) {
@@ -147,13 +147,12 @@ void ElfModuleLoader::initData(void) {
 				continue;
 			uint64_t align         = (elf64Shdr[i].sh_addralign ?: 1) - 1;
 			uint64_t alignmentSize = (this->roData.size() + align) & ~align;
+			this->roData.insert(this->roData.end(), alignmentSize - this->roData.size(), 0);
 			this->roData.insert(
-			    this->roData.end(), alignmentSize - this->roData.size(), 0);
-			this->roData.insert(
-			    this->roData.end(),
-			    this->elffile->getFileContent() + elf64Shdr[i].sh_offset,
-			    this->elffile->getFileContent() + elf64Shdr[i].sh_offset +
-			        elf64Shdr[i].sh_size);
+				this->roData.end(),
+				this->elffile->getFileContent() + elf64Shdr[i].sh_offset,
+				this->elffile->getFileContent() + elf64Shdr[i].sh_offset + elf64Shdr[i].sh_size
+			);
 		}
 	}
 	this->roDataSection.size = this->roData.size();
