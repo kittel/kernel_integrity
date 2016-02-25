@@ -90,8 +90,8 @@ void ElfKernelLoader::initText(void) {
 	uint32_t fill = 0x200000 - (this->textSegmentContent.size() % 0x200000);
 	this->textSegmentContent.insert(this->textSegmentContent.end(), fill, 0);
 
-	this->elffile->addSymbolsToKernel(this,
-	                                  (uint64_t)this->textSegment.memindex);
+	this->elffile->addSymbolsToStore(&this->symbols,
+	                                 (uint64_t)this->textSegment.memindex);
 }
 
 void ElfKernelLoader::initData(void) {
@@ -101,11 +101,10 @@ void ElfKernelLoader::initData(void) {
 	this->bssSection        = elffile->findSectionWithName(".bss");
 	this->roDataSection     = elffile->findSectionWithName(".rodata");
 
-	this->idt_tableAddress     = this->getSystemMapAddress("idt_table");
-	this->nmi_idt_tableAddress = this->getSystemMapAddress("nmi_idt_table");
-	this->sinittextAddress = this->getSystemMapAddress("_sinittext");
-	this->irq_entries_startAddress =
-	this->getSystemMapAddress("irq_entries_start");
+	this->idt_tableAddress     = this->symbols.getSymbolAddress("idt_table");
+	this->nmi_idt_tableAddress = this->symbols.getSymbolAddress("nmi_idt_table");
+	this->sinittextAddress = this->symbols.getSymbolAddress("_sinittext");
+	this->irq_entries_startAddress = this->symbols.getSymbolAddress("irq_entries_start");
 
 	// initialize roData Segment
 	SectionInfo info = elffile->findSectionWithName("__modver");

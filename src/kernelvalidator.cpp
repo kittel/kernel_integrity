@@ -21,8 +21,7 @@ KernelValidator::KernelValidator(ElfKernelLoader *kernelLoader,
 	stackAddresses() {
 
 	this->kernelLoader->loadAllModules();
-	this->kernelLoader->updateRevMaps();
-	this->kernelLoader->dumpSymbols();
+	this->kernelLoader->symbols.updateRevMaps();
 
 	if (targetsFile.length() > 0) {
 		// Read targets of calls
@@ -177,10 +176,10 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 			continue;
 		}
 
-		if (kernelLoader->isFunction(*longPtr))
+		if (kernelLoader->symbols.isFunction(*longPtr))
 			continue;
 
-		if (kernelLoader->isSymbol(*longPtr))
+		if (kernelLoader->symbols.isSymbol(*longPtr))
 			continue;
 
 		uint64_t offset = *longPtr - (uint64_t)elfloader->textSegment.memindex;
@@ -226,9 +225,9 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 			   << COLOR_BOLD_OFF << std::dec << std::endl;
 		}
 
-		uint64_t retFunc = kernelLoader->getContainingSymbol(retAddr.second);
+		uint64_t retFunc = kernelLoader->symbols.getContainingSymbol(retAddr.second);
 
-		std::string retFuncName = kernelLoader->getSymbolName(retFunc);
+		std::string retFuncName = kernelLoader->symbols.getModuleSymbolName(retFunc);
 
 		ss << std::hex << COLOR_GREEN << COLOR_BOLD << "return address: 0x"
 		   << retAddr.second << " ( @ 0x" << retAddr.first << " )" << std::endl
@@ -294,7 +293,7 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 
 		stackInteresting = true;
 		ss << std::hex << "callAddr:      " << callAddr << " "
-		   << kernelLoader->getSymbolName(callAddr) << std::endl
+		   << kernelLoader->symbols.getModuleSymbolName(callAddr) << std::endl
 		   << "retFunc:       " << retFunc << " " << retFuncName << std::endl
 		   << "oldRetFunc:    " << oldRetFunc << " " << oldRetFuncName
 		   << std::endl
@@ -529,8 +528,8 @@ void KernelValidator::validateDataPage(page_info_t* page, ElfLoader* elf) {
 			idtPtrPtr[1] = pagePtr[1];
 
 			// TODO also verify flags
-			if ((kernelLoader->isFunction(idtPtr) ||
-			     kernelLoader->isSymbol(idtPtr) || idtPtr == 0) &&
+			if ((kernelLoader->symbols.isFunction(idtPtr) ||
+			     kernelLoader->symbols.isSymbol(idtPtr) || idtPtr == 0) &&
 			    *((uint32_t*)(pagePtr + 12)) == 0) {
 				// IDT Entry points to function
 				continue;
@@ -580,7 +579,7 @@ void KernelValidator::validateDataPage(page_info_t* page, ElfLoader* elf) {
 					// kvm_guest_apic_eoi_write vs native_apic_mem_write
 					// KVM init code overwrites apci->eoi_write with
 					//     kvm_guest_apic_eoi_write
-					if (kernelLoader->getFunctionAddress(
+					if (kernelLoader->symbols.getFunctionAddress(
 						    "kvm_guest_apic_eoi_write") == currentPtr) {
 						std::cout << "Found pointer to kvm_guest_apic_eoi_write"
 						          << " ... skipping" << std::endl;
@@ -708,11 +707,11 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 				exit(0);
 			}
 
-			if (kernelLoader->isFunction(*longPtr)) {
+			if (kernelLoader->symbols.isFunction(*longPtr)) {
 				continue;
 			}
 
-			if (kernelLoader->isSymbol(*longPtr)) {
+			if (kernelLoader->symbols.isSymbol(*longPtr)) {
 				// stats.symPtrs++;
 				continue;
 			}
@@ -773,7 +772,7 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 
 			// Handle bp_int3_addr and bp_int3_handler
 			static uint64_t bp_int3_addr =
-			kernelLoader->getSystemMapAddress("bp_int3_addr", true);
+			kernelLoader->symbols.getSymbolAddress("bp_int3_addr");
 			if ((page->vaddr + i - 4) == (bp_int3_addr & 0xffffffffffff)) {
 				i += 16;
 				continue;

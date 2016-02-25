@@ -42,7 +42,7 @@ public:
 	std::vector<uint8_t> *getDataSegmentForLib(const std::string &name);
 	SectionInfo *getSectionInfoForLib(const std::string &name);
 	SegmentInfo *getSegmentInfoForLib(const std::string &name);
-	
+
 	SectionInfo *setSectionInfoForLib(const std::string &name);
 	SegmentInfo *setSegmentInfoForLib(const std::string &name);
 
@@ -59,7 +59,7 @@ protected:
 
 	ElfProcessLoader *execLoader;
 	std::string binaryName;
-	
+
 	std::vector<VMAInfo> mappedVMAs;
 
 	std::vector<std::string> getArgv();
@@ -75,7 +75,6 @@ protected:
 	DataSectionInfoMap dataSectionInfoMap;
 	typedef std::unordered_map<std::string, SegmentInfo> DataSegmentInfoMap;
 	DataSegmentInfoMap dataSegmentInfoMap;
-	
 };
 
 #endif

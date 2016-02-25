@@ -45,18 +45,22 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 	for (Elf64_Sym *sym = symBase;
 	     sym < (Elf64_Sym *)(((uint8_t *)symBase) + symSize);
 	     sym++) {
-		if(!sym->st_name) continue;
+
+		if (!sym->st_name) {
+			continue;
+		}
 
 		std::string symbolName = this->symbolName(sym->st_name, strindex);
 		uint64_t symbolAddress = sym->st_value;
 
-		symbolNameMap[symbolName] = symbolAddress;
+		this->symbolNameMap[symbolName] = symbolAddress;
 	}
 }
 
 ElfFile64::~ElfFile64() {}
 
-void ElfFile64::addSymbolsToKernel(Kernel *kernel, uint64_t memindex) const {
+// memindex: base address of the module elf file .text section
+void ElfFile64::addSymbolsToStore(SymbolManager *store, uint64_t memindex) const {
 	uint32_t symindex = 0;
 	uint32_t strindex = 0;
 
@@ -87,17 +91,19 @@ void ElfFile64::addSymbolsToKernel(Kernel *kernel, uint64_t memindex) const {
 			std::string newSymName = symbolName;
 			symbolName = newSymName;
 		}
-		kernel->addSymbolAddress(symbolName, symbolAddress);
+
+		store->addSymbolAddress(symbolName, symbolAddress);
 
 		// We also have to consider local functions
 		// if((ELF64_ST_TYPE(sym->st_info) & STT_FUNC) &&
 		// ELF64_ST_BIND(sym->st_info) & STB_GLOBAL)
 		if ((ELF64_ST_TYPE(sym->st_info) == STT_FUNC)) {
-			if (symbolAddress < memindex) symbolAddress += memindex;
-			kernel->addFunctionAddress(symbolName, symbolAddress);
+			if (symbolAddress < memindex) {
+				symbolAddress += memindex;
+			}
+			store->addFunctionAddress(symbolName, symbolAddress);
 		}
 	}
-
 }
 
 ElfKernelLoader *ElfFile64::parseKernel() {
@@ -121,7 +127,7 @@ ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
 ElfProcessLoader *ElfFile64::parseProcess(const std::string &name,
                                           Kernel *kernel) {
 	auto proc = new ElfProcessLoader64(this, kernel, name);
-	
+
 	// TODO XXX Reenable Dwarf parsing
 	//this->symbols = &process->symbols;
 	//this->parseDwarf();
@@ -245,11 +251,14 @@ bool ElfFile64::isExecutable() const {
 	return (elf64Ehdr->e_type == ET_EXEC);
 }
 
+
 void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
-	std::cout << COLOR_GREEN << "Relocating: " << this->filename << COLOR_NORM << std::endl;
-	
+
+	std::cout << COLOR_GREEN << "Relocating: " << this->filename << COLOR_NORM
+	          << std::endl;
+
 	switch(elf64Ehdr->e_type) {
 	case ET_REL:
 	case ET_DYN:
@@ -343,13 +352,15 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			break;
 		case SHN_UNDEF:
 			if (process) {
-				std::cout << "Need to find address of symbol: " <<
-				this->symbolName(sym->st_name, strindex) << std::endl;
-			//	sym->st_value = process->findAddressOfSymbol(
-			//	                            this->symbolName(sym->st_name));
+				std::cout << "Need to find address of symbol: "
+				          << this->symbolName(sym->st_name, strindex)
+				          << std::endl;
+
+				sym->st_value = process->symbols.getSymbolAddress(
+					this->symbolName(sym->st_name, strindex));
 			} else {
-				sym->st_value = kernel->findAddressOfSymbol(
-				                    this->symbolName(sym->st_name, strindex));
+				sym->st_value = kernel->symbols.getSymbolAddress(
+					this->symbolName(sym->st_name, strindex));
 			}
 			break;
 		default:
@@ -362,6 +373,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			break;
 		}
 
+		// TODO: this function should also work for processes.
 		if(process) return;
 
 		uint64_t val = sym->st_value + rel[i].r_addend;
@@ -387,6 +399,8 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			}
 			*(uint32_t *)locInElf = val;
 			break;
+			// TODO: should work for process?
+			// maybe: address has to be relative, not absolute
 		case R_X86_64_GLOB_DAT:   /* Create GOT entry */
 		case R_X86_64_JUMP_SLOT:  /* Create PLT entry */
 		case R_X86_64_RELATIVE:   /* Adjust by program base */

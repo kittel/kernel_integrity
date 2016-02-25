@@ -31,7 +31,7 @@ AC_LIBTOOL_DLOPEN
 
 # use the C++ compiler for the following checks
 AC_LANG([C++])
-AM_CXXFLAGS="$AM_CXXFLAGS --std=c++14"
+AM_CXXFLAGS="$AM_CXXFLAGS -std=c++14"
 
 
 # Checks for libraries.
@@ -125,16 +125,17 @@ AC_CHECK_HEADERS([libdwarf/libdwarf.h], [],
 LIBS=$OLDLIBS
 
 # Checks for libraries.
-OLD_CPPFLAGS=$CPPFLAGS
-CPPFLAGS="$CPPFLAGS  $GLIB_CFLAGS"
+# TODO: purge CXXFLAGS, might overwrite the user flags
+OLD_CXXFLAGS=$CXXFLAGS
+CXXFLAGS="$CXXFLAGS  $GLIB_CFLAGS"
 AC_CHECK_HEADERS([libdwarfparser/libdwarfparser.h], [],
-				 [AC_MSG_ERROR(["Error! You need to have libdwarfparser headers around."])]
+                 [AC_MSG_ERROR(["Error! You need to have libdwarfparser headers around."])]
 )
 
 AC_CHECK_HEADERS([libvmiwrapper/libvmiwrapper.h], [],
-				 [AC_MSG_ERROR(["Error! You need to have libvmiwrapper headers around."])]
+                 [AC_MSG_ERROR(["Error! You need to have libvmiwrapper headers around."])]
 )
-CPPFLAGS=$OLD_CPPFLAGS
+CXXFLAGS=$OLD_CXXFLAGS
 
 
 ##########################################################################

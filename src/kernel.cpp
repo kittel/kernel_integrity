@@ -185,123 +185,6 @@ void Kernel::loadKernelModules() {
 	}
 }
 
-uint64_t Kernel::getSystemMapAddress(const std::string &name,
-                                            bool priv) {
-	auto symbol = this->symbolMap.find(name);
-	if (symbol != this->symbolMap.end()) {
-		return symbol->second;
-	}
-	if (!priv) {
-		return 0;
-	}
-
-	symbol = this->privSymbolMap.find(name);
-	if (symbol != this->privSymbolMap.end()) {
-		return symbol->second;
-	}
-	return 0;
-}
-void Kernel::addSymbolAddress(const std::string &name,
-                                     uint64_t address) {
-	std::string newName = name;
-	while (this->moduleSymbolMap.find(newName) != this->moduleSymbolMap.end()) {
-		newName = newName.append("_");
-	}
-	this->moduleSymbolMap[newName] = address;
-}
-
-uint64_t Kernel::getSymbolAddress(const std::string &name) {
-	auto symbol = this->moduleSymbolMap.find(name);
-	if (symbol != this->moduleSymbolMap.end()) {
-		return symbol->second;
-	}
-	return 0;
-}
-
-std::string Kernel::getSymbolName(uint64_t address) {
-	auto symbol = this->moduleSymbolRevMap.find(address);
-	if (symbol != this->moduleSymbolRevMap.end()) {
-		return symbol->second;
-	}
-	return "";
-}
-
-bool Kernel::isSymbol(uint64_t address) {
-	if (this->moduleSymbolRevMap.find(address) !=
-	    this->moduleSymbolRevMap.end()) {
-
-		return true;
-	}
-	return false;
-}
-
-uint64_t Kernel::getContainingSymbol(uint64_t address) {
-	auto iter = this->moduleSymbolRevMap.upper_bound(address);
-	if (iter != this->moduleSymbolRevMap.end() &&
-	    iter-- != this->moduleSymbolRevMap.begin()) {
-
-		return iter->first;
-	}
-	return 0;
-}
-
-void Kernel::dumpSymbols() {
-	//std::ofstream outfile
-	//("/home/kittel/linux-symbols-3.16.txt",std::ofstream::binary);
-	//for (auto &symbol : this->moduleSymbolRevMap) {
-	//	outfile << std::hex << symbol.first << std::dec
-	//	        << " " << symbol.second << std::endl;
-	//}
-	//outfile.close();
-}
-
-void Kernel::addFunctionAddress(const std::string &name,
-                                       uint64_t address) {
-	std::string newName = name;
-	while (this->functionSymbolMap.find(newName) !=
-	       this->functionSymbolMap.end()) {
-
-		newName = newName.append("_");
-	}
-	this->functionSymbolMap[newName] = address;
-}
-
-uint64_t Kernel::getFunctionAddress(const std::string &name) {
-	auto function = this->functionSymbolMap.find(name);
-	if (function != this->functionSymbolMap.end()) {
-		return function->second;
-	}
-	return 0;
-}
-
-std::string Kernel::getFunctionName(uint64_t address) {
-	auto function = this->functionSymbolRevMap.find(address);
-	if (function != this->functionSymbolRevMap.end()) {
-		return function->second;
-	}
-	return "";
-}
-
-bool Kernel::isFunction(uint64_t address) {
-	if (this->functionSymbolRevMap.find(address) !=
-	    this->functionSymbolRevMap.end()) {
-		return true;
-	}
-	return false;
-}
-
-void Kernel::updateRevMaps() {
-	this->moduleSymbolRevMap.clear();
-	this->functionSymbolRevMap.clear();
-
-	for (auto &i : this->moduleSymbolMap) {
-		this->moduleSymbolRevMap[i.second] = i.first;
-	}
-	for (auto &i : this->functionSymbolMap) {
-		this->functionSymbolRevMap[i.second] = i.first;
-	}
-}
-
 void Kernel::parseSystemMap() {
 	std::string sysMapFileName = this->kernelDirName;
 	sysMapFileName.append("/System.map");
@@ -316,15 +199,12 @@ void Kernel::parseSystemMap() {
 			std::stringstream iss(line);
 			iss >> std::hex >> address >> mode >> varname;
 
-			if (std::isupper(mode)) {
-				symbolMap[varname] = address;
-			} else {
-				privSymbolMap[varname] = address;
-			}
+			this->symbols.addSysmapSymbol(varname, address, not std::isupper(mode));
 		}
 		sysMapFile.close();
 	} else {
-		std::cout << "Unable to open file" << std::endl;
+		std::cout << "Unable to open systemmap file at '"
+		          << sysMapFileName << "'" << std::endl;
 		return;
 	}
 }
@@ -333,40 +213,3 @@ void Kernel::parseSystemMap() {
 ParavirtState *Kernel::getParavirtState() {
 	return &this->paravirt;
 }
-
-uint64_t Kernel::findAddressOfSymbol(const std::string &symbolName) {
-	// First look into the system map.
-	// As we depend on dwarf anyway we use that information to find
-	// a variable.
-
-	uint64_t address = this->getSystemMapAddress(symbolName);
-	if (address != 0) {
-		return address;
-	}
-	address = this->getSymbolAddress(symbolName);
-	if (address != 0) {
-		return address;
-	}
-	address = this->getFunctionAddress(symbolName);
-	if (address != 0) {
-		return address;
-	}
-
-	// Variable not found in system.map
-	// Try to find the variable by name in insight.
-	Function *func = this->symbols.findFunctionByName(symbolName);
-	if (func && func->getAddress()) {
-		return func->getAddress();
-	}
-
-	Variable *var = this->symbols.findVariableByName(symbolName);
-	if (var && var->getLocation()) {
-		return var->getLocation();
-	}
-	std::cout << COLOR_RED << COLOR_BOLD
-	          << "Could not find address for variable " << symbolName
-	          << COLOR_NORM << COLOR_BOLD_OFF << std::endl;
-	assert(false);
-	return 0;
-}
-

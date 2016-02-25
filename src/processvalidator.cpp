@@ -58,8 +58,9 @@ int ProcessValidator::validateProcess() {
 		if (section.name[0] == '[') {
 			continue;
 		} else if ((section.flags & VMAInfo::VM_EXEC)) {
-			validateCodePage(&section);
+			this->validateCodePage(&section);
 		} else if ((section.flags & VMAInfo::VM_WRITE)) {
+			// TODO: reenable data page validation!!!
 			//validateDataPage(&section);
 		}
 		// No need to validate pages that are only readable
@@ -81,6 +82,7 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	} else {
 		ElfProcessLoader *lib = this->findLoaderByName(vma->name);
 		if (!lib) {
+			// occurs when it's library is mapped but is not a dependency
 			// TODO find out why libnss* is always mapped to the process space
 			// std::cout << COLOR_RED <<
 			//    "Warning: Found library in process that was not a dependency "
@@ -134,6 +136,10 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 }
 
 void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
+	// TODO: see if vmastart is the address of GOT, validate if symbols and
+	// references are correct.
+	// like elffile
+
 	std::vector<VMAInfo> range;
 	for (auto &section : this->process->getMappedVMAs()) {
 		if (CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)) {

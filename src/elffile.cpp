@@ -131,21 +131,20 @@ void ElfFile::parseDwarf() {
 	}
 }
 
-ElfFile* ElfFile::loadElfFile(const std::string &filename){
-	FILE* fd = nullptr;
-	fd = fopen(filename.c_str(), "rb");
+ElfFile *ElfFile::loadElfFile(const std::string &filename) {
+	FILE *fd = nullptr;
+	fd       = fopen(filename.c_str(), "rb");
 
-	if(!fd){
-		std::cout << COLOR_RED << COLOR_BOLD <<
-		"File not found: " << filename <<
-		COLOR_NORM << std::endl;
+	if (!fd) {
+		std::cout << COLOR_RED << COLOR_BOLD << "File not found: " << filename
+		          << COLOR_NORM << std::endl;
 		exit(0);
 	}
 
-	ElfFile* elfFile = nullptr;
+	ElfFile *elfFile = nullptr;
 
-	size_t fileSize = 0;
-	uint8_t* fileContent = nullptr;
+	size_t fileSize      = 0;
+	uint8_t *fileContent = nullptr;
 
 	if (fd != nullptr) {
 		/* Go to the end of the file. */
@@ -153,10 +152,15 @@ ElfFile* ElfFile::loadElfFile(const std::string &filename){
 			/* Get the size of the file. */
 			fileSize = ftell(fd);
 
-			//MMAP the file to memory
-			fileContent = (uint8_t*) mmap(0, fileSize,
-			                              PROT_READ | PROT_WRITE,
-			                              MAP_PRIVATE, fileno(fd), 0);
+			// MMAP the file to memory
+			fileContent = (uint8_t *)mmap(
+				0,
+				fileSize,
+				PROT_READ | PROT_WRITE,
+				MAP_PRIVATE,
+				fileno(fd),
+				0
+			);
 			if (fileContent == MAP_FAILED) {
 				std::cout << "mmap failed" << std::endl;
 				throw ElfException("MMAP failed!!!\n");
@@ -167,14 +171,13 @@ ElfFile* ElfFile::loadElfFile(const std::string &filename){
 		throw ElfException("Cannot load file");
 	}
 
-
-	if(fileContent[4] == ELFCLASS64) {
+	if (fileContent[4] == ELFCLASS64) {
 		elfFile = new ElfFile64(fd, fileSize, fileContent);
 	}
-	elfFile->fd = fd;
-	elfFile->fileSize = fileSize;
+	elfFile->fd          = fd;
+	elfFile->fileSize    = fileSize;
 	elfFile->fileContent = fileContent;
-	elfFile->filename = filename;
+	elfFile->filename    = filename;
 
 	return elfFile;
 }
@@ -273,14 +276,14 @@ void ElfFile::printSymbols(uint32_t symindex){
 	}
 }
 
-uint8_t* ElfFile::getFileContent(){
+uint8_t* ElfFile::getFileContent() {
 	return this->fileContent;
 }
 
-size_t ElfFile::getFileSize(){
+size_t ElfFile::getFileSize() {
 	return this->fileSize;
 }
 
-std::string ElfFile::getFilename(){
+std::string ElfFile::getFilename() {
 	return this->filename;
 }
