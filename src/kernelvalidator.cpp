@@ -60,6 +60,7 @@ ElfKernelLoader *KernelValidator::loadKernel(const std::string &dirName) {
 
 	ElfKernelLoader *kernelLoader = kernelFile->parseKernel();
 
+	kernelLoader->setKernelDir(dirName);
 	kernelLoader->parseSystemMap();
 	kernelLoader->parse();
 
