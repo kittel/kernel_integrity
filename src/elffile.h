@@ -99,7 +99,7 @@ public:
 
 	virtual ~ElfFile();
 
-	virtual int getNrOfSections() = 0;
+	virtual unsigned int getNrOfSections() const = 0;
 
 	virtual SectionInfo findSectionWithName(const std::string &sectionName) const = 0;
 	virtual SectionInfo findSectionByID(uint32_t sectionID) const = 0;
@@ -160,7 +160,7 @@ public:
 	virtual bool isRelocatable() const = 0;
 	virtual void applyRelocations(ElfLoader *loader,
 	                              Kernel *kernel,
-	                              Process *process = NULL) = 0;
+	                              Process *process=nullptr) = 0;
 	virtual bool isDynamic() const = 0;
 	virtual bool isDynamicLibrary() const = 0;
 	virtual bool isExecutable() const = 0;
@@ -168,8 +168,8 @@ public:
 	virtual std::vector<std::string> getDependencies() = 0;
 	virtual std::vector<RelSym> getSymbols() = 0;
 
-	virtual void getRelEntries(std::vector<Elf64_Rel> &ret) = 0;
-	virtual void getRelaEntries(std::vector<Elf64_Rela> &ret) = 0;
+	virtual std::vector<Elf64_Rel> getRelEntries() const = 0;
+	virtual std::vector<Elf64_Rela> getRelaEntries() const = 0;
 
 	uint32_t shstrindex;
 

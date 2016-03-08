@@ -134,19 +134,23 @@ void ElfModuleLoader::initData(void) {
 	// initialize roData Segment
 	ElfFile64 *elf64      = dynamic_cast<ElfFile64 *>(this->elffile);
 	Elf64_Shdr *elf64Shdr = elf64->elf64Shdr;
+
 	for (unsigned int i = 0; i < elf64->elf64Ehdr->e_shnum; i++) {
 		if (((elf64Shdr[i].sh_flags == SHF_ALLOC ||
 		      elf64Shdr[i].sh_flags == SHF_STRINGS) &&
 		     elf64Shdr[i].sh_type == SHT_PROGBITS) ||
 		    (elf64Shdr[i].sh_flags == SHF_ALLOC &&
 		     elf64Shdr[i].sh_type == SHT_NOTE)) {
+
 			std::string sectionName = this->elffile->sectionName(i);
 			if (sectionName.compare(".modinfo") == 0 ||
 			    sectionName.compare("__versions") == 0 ||
 			    sectionName.substr(0, 5).compare(".init") == 0)
 				continue;
-			uint64_t align         = (elf64Shdr[i].sh_addralign ?: 1) - 1;
+
+			uint64_t align         = (elf64Shdr[i].sh_addralign ? 0 : 1) - 1;
 			uint64_t alignmentSize = (this->roData.size() + align) & ~align;
+
 			this->roData.insert(this->roData.end(), alignmentSize - this->roData.size(), 0);
 			this->roData.insert(
 				this->roData.end(),

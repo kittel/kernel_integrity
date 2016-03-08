@@ -23,18 +23,18 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	libraryMap{},
 	dataSegmentMap{},
 	dataSegmentInfoMap{} {
-	
+
 	this->mappedVMAs = kernel->getTaskManager()->getVMAInfo(pid);
 }
 
 
-const std::string &Process::getName() {
+const std::string &Process::getName() const {
 	return this->binaryName;
 }
 
 ElfProcessLoader *Process::getExecLoader() {
 	if (!this->execLoader) {
-		this->execLoader = this->kernel->getUserspace()->loadExec(this);
+		this->execLoader = this->kernel->getTaskManager()->loadExec(this);
 	}
 	assert(this->execLoader);
 	return this->execLoader;
@@ -45,7 +45,7 @@ Kernel *Process::getKernel() const {
 }
 
 pid_t Process::getPID() const {
-	return this->pid;	
+	return this->pid;
 }
 
 ElfLoader *Process::loadLibrary(const std::string &libraryName) {
@@ -53,8 +53,8 @@ ElfLoader *Process::loadLibrary(const std::string &libraryName) {
 	// Also relocate the data section according to this process.
 	ElfLoader *library = this->findLibByName(libraryName);
 	if(library) return library;
-	
-	library = this->kernel->getUserspace()->loadLibrary(libraryName);
+
+	library = this->kernel->getTaskManager()->loadLibrary(libraryName);
 	this->libraryMap[libraryName] = library;
 	return library;
 }
@@ -116,8 +116,7 @@ const VMAInfo *Process::findVMAByName(const std::string &name) const {
 	return nullptr;
 }
 
-const VMAInfo *Process::findVMAByAddress(
-    const uint64_t address) const {
+const VMAInfo *Process::findVMAByAddress(const uint64_t address) const {
 	for (auto &vma : this->mappedVMAs) {
 		if (address >= vma.start && address < vma.end) {
 			return &vma;
@@ -125,4 +124,3 @@ const VMAInfo *Process::findVMAByAddress(
 	}
 	return nullptr;
 }
-

@@ -17,10 +17,7 @@ public:
 
 	ElfProcessLoader *getExecLoader();
 
-	const std::string &getName();
-
-	std::unordered_map<std::string, RelSym> *getSymMap();
-	RelSym *findSymbolByName(const std::string &name);
+	const std::string &getName() const;
 
 	/**
 	 * Check if the given pid is still scheduled in the kernel.

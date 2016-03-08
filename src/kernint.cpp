@@ -277,7 +277,7 @@ int main(int argc, char **argv) {
 	}
 
 	if (!binaryName.empty() && pid != 0) {
-		kl->getUserspace()->setLibraryDir(libraryDir);
+		kl->getTaskManager()->setLibraryDir(libraryDir);
 		Process proc{binaryName, kl, pid};
 		// Ensure that all arguments make sense at this point
 		std::cout << "Starting Process Validation..." << std::endl;

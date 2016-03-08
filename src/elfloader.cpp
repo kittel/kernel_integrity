@@ -197,9 +197,8 @@ void ElfLoader::applyJumpEntries(uint64_t jumpStart,
 			}
 		} else if (dynamic_cast<ElfModuleLoader *>(this)) {
 			assert(false);
-			//	TODO!!!!
-			//    jumpEntry =
-			//    context.currentModule.member("jump_entries").arrayElem(i);
+			//TODO!!!!
+			//jumpEntry = context.currentModule.member("jump_entries").arrayElem(i);
 		}
 
 		uint64_t keyAddress = jumpEntry.memberByName("key").getValue<uint64_t>();

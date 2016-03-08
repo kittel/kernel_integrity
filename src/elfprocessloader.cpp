@@ -19,7 +19,7 @@ void ElfProcessLoader::loadDependencies() {
 	auto dependencies = this->elffile->getDependencies();
 
 	for (auto &dep : dependencies) {
-		this->kernel->getUserspace()->loadLibrary(dep);
+		this->kernel->getTaskManager()->loadLibrary(dep);
 	}
 }
 
@@ -27,36 +27,35 @@ void ElfProcessLoader::initText() {
 	this->textSegmentInfo = this->elffile->findCodeSegment();
 
 	auto index = this->elffile->getFileContent() + this->textSegmentInfo.offset;
+
+	// TODO: why pages? the exact size is specified!
 	size_t pages = (this->textSegmentInfo.filesz + PAGESIZE) / PAGESIZE;
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 	                                index, index + pages * PAGESIZE);
-
-	// TODO:
-	//library.addsymbolstostore(process)
 }
 
 void ElfProcessLoader::initData() {
-	// This has to be done once per process.
-	assert(false);
-	// this->dataSegmentInfo = this->elffile->findDataSegment();
+	// TODO: This has to be done once per process.
+	std::cout << "TODO: initData for elfprocessloader: " << name << std::endl;
 
-	// auto index = this->elffile->getFileContent() + this->dataSegmentInfo.offset;
-	// this->dataSegmentContent.insert(this->dataSegmentContent.end(),
-	//                                 index,
-	//                                 index + this->dataSegmentInfo.filesz);
+	this->dataSegmentInfo = this->elffile->findDataSegment();
+
+	auto index = this->elffile->getFileContent() + this->dataSegmentInfo.offset;
+	this->dataSegmentContent.insert(this->dataSegmentContent.end(),
+	                                index,
+	                                index + this->dataSegmentInfo.filesz);
+	// TODO: apply relocations for each linked elf in that process:
+	//this->elffile->applyRelocations(this, kernel, process);
 }
 
-void ElfProcessLoader::initData(Process *process) {
-	this->elffile->applyRelocations(this, kernel, process);
-}
 /*
  * Initialize a complete memory image for validation. Relocations are not yet
  * processed
  */
 void ElfProcessLoader::parse() {
 	if (this->elffile->isExecutable()) {
-		//std::cout << "Loading VDSO" << std::endl;
-		// TODO: load vdso for the process.
+		std::cout << "ElfProcessLoader::parse(): TODO: load VDSO"
+		          << std::endl;
 		//this->kernel->loadVDSO();
 
 		//create_process
@@ -66,8 +65,7 @@ void ElfProcessLoader::parse() {
 	// Load Dependencies
 	this->loadDependencies();
 	this->initText();
-	
-	// init the first memory segment
+	this->initData();
 }
 
 /* Return the SectionInfo, in which the given addr is contained. */
@@ -99,8 +97,6 @@ SectionInfo *ElfProcessLoader::getSegmentForAddress(uint64_t addr) {
 void ElfProcessLoader::updateSectionInfoMemAddress(SectionInfo &info) {
 	UNUSED(info);
 }
-
-void ElfProcessLoader::addSymbols() {}
 
 /* Check if the given virtual address is located in the textSegment */
 bool ElfProcessLoader::isCodeAddress(uint64_t addr) {

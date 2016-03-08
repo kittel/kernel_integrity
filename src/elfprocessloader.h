@@ -12,6 +12,7 @@
 class ElfProcessLoader;
 class ElfKernelLoader;
 class Process;
+class ProcessValidator;
 
 class ElfProcessLoader : public ElfLoader {
 	friend class ProcessValidator;
@@ -35,18 +36,16 @@ protected:
 	void loadDependencies();
 
 	SegmentInfo textSegmentInfo;
+	SegmentInfo dataSegmentInfo;
 
 	SectionInfo heapSection;  // handler for optional heap segment
-	std::vector<uint8_t> dataSegmentContent;  // actual dataSegment data
 
-	std::vector<RelSym> providedSyms; // symbols provided by this loader
+	// symbols provided by this loader
+	std::vector<RelSym> providedSyms;
 	virtual std::vector<RelSym> getProvidedSyms();
 
 	void initText() override;
 	void initData() override;
-	void initData(Process *proc);
-
-	virtual void applyLoadRel(class ProcessValidator *val) = 0;
 
 	SectionInfo *getSegmentForAddress(uint64_t addr);
 
@@ -62,8 +61,6 @@ protected:
 	                     std::unordered_map<std::string, RelSym> *map) = 0;
 
 	virtual void updateSectionInfoMemAddress(SectionInfo& info);
-	virtual void addSymbols();
-
 };
 
 #include "elfprocessloader64.h"

@@ -10,9 +10,6 @@
 #include "libdwarfparser/variable.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
-class TaskManager;
-class VMAInfo;
-
 #include "process.h"
 #include "helpers.h"
 
@@ -90,9 +87,38 @@ public:
 	 */
 	std::unordered_map<std::string, std::string> getEnvForTask(pid_t pid) const;
 
+	/** Set the path where libraries are loaded from. */
+	void setLibraryDir(const std::string &dirName);
+
+	/** get the vdso (currently hardcoded to vdso_image_64) */
+	ElfLoader *loadVDSO();
+
+	/** load a shared library by name */
+	ElfLoader *loadLibrary(const std::string &libraryName);
+
+	/** determine the absolute path of a library */
+	std::string findLibraryFile(const std::string &libName);
+
+	/** try to return an already loaded library by name */
+	ElfProcessLoader *findLibByName(const std::string &name);
+
+	/** create an executable from a process */
+	ElfProcessLoader *loadExec(Process *process);
+
 protected:
 	Instance initTask;
+
+	/**
+	 * Memory holder of all processes observed.
+	 */
 	std::unordered_map<pid_t, Process> processes;
+
+	std::unordered_map<std::string, Process *> processMap;
+
+	using LibraryMap = std::unordered_map<std::string, ElfLoader *>;
+	LibraryMap libraryMap;
+
+	std::vector<std::string> libDirName;
 
 	Kernel *kernel;
 

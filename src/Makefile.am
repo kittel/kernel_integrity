@@ -1,10 +1,10 @@
-AM_CXXFLAGS = -ggdb -Wall -Wextra -Werror -fpic -I $(top_builddir)/src -std=c++1y -I /usr/include -O3 -pg
+AM_CXXFLAGS = -ggdb -Wall -Wextra -pedantic -Wcast-align -fpic -I $(top_builddir)/src -std=c++14 -I /usr/include -O3 -pg
 
 kernint_CXXFLAGS=$(AM_CXXFLAGS) $(GLIB_CFLAGS) $(LIBS)
 kernint_LDFLAGS=$(GLIB_LIBS) \
-				-ldwarfparser -ldwarf -lelf \
-				-lvmi -lvmiwrapper \
-				-lboost_system -lboost_filesystem -lpthread
+                -ldwarfparser -ldwarf -lelf \
+                -lvmi -lvmiwrapper \
+                -lboost_system -lboost_filesystem -lpthread
 
 bin_PROGRAMS=kernint
 
@@ -29,7 +29,7 @@ kernint_HEADERS=kernint.h \
                 paravirt_state.h \
                 paravirt_patch.h \
                 process.h \
-                userspacemanager.h
+                helpers.h
 
 kernint_SOURCES=kernint.cpp \
                 kernelvalidator.cpp \
@@ -50,5 +50,4 @@ kernint_SOURCES=kernint.cpp \
                 paravirt_state.cpp \
                 paravirt_patch.cpp \
                 process.cpp \
-                userspacemanager.cpp
-
+                helpers.cpp

@@ -20,7 +20,7 @@ public:
 	ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent);
 	virtual ~ElfFile64();
 
-	int getNrOfSections() override;
+	unsigned int getNrOfSections() const override;
 
 	SectionInfo findSectionWithName(const std::string &sectionName) const override;
 	SectionInfo findSectionByID(uint32_t sectionID) const override;
@@ -50,7 +50,7 @@ public:
 	bool isRelocatable() const override;
 	void applyRelocations(ElfLoader *loader,
 	                      Kernel *kernel,
-	                      Process *process) override;
+	                      Process *process=nullptr) override;
 	bool isDynamic() const override;
 	bool isDynamicLibrary() const override;
 	bool isExecutable() const override;
@@ -59,15 +59,15 @@ public:
 
 	std::vector<std::string> getDependencies() override;
 
-
 	Elf64_Ehdr *elf64Ehdr;
 	Elf64_Shdr *elf64Shdr;
 	Elf64_Phdr *elf64Phdr;
 
 	template<typename T>
-	void getRelEntries(std::vector<T> &ret, uint32_t type);
-	void getRelEntries(std::vector<Elf64_Rel> &ret) override;
-	void getRelaEntries(std::vector<Elf64_Rela> &ret) override;
+	std::vector<T> getRelocationEntries(uint32_t type) const;
+
+	std::vector<Elf64_Rel> getRelEntries() const override;
+	std::vector<Elf64_Rela> getRelaEntries() const override;
 
 private:
 	void applyRelaOnSection(uint32_t relSectionID,
