@@ -26,7 +26,9 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 	std::cout << "ProcessValidator got: " << this->process->getName() << std::endl;
 
-	pid = process->getPID();
+	this->pid = process->getPID();
+	std::cout << "[PID] " << this->pid << std::endl;
+
 	// process load-time relocations
 	std::cout << "Processing load-time relocations..." << std::endl;
 	this->processLoadRel();
@@ -37,10 +39,10 @@ ProcessValidator::~ProcessValidator() {}
 int ProcessValidator::validateProcess() {
 	// check if all mapped pages are known
 	std::cout << COLOR_GREEN
-	    << "Starting page validation ..."
-	    COLOR_RESET << std::endl;
+	          << "Starting page validation ..."
+	          << COLOR_RESET << std::endl;
 
-	PageMap executablePageMap = vmi->getPages(pid);
+	PageMap executablePageMap = vmi->getPages(this->pid);
 	for (auto &page : executablePageMap) {
 		// check if page is contained in VMAs
 		if (!(page.second->vaddr & 0xffff800000000000) &&
@@ -60,8 +62,7 @@ int ProcessValidator::validateProcess() {
 		} else if ((section.flags & VMAInfo::VM_EXEC)) {
 			this->validateCodePage(&section);
 		} else if ((section.flags & VMAInfo::VM_WRITE)) {
-			// TODO: reenable data page validation!!!
-			//validateDataPage(&section);
+			this->validateDataPage(&section);
 		}
 		// No need to validate pages that are only readable
 	}
@@ -75,19 +76,19 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	ElfProcessLoader *binary = nullptr;
 
 	if (this->process->getName().length() >= vma->name.length() &&
-	    this->process->getName().compare(
-	        this->process->getName().length() - vma->name.length(),
-	        vma->name.length(), vma->name) == 0) {
+	    this->process->getName().compare(this->process->getName().length()
+	                                     - vma->name.length(),
+	                                     vma->name.length(),
+	                                     vma->name) == 0) {
 		binary = this->process->getExecLoader();
 	} else {
 		ElfProcessLoader *lib = this->findLoaderByName(vma->name);
 		if (!lib) {
 			// occurs when it's library is mapped but is not a dependency
 			// TODO find out why libnss* is always mapped to the process space
-			// std::cout << COLOR_RED <<
-			//    "Warning: Found library in process that was not a dependency "
-			//    <<
-			//    vma->name << COLOR_RESET << std::endl;
+			std::cout << COLOR_RED << "Warning: Found library in process "
+			                          "that was not a dependency "
+			          << vma->name << COLOR_RESET << std::endl;
 			return;
 		}
 		binary = lib;
@@ -95,8 +96,8 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 
 	assert(binary);
 
-	const uint8_t *fileContent = 0;
-	const uint8_t *memContent  = 0;
+	const uint8_t *fileContent = nullptr;
+	const uint8_t *memContent  = nullptr;
 	size_t textsize            = 0;
 	size_t bytesChecked        = 0;
 
@@ -113,11 +114,13 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 		for (size_t j = 0;
 		     j < std::min(textsize - bytesChecked, codevma.size());
 		     j++) {
+
 			if (memContent[j] != fileContent[bytesChecked + j]) {
 				std::cout << COLOR_RED << COLOR_BOLD
 				          << "MISMATCH in code segment! " << vma->name
 				          << COLOR_RESET
 				          << std::endl;
+
 				displayChange(memContent, fileContent + bytesChecked, j, textsize);
 				return;
 			}
@@ -148,9 +151,9 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	}
 
 	uint64_t counter = 0;
-	auto content =
-	    vmi->readVectorFromVA(vma->start, vma->end - vma->start, pid);
+	auto content = vmi->readVectorFromVA(vma->start, vma->end - vma->start, this->pid);
 	uint8_t *data = content.data();
+
 	for (uint32_t i = 0; i < content.size() - 7; i++) {
 		uint64_t *value = (uint64_t *)(data + i);
 		// if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
@@ -167,7 +170,8 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 		}
 	}
 
-	std::cout << "Found " << COLOR_RED << COLOR_BOLD << counter << COLOR_RESET
+	std::cout << "Found " << COLOR_RED << COLOR_BOLD
+	          << counter << COLOR_RESET
 	          << " pointers in section:" << std::endl;
 	vma->print();
 }
@@ -192,7 +196,8 @@ void ProcessValidator::processLoadRel() {
 
 	for (auto &lib : mappedLibs) {
 		// process own relocations
-		lib->applyLoadRel(this);
+		// TODO: library relocations
+		// lib->applyLoadRel(this);
 	}
 	return;
 }
@@ -204,9 +209,10 @@ void ProcessValidator::processLoadRel() {
  * => Reverse iterate through the mappedVMAs and find the corresponding loader,
  *    gives the loaders in the correct processing order.
  */
-const std::set<ElfProcessLoader*> ProcessValidator::getMappedLibs() const {
+const std::set<ElfProcessLoader *> ProcessValidator::getMappedLibs() const {
 	std::set<ElfProcessLoader *> ret;
 	ElfProcessLoader *loader = nullptr;
+
 	for (auto &vma : this->process->getMappedVMAs()) {
 		loader = this->findLoaderByName(vma.name);
 		if (loader) {
@@ -219,9 +225,8 @@ const std::set<ElfProcessLoader*> ProcessValidator::getMappedLibs() const {
 /* Add the symbols, announced by lib, to the nameRelSymMap
  *
  *  - sweep through all provided symbols of the lib
- *  - if( symbol not yet in map || symbol in map(WEAK) and exported
- * symbol(GLOBAL)
- *      - add to map
+ *  if symbol not in map or (symbol in map(WEAK) and exported symbol(GLOBAL))
+ *      add to relSymMap
  */
 void ProcessValidator::announceSyms(ElfProcessLoader *lib) {
 	std::vector<RelSym> syms = lib->getProvidedSyms();
@@ -246,15 +251,14 @@ std::vector<uint8_t> ProcessValidator::getStackContent(
     size_t readAmount) const {
 	const VMAInfo *stack = process->findVMAByName("[stack]");
 	// get stack content from VM
-	// return vmi->readVectorFromVA(stack->start, readAmount, pid);
+	// return vmi->readVectorFromVA(stack->start, readAmount, this->pid);
 
-	return vmi->readVectorFromVA(
-	    stack->end - readAmount, readAmount, pid, true);
+	return vmi->readVectorFromVA(stack->end - readAmount, readAmount, this->pid, true);
 }
 
 int ProcessValidator::checkEnvironment(const std::map<std::string, std::string> &inputMap) {
 	int errors  = 0;
-	auto envMap = this->kl->getTaskManager()->getEnvForTask(pid);
+	auto envMap = this->kl->getTaskManager()->getEnvForTask(this->pid);
 
 	// check all input settings
 	for (auto &inputPair : inputMap) {
@@ -291,7 +295,7 @@ ElfProcessLoader *ProcessValidator::findLoaderByName(const std::string &name) co
 	std::string libname = fs::path(name).filename().string();
 	return this->process
 	           ->getKernel()
-	           ->getUserspace()->findLibByName(libname);
+	           ->getTaskManager()->findLibByName(libname);
 }
 
 /* Find a corresponding SectionInfo for the given vaddr */
@@ -406,8 +410,7 @@ int ProcessValidator::_validatePage(page_info_t *page) {
 		return 1;
 
 	// get Page _content_ from VM
-	std::vector<uint8_t> pageInMem =
-	    vmi->readVectorFromVA(page->vaddr, page->size, pid);
+	std::vector<uint8_t> pageInMem = vmi->readVectorFromVA(page->vaddr, page->size, this->pid);
 
 #ifdef DEBUG
 	std::cout << "Content of the whitelisted page:" << std::endl;

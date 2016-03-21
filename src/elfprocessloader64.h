@@ -57,7 +57,8 @@ private:
 	uint64_t vdsoAddr; // if exec : Starting vaddr of the VDSO Image
 	// if vdso : 0 [the vdso doesn't care where it is at]
 
-	std::unordered_map<std::string, uint32_t> neededSyms; // first:name, second:symtabID
+	// map: name -> symtabID
+	std::unordered_map<std::string, uint32_t> neededSyms;
 
 public:
 	ElfProcessLoader64(ElfFile64 *elffile,
@@ -67,13 +68,7 @@ public:
 	virtual ~ElfProcessLoader64();
 
 protected:
-	virtual uint64_t getVAForAddr(uint64_t addr, uint32_t shtID);
-
-	virtual void applyLoadRel(ProcessValidator *val);
 	int evalLazy(uint64_t addr, std::unordered_map<std::string, RelSym> *map) override;
-
-	void relocate(Elf64_Rela *rel);
-	void relocate(Elf64_Rel *rel);
 
 	void writeRelValue(uint64_t locAddr, uint64_t symAddr);
 };

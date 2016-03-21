@@ -211,7 +211,8 @@ void ElfFile::printSymbols(uint32_t symindex){
 	uint8_t *elfEhdr = this->fileContent;
 
 	if (elfEhdr[4] == ELFCLASS32) {
-		//TODO
+		// TODO
+		std::cout << "can't print elfclass32 symbols" << std::endl;
 	}
 	else if (elfEhdr[4] == ELFCLASS64) {
 		Elf64_Ehdr * elf64Ehdr;

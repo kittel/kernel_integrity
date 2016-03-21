@@ -13,7 +13,6 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 
 #include "paravirt_state.h"
-#include "userspacemanager.h"
 #include "taskmanager.h"
 
 class ElfLoader;
@@ -38,7 +37,6 @@ public:
 	void parseSystemMap();
 
 	ParavirtState *getParavirtState();
-	UserspaceManager* getUserspace();
 	TaskManager *getTaskManager();
 
 	void initTaskManager();
@@ -52,7 +50,6 @@ public:
 
 protected:
 	ParavirtState paravirt;
-	UserspaceManager userspace;
 	TaskManager tm;
 
 	std::mutex moduleMapMutex;

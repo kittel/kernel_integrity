@@ -45,9 +45,6 @@ protected:
 	ElfFile *elffile;         // Wrapped ElfFile, provides to file and seg
 	Instance *debugInstance;  // Wrapped debug instance of the file
 
-	SectionInfo textSegment;  // The first big memory segment
-	std::vector<uint8_t> textSegmentContent;
-
 	std::vector<uint8_t> jumpTable;
 	std::vector<uint8_t> roData;
 
@@ -55,9 +52,13 @@ protected:
 	std::set<uint64_t> jumpDestinations;
 	std::set<uint64_t> smpOffsets;
 
+	SectionInfo textSegment;  // The first big memory segment
 	SectionInfo dataSection;  // The second big memory segment
 	SectionInfo bssSection;   // The last memory segment
 	SectionInfo roDataSection;
+
+	std::vector<uint8_t> textSegmentContent;
+	std::vector<uint8_t> dataSegmentContent;
 
 	void applyMcount(const SectionInfo &info, ParavirtPatcher *patcher);
 	void applyAltinstr(ParavirtPatcher *patcher);

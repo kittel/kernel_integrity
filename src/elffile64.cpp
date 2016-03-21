@@ -30,7 +30,7 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 	uint32_t strindex = 0;
 
 	/* find sections SHT_SYMTAB, SHT_STRTAB  */
-	for (unsigned int i = 0; i < this->elf64Ehdr->e_shnum; i++) {
+	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 		if ((elf64Shdr[i].sh_type == SHT_SYMTAB )) {
 			symindex = i;
 			strindex = elf64Shdr[i].sh_link;
@@ -65,7 +65,7 @@ void ElfFile64::addSymbolsToStore(SymbolManager *store, uint64_t memindex) const
 	uint32_t strindex = 0;
 
 	/* find sections SHT_SYMTAB, SHT_STRTAB  */
-	for (unsigned int i = 0; i < this->elf64Ehdr->e_shnum; i++) {
+	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 		if ((elf64Shdr[i].sh_type == SHT_SYMTAB )) {
 			symindex = i;
 			strindex = elf64Shdr[i].sh_link;
@@ -128,20 +128,19 @@ ElfProcessLoader *ElfFile64::parseProcess(const std::string &name,
                                           Kernel *kernel) {
 	auto proc = new ElfProcessLoader64(this, kernel, name);
 
-	// TODO XXX Reenable Dwarf parsing
-	//this->symbols = &process->symbols;
-	//this->parseDwarf();
+	this->parseDwarf();
+	//TODO: this->symbols = &proc->symbols;
 	return proc;
 }
 
-int ElfFile64::getNrOfSections() {
+unsigned int ElfFile64::getNrOfSections() const {
 	return this->elf64Ehdr->e_shnum;
 }
 
 /* This function actually searches for a _section_ in the ELF file */
 SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const {
 	char *tempBuf = 0;
-	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
+	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 		tempBuf = (char *)this->fileContent +
 		          elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
 		          elf64Shdr[i].sh_name;
@@ -159,7 +158,7 @@ SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const
 }
 
 SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
-	if (sectionID < elf64Ehdr->e_shnum) {
+	if (sectionID < this->getNrOfSections()) {
 		std::string sectionName = toString(
 		    this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
 		    elf64Shdr[sectionID].sh_name);
@@ -173,7 +172,7 @@ SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
 }
 
 bool ElfFile64::isCodeAddress(uint64_t address) {
-	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
+	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)) {
 			if (CHECKFLAGS(this->elf64Shdr[i].sh_flags,
 			               (SHF_ALLOC & SHF_EXECINSTR))) {
@@ -187,7 +186,7 @@ bool ElfFile64::isCodeAddress(uint64_t address) {
 }
 
 bool ElfFile64::isDataAddress(uint64_t address) {
-	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
+	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)) {
 			if (CHECKFLAGS(this->elf64Shdr[i].sh_flags, (SHF_ALLOC)) &&
 			    !CHECKFLAGS(this->elf64Shdr[i].sh_flags, (SHF_EXECINSTR))) {
@@ -262,9 +261,9 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
 	switch(elf64Ehdr->e_type) {
 	case ET_REL:
 	case ET_DYN:
-		for (unsigned int i = 0; i < this->elf64Ehdr->e_shnum; i++) {
+		for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 			unsigned int infosec = this->elf64Shdr[i].sh_info;
-			if (infosec >= this->elf64Ehdr->e_shnum)
+			if (infosec >= this->getNrOfSections())
 				continue;
 
 			/* Don't bother with non-allocated sections */
@@ -285,7 +284,7 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
 }
 
 void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
-                                   ElfLoader* loader,
+                                   ElfLoader *loader,
                                    Kernel *kernel,
                                    Process *process) {
 
@@ -304,9 +303,9 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 
 	SectionInfo relSectionInfo = this->findSectionByID(relSectionID);
 
-	Elf64_Rela *rel = (Elf64_Rela *)relSectionInfo.index;
+	Elf64_Rela *rel = reinterpret_cast<Elf64_Rela *>(relSectionInfo.index);
 	assert(symindex);
-	Elf64_Sym *symBase = (Elf64_Sym *)this->sectionAddress(symindex);
+	Elf64_Sym *symBase = reinterpret_cast<Elf64_Sym *>(this->sectionAddress(symindex));
 
 	// TODO move this to a dedicated function if used with kernel modules
 	SectionInfo percpuDataSegment = this->findSectionWithName(".data..percpu");
@@ -315,30 +314,33 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	SectionInfo symRelSectionInfo;
 
 	for (uint32_t i = 0; i < relSectionInfo.size / sizeof(*rel); i++) {
-		void *locInElf             = 0;
-		void *locInMem             = 0;
-		void *locOfRelSectionInMem = 0;
-		void *locOfRelSectionInElf = 0;
+		uint8_t *locInElf = nullptr;  // on host
+		uint64_t locInMem = 0;  // on guest
+		size_t locOfRelSectionInElf = 0;  // on host
+		size_t locOfRelSectionInMem = 0;  // on guest
 
-		/* This is where to make the change */
-		locInElf = (void *)((char *)sectionInfo.index + rel[i].r_offset);
-		locInMem = (void *)((char *)sectionInfo.memindex + rel[i].r_offset);
+		// This is where to make the change:
+		// on our host
+		locInElf = reinterpret_cast<uint8_t *>(sectionInfo.index) + rel[i].r_offset;
+
+		// in the guest
+		locInMem = reinterpret_cast<uint64_t>(reinterpret_cast<char *>(sectionInfo.memindex) + rel[i].r_offset);
 
 		Elf64_Sym *sym = symBase + ELF64_R_SYM(rel[i].r_info);
 
 		if (symRelSectionInfo.segID != sym->st_shndx) {
-			symRelSectionInfo =
-			    this->findSectionByID(sym->st_shndx);
+			symRelSectionInfo = this->findSectionByID(sym->st_shndx);
 			loader->updateSectionInfoMemAddress(symRelSectionInfo);
 		}
 
-		if(sym->st_shndx == percpuDataSegment.segID) {
-			Instance currentModule = loader->getKernel()->
-			                getKernelModuleInstance(loader->getName());
-			symRelSectionInfo.memindex =
-			    (uint8_t *) currentModule.memberByName("percpu")
-			                          .getRawValue<uint64_t>(false);
+		if (sym->st_shndx == percpuDataSegment.segID) {
+			Instance currentModule = loader->getKernel()->getKernelModuleInstance(loader->getName());
+			symRelSectionInfo.memindex = reinterpret_cast<uint8_t *>(currentModule.memberByName("percpu").getRawValue<uint64_t>(false));
 		}
+
+		// store section starts for host and guest
+		locOfRelSectionInElf = reinterpret_cast<size_t>(symRelSectionInfo.index);
+		locOfRelSectionInMem = reinterpret_cast<size_t>(symRelSectionInfo.memindex);
 
 		std::cout << "Relocating: "
 		          << this->symbolName(sym->st_name, strindex) << " -> "
@@ -356,56 +358,81 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 				          << this->symbolName(sym->st_name, strindex)
 				          << std::endl;
 
-				sym->st_value = process->symbols.getSymbolAddress(
-					this->symbolName(sym->st_name, strindex));
-			} else {
-				sym->st_value = kernel->symbols.getSymbolAddress(
-					this->symbolName(sym->st_name, strindex));
+				// this fetches the value to be written from the process.
+				sym->st_value = process->symbols.getSymbolAddress(this->symbolName(sym->st_name, strindex));
+			}
+			else {
+				sym->st_value = kernel->symbols.getSymbolAddress(this->symbolName(sym->st_name, strindex));
 			}
 			break;
 		default:
-			locOfRelSectionInElf = (void *)symRelSectionInfo.index;
-			locOfRelSectionInMem = (void *)symRelSectionInfo.memindex;
-
-			if (sym->st_value < (long unsigned int)locOfRelSectionInMem) {
-				sym->st_value += (long unsigned int)locOfRelSectionInMem;
+			// sometimes, in the kernel one only gets the offset in the section
+			if (sym->st_value < locOfRelSectionInMem) {
+				sym->st_value += locOfRelSectionInMem;
 			}
 			break;
 		}
 
-		// TODO: this function should also work for processes.
-		if(process) return;
-
+		// now follows the actual relocation part.
+		// this is what we'll write:
 		uint64_t val = sym->st_value + rel[i].r_addend;
 
+		// depending on the relocation type, write differently:
 		switch (ELF64_R_TYPE(rel[i].r_info)) {
-		case R_X86_64_NONE: break;
-		case R_X86_64_64: *(uint64_t *)locInElf = val; break;
+		case R_X86_64_NONE:
+			break;
+
+		case R_X86_64_64:
+			*reinterpret_cast<uint64_t *>(locInElf) = val;
+			break;
+
 		case R_X86_64_32:
-			*(uint64_t *)locInElf = val;
-			assert(val == *(uint64_t *)locInElf);
+			*reinterpret_cast<uint64_t *>(locInElf) = val;
 			break;
+
 		case R_X86_64_32S:
-			*(uint32_t *)locInElf = val;
-			assert(val == (uint64_t) *(int32_t *)locInElf);
+			*reinterpret_cast<uint32_t *>(locInElf) = val;
 			break;
+
 		case R_X86_64_PC32:
 			if (isAltinstrSection) {
 				// This is later used to copy some memory
-				val = val - (uint64_t)locOfRelSectionInMem +
-				      (uint64_t)locOfRelSectionInElf - (uint64_t)locInElf;
+				val = val -
+				      reinterpret_cast<uint64_t>(locOfRelSectionInMem) +
+				      reinterpret_cast<uint64_t>(locOfRelSectionInElf) -
+				      reinterpret_cast<uint64_t>(locInElf);
 			} else {
-				val -= (uint64_t)locInMem;
+				// make it relative again
+				val -= locInMem;
 			}
-			*(uint32_t *)locInElf = val;
+
+			*(reinterpret_cast<uint32_t *>(locInElf)) = val;
 			break;
-			// TODO: should work for process?
-			// maybe: address has to be relative, not absolute
+
 		case R_X86_64_GLOB_DAT:   /* Create GOT entry */
 		case R_X86_64_JUMP_SLOT:  /* Create PLT entry */
+
+			// TODO: does this get the correct memindex?
+			//       the process has to return it
+			// write: host-memindex + offset + addend
+			*reinterpret_cast<uint64_t *>(locInElf) = val;
+			break;
+
 		case R_X86_64_RELATIVE:   /* Adjust by program base */
 		case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
-			*(uint64_t *)locInElf = val; break;
+			// TODO: don't patch JUMP_SLOT if we have lazy binding.
+			// instead, write in the _dl_runtime_resolve_{sse,avx,avx512}
+
+			std::cout << "relocating 0x" << std::hex << locInElf
+			          << " to 0x" << val << " off=0x" << sym->st_value
+			          << std::dec << std::endl;
+
+			// maybe: address has to be relative, not absolute
+
+			// write: sectionoffset + addend
+			*reinterpret_cast<uint64_t *>(locInElf) = val - sym->st_value;
+			break;
+
 		default:
 			std::cout << COLOR_RED << "Unknown RELA: "
 			          << "Requested Type: " << ELF64_R_TYPE(rel[i].r_info)
@@ -436,7 +463,9 @@ std::vector<std::string> ElfFile64::getDependencies() {
 			dependencies.push_back(
 			    std::string(&strtab[(dynamicEntries[i].d_un.d_val)]));
 		}
-		// if(dynamicEntries[i].d_tag == DT_BIND_NOW){
+
+		// TODO: lazy binding?
+		//if (dynamicEntries[i].d_tag == DT_BIND_NOW) {
 		//	this->bindLazy = false;
 		//}
 	}
@@ -482,40 +511,34 @@ SegmentInfo ElfFile64::findDataSegment() {
 }
 
 template <typename T>
-void ElfFile64::getRelEntries(std::vector<T> &ret, uint32_t type) {
-	int maxSec = this->getNrOfSections();
-	int nrRel  = 0;
+std::vector<T> ElfFile64::getRelocationEntries(uint32_t type) const {
+	std::vector<T> ret;
 
 	// find .rel sections
-	for (int i = 0; i < maxSec; i++) {
+	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
+		// check the relocation type
 		if (this->elf64Shdr[i].sh_type == type) {
-			nrRel      = (int)(this->elf64Shdr[i].sh_size / sizeof(T));
+			int nrRel = (int)(this->elf64Shdr[i].sh_size / sizeof(T));
 			auto index = this->fileContent + elf64Shdr[i].sh_offset;
 
 			// add .rel entries to vector
 			for (int j = 0; j < nrRel; j++) {
-				ret.push_back(((T *)index)[j]);
+				ret.push_back((reinterpret_cast<T *>(index))[j]);
 			}
 		}
 	}
+
+	return ret;
 }
 
-/* Return all relocation entries from all .rel sections
- *
- *  - find .rel sections (if any)
- *  - build vector from entries
- */
-void ElfFile64::getRelEntries(std::vector<Elf64_Rel> &ret) {
-	this->getRelEntries(ret, SHT_REL);
+// Return all relocation entries from all .rel sections
+std::vector<Elf64_Rel> ElfFile64::getRelEntries() const {
+	return this->getRelocationEntries<Elf64_Rel>(SHT_REL);
 }
 
-/* Return all relocation entries from all .rela sections
- *
- *  - find .rela sections (if any)
- *  - build vector from entries
- */
-void ElfFile64::getRelaEntries(std::vector<Elf64_Rela> &ret) {
-	this->getRelEntries(ret, SHT_RELA);
+// Return all relocation entries from all .rela sections
+std::vector<Elf64_Rela> ElfFile64::getRelaEntries() const {
+	return this->getRelocationEntries<Elf64_Rela>(SHT_RELA);
 }
 
 
@@ -536,9 +559,10 @@ std::vector<RelSym> ElfFile64::getSymbols() {
 	uint64_t targetAddr = 0;  // this is final memory address after loading
 
 	uint32_t elements = symtabSection.size / sizeof(Elf64_Sym);
-	// initialize own symbols
 
+	// initialize own symbols
 	for (unsigned int i = 0; i < elements; i++) {
+
 		// if symbol is GLOBAL and _not_ UNDEFINED save it for announcement
 		if ((ELF64_ST_BIND(symtab[i].st_info) == STB_GLOBAL ||
 		     ELF64_ST_BIND(symtab[i].st_info) == STB_WEAK) &&
@@ -546,12 +570,12 @@ std::vector<RelSym> ElfFile64::getSymbols() {
 		    symtab[i].st_shndx != SHN_ABS &&
 		    symtab[i].st_shndx != SHN_COMMON) {
 
-			// TODO
+			// TODO: implement getVAForAddr!!!!!!
 			targetAddr = 0;
 			// targetAddr = this->getVAForAddr(symtab[i].st_value,
 			//                                 symtab[i].st_shndx);
 
-			RelSym sym = RelSym(std::string(&strtab[symtab[i].st_name]),
+			RelSym sym = RelSym(std::string{&strtab[symtab[i].st_name]},
 			                    targetAddr,
 			                    symtab[i].st_info,
 			                    symtab[i].st_shndx);

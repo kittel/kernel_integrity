@@ -24,7 +24,6 @@
 Kernel::Kernel()
 	:
 	paravirt{this},
-	userspace{this},
 	tm{this} {}
 
 void Kernel::setVMIInstance(VMIInstance *vmi) {
@@ -32,11 +31,8 @@ void Kernel::setVMIInstance(VMIInstance *vmi) {
 }
 
 void Kernel::setKernelDir(const std::string &dirName) {
+	std::cout << "setting kernel dir to " << dirName << std::endl;
 	this->kernelDirName = dirName;
-}
-
-UserspaceManager* Kernel::getUserspace() {
-	return &this->userspace;
 }
 
 TaskManager *Kernel::getTaskManager() {
