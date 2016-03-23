@@ -24,7 +24,10 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	dataSegmentMap{},
 	dataSegmentInfoMap{} {
 
+	std::cout << COLOR_GREEN << "Loading process " << binaryName
+	    << COLOR_NORM << std::endl;
 	this->mappedVMAs = kernel->getTaskManager()->getVMAInfo(pid);
+	this->execLoader = this->kernel->getTaskManager()->loadExec(this);
 }
 
 
@@ -33,9 +36,6 @@ const std::string &Process::getName() const {
 }
 
 ElfProcessLoader *Process::getExecLoader() {
-	if (!this->execLoader) {
-		this->execLoader = this->kernel->getTaskManager()->loadExec(this);
-	}
 	assert(this->execLoader);
 	return this->execLoader;
 }

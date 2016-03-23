@@ -151,14 +151,20 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	}
 
 	uint64_t counter = 0;
-	auto content = vmi->readVectorFromVA(vma->start, vma->end - vma->start, this->pid);
+	auto content = vmi->readVectorFromVA(vma->start, vma->end - vma->start, this->pid, true);
+	if(content.size() <= sizeof(uint64_t)){
+		//This page is currently not mapped
+		return;
+	}
 	uint8_t *data = content.data();
 
-	for (uint32_t i = 0; i < content.size() - 7; i++) {
+
+	for (uint32_t i = 0; i < content.size() - sizeof(uint64_t); i++) {
 		uint64_t *value = (uint64_t *)(data + i);
 		// if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
 		//	continue;
 		//}
+		if(*value == 0) continue;
 		for (auto &section : range) {
 			if ((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))) {
 				if (contained(*value, section.start, section.end)) {
@@ -195,6 +201,7 @@ void ProcessValidator::processLoadRel() {
 	}
 
 	for (auto &lib : mappedLibs) {
+		UNUSED(lib);
 		// process own relocations
 		// TODO: library relocations
 		// lib->applyLoadRel(this);
