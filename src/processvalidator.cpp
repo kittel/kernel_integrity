@@ -31,7 +31,7 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 	// process load-time relocations
 	std::cout << "Processing load-time relocations..." << std::endl;
-	this->processLoadRel();
+	this->process->processLoadRel();
 }
 
 ProcessValidator::~ProcessValidator() {}
@@ -42,18 +42,18 @@ int ProcessValidator::validateProcess() {
 	          << "Starting page validation ..."
 	          << COLOR_RESET << std::endl;
 
-	PageMap executablePageMap = vmi->getPages(this->pid);
+	PageMap executablePageMap = this->vmi->getPages(this->pid);
 	for (auto &page : executablePageMap) {
 		// check if page is contained in VMAs
 		if (!(page.second->vaddr & 0xffff800000000000) &&
-		    !process->findVMAByAddress(page.second->vaddr)) {
+		    !this->process->findVMAByAddress(page.second->vaddr)) {
 			std::cout << COLOR_RED << COLOR_BOLD
 			          << "Found page that has no corresponding VMA: "
 			          << std::hex << page.second->vaddr << std::dec
 			          << COLOR_RESET << std::endl;
 		}
 	}
-	vmi->destroyMap(executablePageMap);
+	this->vmi->destroyMap(executablePageMap);
 
 	// Check if all mapped VMAs are valid
 	for (auto &section : this->process->getMappedVMAs()) {
@@ -64,7 +64,8 @@ int ProcessValidator::validateProcess() {
 		} else if ((section.flags & VMAInfo::VM_WRITE)) {
 			this->validateDataPage(&section);
 		}
-		// No need to validate pages that are only readable
+		// No need to validate pages that are only readable,
+		// we trust the kernel.
 	}
 
 	// TODO count errors or change return value
@@ -82,7 +83,7 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	                                     vma->name) == 0) {
 		binary = this->process->getExecLoader();
 	} else {
-		ElfProcessLoader *lib = this->findLoaderByName(vma->name);
+		ElfProcessLoader *lib = this->process->findLoaderByFileName(vma->name);
 		if (!lib) {
 			// occurs when it's library is mapped but is not a dependency
 			// TODO find out why libnss* is always mapped to the process space
@@ -139,9 +140,9 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 }
 
 void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
-	// TODO: see if vmastart is the address of GOT, validate if symbols and
-	// references are correct.
-	// like elffile
+	// TODO: see if the start address of the mapping
+	// is the address of GOT, then validate if symbols and
+	// references are correct. elffile64 does the patching.
 
 	std::vector<VMAInfo> range;
 	for (auto &section : this->process->getMappedVMAs()) {
@@ -152,29 +153,36 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 
 	uint64_t counter = 0;
 	auto content = vmi->readVectorFromVA(vma->start, vma->end - vma->start, this->pid, true);
-	if(content.size() <= sizeof(uint64_t)){
-		//This page is currently not mapped
+	if (content.size() <= sizeof(uint64_t)) {
+		// This page is currently not mapped
 		return;
 	}
+
 	uint8_t *data = content.data();
 
-
 	for (uint32_t i = 0; i < content.size() - sizeof(uint64_t); i++) {
-		uint64_t *value = (uint64_t *)(data + i);
-		// if((*value & 0x00007f00000000UL) != 0x00007f0000000000UL){
-		//	continue;
-		//}
-		if(*value == 0) continue;
+		// create pointer to current sec
+		uint64_t *value = reinterpret_cast<uint64_t *>(data + i);
+
+		// the pointer is never invalid as we're walking
+		// over memory to verify.
+		if (*value == 0) {
+			continue;
+		}
+
 		for (auto &section : range) {
 			if ((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))) {
-				if (contained(*value, section.start, section.end)) {
+				if (IN_RANGE(*value, section.start, section.end)) {
 					counter++;
-					// std::cout << "Found ptr to: " << section->name <<
-					// std::endl;
+					std::cout << "Found ptr to: " << section.name << std::endl;
 				}
 			}
 		}
 	}
+
+	// resolve-trampoline:
+	// sysdeps/x86_64/dl-trampoline.S:64
+	// LD_BIND_NOW forces load-time relocations.
 
 	std::cout << "Found " << COLOR_RED << COLOR_BOLD
 	          << counter << COLOR_RESET
@@ -182,77 +190,6 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	vma->print();
 }
 
-/* Process load-time relocations of all libraries, which are mapped to the
- * virtual address space of our main process. The following steps have to be
- * taken:
- *
- *  - check which libraries are mapped to the VAS
- *  - generate processing order based on cross-dependencies
- *  - based on the order do for every library:
- *      - retrieve all exported symbols from the respective library
- *      - process relocation of the respective library
- */
-void ProcessValidator::processLoadRel() {
-	const std::set<ElfProcessLoader *> mappedLibs = this->getMappedLibs();
-
-	for (auto &lib : mappedLibs) {
-		// announce provided symbols
-		this->announceSyms(lib);
-	}
-
-	for (auto &lib : mappedLibs) {
-		UNUSED(lib);
-		// process own relocations
-		// TODO: library relocations
-		// lib->applyLoadRel(this);
-	}
-	return;
-}
-
-/* Gather all libraries which are mapped into the current Address-Space
- *
- * The dynamic linker has already done the ordering work.
- * The libraries lay in this->mappedVMAs, lowest address first.
- * => Reverse iterate through the mappedVMAs and find the corresponding loader,
- *    gives the loaders in the correct processing order.
- */
-const std::set<ElfProcessLoader *> ProcessValidator::getMappedLibs() const {
-	std::set<ElfProcessLoader *> ret;
-	ElfProcessLoader *loader = nullptr;
-
-	for (auto &vma : this->process->getMappedVMAs()) {
-		loader = this->findLoaderByName(vma.name);
-		if (loader) {
-			ret.insert(loader);
-		}
-	}
-	return ret;
-}
-
-/* Add the symbols, announced by lib, to the nameRelSymMap
- *
- *  - sweep through all provided symbols of the lib
- *  if symbol not in map or (symbol in map(WEAK) and exported symbol(GLOBAL))
- *      add to relSymMap
- */
-void ProcessValidator::announceSyms(ElfProcessLoader *lib) {
-	std::vector<RelSym> syms = lib->getProvidedSyms();
-
-	for (auto &it : syms) {
-		if (this->relSymMap.find(it.name) == this->relSymMap.end()) {
-			this->relSymMap[it.name] = it;
-			continue;
-		} else {
-			RelSym sym = this->relSymMap[it.name];
-			// if mapped symbol is WEAK and cur symbol is GLOBAL . overwrite
-			if (ELF64_ST_BIND(sym.info) == STB_WEAK &&
-			    ELF64_ST_BIND(it.info) == STB_GLOBAL) {
-				this->relSymMap[it.name] = it;
-			}
-		}
-	}
-	return;
-}
 
 std::vector<uint8_t> ProcessValidator::getStackContent(
     size_t readAmount) const {
@@ -288,61 +225,11 @@ int ProcessValidator::checkEnvironment(const std::map<std::string, std::string> 
 	return errors;
 }
 
-/*
- * Find a corresponding ElfProcessLoader for the given vaddr
- */
-ElfProcessLoader *ProcessValidator::findLoaderByAddress(const uint64_t addr) const {
-	const VMAInfo *vma = process->findVMAByAddress(addr);
-	if (!vma)
-		return nullptr;
-	return this->findLoaderByName(vma->name);
-}
 
-ElfProcessLoader *ProcessValidator::findLoaderByName(const std::string &name) const {
-	std::string libname = fs::path(name).filename().string();
-	return this->process
-	           ->getKernel()
-	           ->getTaskManager()->findLibByName(libname);
-}
 
-/* Find a corresponding SectionInfo for the given vaddr */
-SectionInfo *ProcessValidator::getSegmentForAddress(uint64_t vaddr) {
-	SectionInfo *ret;
-
-	// find a corresponding loader for the given vaddr
-	ElfProcessLoader *loader = this->findLoaderByAddress(vaddr);
-	this->lastLoader = loader;
-	ret = loader->getSegmentForAddress(vaddr);
-	return ret;
-}
-
-/* Lazy evaluation of the given address addr
- *
- *   - get corresponding loader/segment for addr
- *   - if ( addr subject to LazyBinding )
- *       - relocate the address
- *       - return 0
- *   - else
- *       - return 1
- */
-int ProcessValidator::evalLazy(uint64_t start, uint64_t addr) {
-	ElfProcessLoader *loader = 0;
-
-	try {
-		// TODO: will be empty, is filled nowhere currently.
-		loader = this->addrToLoaderMap.at(start);
-	} catch (const std::out_of_range &oor) {
-#ifdef DEBUG
-		std::cout << "debug:(evalLazy) Couldn't find a corresponding loader "
-		          << "for address " << (void *)addr << std::endl;
-#endif
-		return 1;
-	}
-
-	return loader->evalLazy(addr, &this->relSymMap);
-}
-
-int ProcessValidator::_validatePage(page_info_t *page) {
+// TODO: obsolete?
+[[ deprecated ]]
+int ProcessValidator::validatePage(page_info_t *page) {
 	assert(page);
 
 	// TODO optimize this output, such that we don't have to check for stack
@@ -353,7 +240,7 @@ int ProcessValidator::_validatePage(page_info_t *page) {
 		return 0;
 	}
 
-	SectionInfo *targetSegment = this->getSegmentForAddress(page->vaddr);
+	SectionInfo *targetSegment = this->process->getSegmentForAddress(page->vaddr);
 
 	if (targetSegment == nullptr) {
 		std::cout << "Located in heap." << std::endl;
@@ -367,8 +254,7 @@ int ProcessValidator::_validatePage(page_info_t *page) {
 		          << ". Skipping..." << std::endl;
 		return 0;
 	} else {
-		std::cout << "Located in "
-		          << getNameFromPath(this->lastLoader->getName()) << std::endl;
+		std::cout << "Located somewhere else (last loader?)" << std::endl;
 	}
 
 #ifdef DEBUG
@@ -461,36 +347,7 @@ for(auto &it : pageInMem) {
 			if (remain == 0) {
 				// Lazy Evaluation TODO this can be optimized by giving the
 				// targetSegment->index directly
-				if (!this->evalLazy(
-				        (uint64_t)targetSegment->memindex,
-				        ((uint64_t)targetSegment->memindex) + i + pageOffset)) {
-					// Lazy evaluation has been applied. Block the next 8 Bytes
-					// from writing!
-					remain = 7;
-#ifdef DEBUG
-					std::cout << "Found change. remain: " << std::hex
-					          << (int)remain << std::dec << std::endl;
-#endif
-					if (loadedPage[i] == pageInMem[i]) {
-#ifdef DEBUG
-#ifndef DUMP
-						std::cout << COLOR_GREEN << "Address " << COLOR_BOLD
-						          << std::hex << (void *)(page->vaddr + i)
-						          << COLOR_BOLD_OFF << " is fine."
-						          << " [Evaluated Lazy]" << std::endl
-						          << COLOR_NORM;
-#endif
-#ifdef DUMP
-						std::cout << "Address 0x" << std::hex
-						          << (int)(page->vaddr + i)
-						          << " is fine. [Evaluated Lazy]" << std::endl;
-#endif
-#endif
-						continue;
-					}
-				}
 			}
-
 			// if we have written recently, the error should be resolved or
 			// malicious
 			else {
@@ -525,19 +382,4 @@ for(auto &it : pageInMem) {
 		std::cout << "Page fine." << std::endl;
 
 	return changeCount;
-}
-
-int ProcessValidator::validatePage(page_info_t *page) {
-	return this->_validatePage(page);
-}
-
-std::unordered_map<std::string, RelSym> *ProcessValidator::getSymMap() {
-	return &this->relSymMap;
-}
-
-RelSym *ProcessValidator::findSymbolByName(const std::string &name) {
-	if (this->relSymMap.find(name) != this->relSymMap.end()) {
-		return &this->relSymMap[name];
-	}
-	return nullptr;
 }

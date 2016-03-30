@@ -8,10 +8,7 @@ ElfProcessLoader::ElfProcessLoader(ElfFile *file,
 	:
 	ElfLoader(file),
 	kernel{kernel},
-	name{name} {
-
-	this->providedSyms = this->elffile->getSymbols();
-}
+	name{name} {}
 
 ElfProcessLoader::~ElfProcessLoader() {}
 
@@ -19,11 +16,14 @@ void ElfProcessLoader::loadDependencies() {
 	auto dependencies = this->elffile->getDependencies();
 
 	for (auto &dep : dependencies) {
-		this->kernel->getTaskManager()->loadLibrary(dep);
+		ElfLoader *lib = this->kernel->getTaskManager()->loadLibrary(dep);
+		std::cout << "Loaded library " << lib->getName() << std::endl;
 	}
 }
 
 void ElfProcessLoader::initText() {
+	std::cout << "Initializing text segment for elfprocessloader: "
+	          << this->name << std::endl;
 	this->textSegmentInfo = this->elffile->findCodeSegment();
 
 	auto index = this->elffile->getFileContent() + this->textSegmentInfo.offset;
@@ -35,8 +35,8 @@ void ElfProcessLoader::initText() {
 }
 
 void ElfProcessLoader::initData() {
-	// TODO: This has to be done once per process.
-	std::cout << "TODO: initData for elfprocessloader: " << name << std::endl;
+	std::cout << "Initializing data segment for elfprocessloader: "
+	          << this->name << std::endl;
 
 	this->dataSegmentInfo = this->elffile->findDataSegment();
 
@@ -44,8 +44,8 @@ void ElfProcessLoader::initData() {
 	this->dataSegmentContent.insert(this->dataSegmentContent.end(),
 	                                index,
 	                                index + this->dataSegmentInfo.filesz);
-	// TODO: apply relocations for each linked elf in that process:
-	//this->elffile->applyRelocations(this, kernel, process);
+
+	// TODO: relocation stuff? lazy bind?
 }
 
 /*
@@ -169,6 +169,6 @@ Kernel *ElfProcessLoader::getKernel() {
 	return this->kernel;
 }
 
-std::vector<RelSym> ElfProcessLoader::getProvidedSyms() {
-	return this->providedSyms;
+std::vector<RelSym> ElfProcessLoader::getSymbols() const {
+	return this->elffile->getSymbols();
 }

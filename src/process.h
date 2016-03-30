@@ -1,6 +1,11 @@
 #ifndef PROCESS_H_
 #define PROCESS_H_
 
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+
 #include "elffile.h"
 #include "libdwarfparser/symbolmanager.h"
 
@@ -48,6 +53,19 @@ public:
 	const VMAInfo *findVMAByName(const std::string &name) const;
 	const VMAInfo *findVMAByAddress(const uint64_t address) const;
 
+	ElfProcessLoader *findLoaderByAddress(const uint64_t addr) const;
+	ElfProcessLoader *findLoaderByFileName(const std::string &name) const;
+
+	const std::unordered_set<ElfProcessLoader *> getMappedLibs() const;
+	SectionInfo *getSegmentForAddress(uint64_t addr);
+
+	/**
+	 * Perform all load time relocations,
+	 * for the executable and all libraries.
+	 */
+	void processLoadRel();
+	void registerSyms(ElfProcessLoader *elf);
+
 protected:
 	Kernel *kernel;
 
@@ -55,6 +73,7 @@ protected:
 	pid_t pid;
 
 	ElfProcessLoader *execLoader;
+	ElfProcessLoader *vdsoLoader;
 	std::string binaryName;
 
 	std::vector<VMAInfo> mappedVMAs;

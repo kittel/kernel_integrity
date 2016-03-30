@@ -24,7 +24,7 @@ Kernel *ElfModuleLoader::getKernel() {
 	return this->kernel;
 }
 
-void ElfModuleLoader::loadDependencies(void) {
+void ElfModuleLoader::loadDependencies() {
 	SectionInfo miS = this->elffile->findSectionWithName(".modinfo");
 
 	// parse .modinfo and load dependencies

@@ -218,7 +218,7 @@ std::string ElfFile64::symbolName(Elf64_Word index, uint32_t strindex) const {
 }
 
 uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
-	return symbolNameMap[symbolName];
+	return this->symbolNameMap[symbolName];
 }
 
 bool ElfFile64::isRelocatable() const {
@@ -255,7 +255,8 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
 
-	std::cout << COLOR_GREEN << "Relocating: " << this->filename << COLOR_NORM
+	std::cout << COLOR_GREEN << "Relocating: "
+	          << this->filename << COLOR_NORM
 	          << std::endl;
 
 	switch(elf64Ehdr->e_type) {
@@ -270,7 +271,9 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
 			if (!(this->elf64Shdr[infosec].sh_flags & SHF_ALLOC))
 				continue;
 
-			if (this->elf64Shdr[i].sh_type == SHT_REL){
+			if (this->elf64Shdr[i].sh_type == SHT_REL) {
+				std::cout << "wtf? REL relocations are not used, "
+				             "instead expecting RELA!" << std::endl;
 				assert(false);
 			}
 			if (this->elf64Shdr[i].sh_type == SHT_RELA) {
@@ -308,7 +311,13 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	Elf64_Sym *symBase = reinterpret_cast<Elf64_Sym *>(this->sectionAddress(symindex));
 
 	// TODO move this to a dedicated function if used with kernel modules
-	SectionInfo percpuDataSegment = this->findSectionWithName(".data..percpu");
+	//      a userspace process doesn't have this section.
+	// loader->pre_relocation_hook()...
+	SectionInfo percpuDataSegment;
+
+	if (process == nullptr) {
+		percpuDataSegment = this->findSectionWithName(".data..percpu");
+	}
 
 	// static member within the for loop
 	SectionInfo symRelSectionInfo;
@@ -333,9 +342,15 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			loader->updateSectionInfoMemAddress(symRelSectionInfo);
 		}
 
-		if (sym->st_shndx == percpuDataSegment.segID) {
-			Instance currentModule = loader->getKernel()->getKernelModuleInstance(loader->getName());
-			symRelSectionInfo.memindex = reinterpret_cast<uint8_t *>(currentModule.memberByName("percpu").getRawValue<uint64_t>(false));
+		// TODO: move to dedicated function as unusable
+		//       for userspace processes
+		// loader->relocation_hook(sym->st_shndx)
+		if (process == nullptr) {
+			if (sym->st_shndx == percpuDataSegment.segID) {
+				Instance currentModule = loader->getKernel()->getKernelModuleInstance(loader->getName());
+				symRelSectionInfo.memindex = reinterpret_cast<uint8_t *>(
+					currentModule.memberByName("percpu").getRawValue<uint64_t>(false));
+			}
 		}
 
 		// store section starts for host and guest
@@ -343,7 +358,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		locOfRelSectionInMem = reinterpret_cast<size_t>(symRelSectionInfo.memindex);
 
 		std::cout << "Relocating: "
-		          << this->symbolName(sym->st_name, strindex) << " -> "
+		          << this->symbolName(sym->st_name, strindex) << " -> 0x"
 		          << std::hex << sym->st_value << std::dec << std::endl;
 
 		switch (sym->st_shndx) {
@@ -354,15 +369,19 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			break;
 		case SHN_UNDEF:
 			if (process) {
-				std::cout << "Need to find address of symbol: "
+				std::cout << "Need to find address of process symbol: "
 				          << this->symbolName(sym->st_name, strindex)
 				          << std::endl;
 
 				// this fetches the value to be written from the process.
-				sym->st_value = process->symbols.getSymbolAddress(this->symbolName(sym->st_name, strindex));
+				// it can provide all symbol positions, even from
+				// libraries it depends on.
+				sym->st_value = process->symbols.getSymbolAddress(
+					this->symbolName(sym->st_name, strindex));
 			}
 			else {
-				sym->st_value = kernel->symbols.getSymbolAddress(this->symbolName(sym->st_name, strindex));
+				sym->st_value = kernel->symbols.getSymbolAddress(
+					this->symbolName(sym->st_name, strindex));
 			}
 			break;
 		default:
@@ -406,11 +425,16 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 				val -= locInMem;
 			}
 
-			*(reinterpret_cast<uint32_t *>(locInElf)) = val;
+			*reinterpret_cast<uint32_t *>(locInElf) = val;
 			break;
 
 		case R_X86_64_GLOB_DAT:   /* Create GOT entry */
 		case R_X86_64_JUMP_SLOT:  /* Create PLT entry */
+
+			std::cout << "got/plt relocation at 0x"
+			          << std::hex << reinterpret_cast<uint64_t>(locInElf)
+			          << " to 0x" << val << " off=0x" << sym->st_value
+			          << std::dec << std::endl;
 
 			// TODO: does this get the correct memindex?
 			//       the process has to return it
@@ -423,7 +447,8 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			// TODO: don't patch JUMP_SLOT if we have lazy binding.
 			// instead, write in the _dl_runtime_resolve_{sse,avx,avx512}
 
-			std::cout << "relocating 0x" << std::hex << locInElf
+			std::cout << "(i)relative relication at 0x"
+			          << std::hex << reinterpret_cast<uint64_t>(locInElf)
 			          << " to 0x" << val << " off=0x" << sym->st_value
 			          << std::dec << std::endl;
 
@@ -454,20 +479,20 @@ std::vector<std::string> ElfFile64::getDependencies() {
 	// get .dynamic section
 	SectionInfo dynamic       = this->findSectionWithName(".dynamic");
 	SectionInfo dynstr        = this->findSectionWithName(".dynstr");
-	Elf64_Dyn *dynamicEntries = (Elf64_Dyn *)(dynamic.index);
-	char *strtab              = (char *)(dynstr.index);
+	Elf64_Dyn *dynamicEntries = reinterpret_cast<Elf64_Dyn *>(dynamic.index);
+	char *strtab              = reinterpret_cast<char *>(dynstr.index);
 
 	for (int i = 0; (dynamicEntries[i].d_tag != DT_NULL); i++) {
 		if (dynamicEntries[i].d_tag == DT_NEEDED) {
 			// insert name from symbol table on which the d_val is pointing
 			dependencies.push_back(
-			    std::string(&strtab[(dynamicEntries[i].d_un.d_val)]));
+				std::string(&strtab[dynamicEntries[i].d_un.d_val]));
 		}
 
-		// TODO: lazy binding?
-		//if (dynamicEntries[i].d_tag == DT_BIND_NOW) {
-		//	this->bindLazy = false;
-		//}
+		// TODO: lazy binding!
+		if (dynamicEntries[i].d_tag == DT_BIND_NOW) {
+			this->doLazyBind = false;
+		}
 	}
 	return dependencies;
 }

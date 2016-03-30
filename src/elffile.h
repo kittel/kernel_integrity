@@ -182,6 +182,11 @@ protected:
 	        ElfType type,
 	        ElfProgramType programType);
 
+	/**
+	 * Parse the dwarf information from the binary.
+	 */
+	void parseDwarf();
+
 	FILE *fd;
 	size_t fileSize;
 	uint8_t *fileContent;
@@ -193,7 +198,7 @@ protected:
 	typedef std::map<std::string, uint64_t> SymbolNameMap;
 	SymbolNameMap symbolNameMap;
 
-	void parseDwarf();
+	bool doLazyBind;
 };
 
 #include "elffile64.h"

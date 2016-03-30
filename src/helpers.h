@@ -1,12 +1,12 @@
-#ifndef _HELPERS_H_
-#define _HELPERS_H_
+#ifndef KERNINT_HELPERS_H_
+#define KERNINT_HELPERS_H_
 
 #define UNUSED(expr) do { (void)(expr); } while (0)
 #define DELETE(expr) do { if(expr){ delete expr; expr = 0; }; } while (0)
 
 #define CHECKFLAGS(byte, flags)    !!((byte & flags) == flags)
-#define CONTAINS(min, size, what)  (min <= what && min + size >= what)
-#define contained(value, left, right) (value >= left && value <= right)
+#define CONTAINS(min, size, what)  (what >= min && what <= min + size)
+#define IN_RANGE(value, left, right) (value >= left && value <= right)
 
 #include <algorithm>
 #include <cstring>
@@ -59,8 +59,8 @@ inline std::vector<std::string> split(const std::string &s, char delim) {
 	return elems;
 }
 
-inline std::string toString(uint8_t * string) {
-	return std::string((const char*) string);
+inline std::string toString(const uint8_t *string) {
+	return std::string(reinterpret_cast<const char *>(string));
 }
 
 /** print a hexdump of some memory */
@@ -73,6 +73,7 @@ void displayChange(const uint8_t *memory,
                    int32_t size);
 
 /* Convert a C-String into a std::string for gdb use (don't use elsewhere) */
+[[deprecated("don't use this gdb helper")]]
 inline std::string& toSTDstring(const char *input) {
 	return *(new std::string(input));
 }
@@ -144,9 +145,8 @@ std::unique_ptr<Target, Del> dynamic_cast_unique_ptr(std::unique_ptr<Current, De
 }
 
 inline
-size_t offset(const char* buf, size_t len, const char* str)
-{
+size_t offset(const char* buf, size_t len, const char* str) {
 	return std::search(buf, buf + len, str, str + strlen(str)) - buf;
 }
 
-#endif /* _HELPERS_H_ */
+#endif

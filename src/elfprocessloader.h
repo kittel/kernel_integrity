@@ -16,6 +16,7 @@ class ProcessValidator;
 
 class ElfProcessLoader : public ElfLoader {
 	friend class ProcessValidator;
+	friend class Process;
 
 public:
 	ElfProcessLoader(ElfFile *elffile, Kernel *kernel,
@@ -40,9 +41,8 @@ protected:
 
 	SectionInfo heapSection;  // handler for optional heap segment
 
-	// symbols provided by this loader
-	std::vector<RelSym> providedSyms;
-	virtual std::vector<RelSym> getProvidedSyms();
+	// symbols provided by this elf
+	std::vector<RelSym> getSymbols() const;
 
 	void initText() override;
 	void initData() override;

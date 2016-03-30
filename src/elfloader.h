@@ -29,6 +29,7 @@ class ElfLoader {
 	friend class ElfProcessLoader;
 	friend class ProcessValidator;
 	friend class ParavirtPatcher;
+	friend class Process;
 
 public:
 	virtual ~ElfLoader();

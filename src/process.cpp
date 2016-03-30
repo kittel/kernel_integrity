@@ -26,7 +26,7 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 
 	std::cout << COLOR_GREEN << "Loading process " << binaryName
 	    << COLOR_NORM << std::endl;
-	this->mappedVMAs = kernel->getTaskManager()->getVMAInfo(pid);
+	this->mappedVMAs = this->kernel->getTaskManager()->getVMAInfo(pid);
 	this->execLoader = this->kernel->getTaskManager()->loadExec(this);
 }
 
@@ -123,4 +123,112 @@ const VMAInfo *Process::findVMAByAddress(const uint64_t address) const {
 		}
 	}
 	return nullptr;
+}
+
+/* Gather all libraries which are mapped into the current Address-Space
+ *
+ * The dynamic linker has already done the ordering work.
+ * The libraries lie in this->mappedVMAs, lowest address first.
+ * => Reverse iterate through the mappedVMAs and find the corresponding loader,
+ *    gives the loaders in the correct processing order.
+ */
+const std::unordered_set<ElfProcessLoader *> Process::getMappedLibs() const {
+	std::unordered_set<ElfProcessLoader *> ret;
+	ElfProcessLoader *loader = nullptr;
+
+	for (auto &vma : this->getMappedVMAs()) {
+		loader = this->findLoaderByFileName(vma.name);
+		if (loader) {
+			ret.insert(loader);
+		}
+	}
+	return ret;
+}
+
+/*
+ * Find a corresponding ElfProcessLoader for the given vaddr
+ */
+ElfProcessLoader *Process::findLoaderByAddress(const uint64_t addr) const {
+	const VMAInfo *vma = this->findVMAByAddress(addr);
+	if (!vma) {
+		return nullptr;
+	}
+	return this->findLoaderByFileName(vma->name);
+}
+
+/*
+ * find loader by searching for a library name
+ */
+ElfProcessLoader *Process::findLoaderByFileName(const std::string &name) const {
+	std::string libname = fs::path(name).filename().string();
+	return this->getKernel()
+	           ->getTaskManager()
+	           ->findLibByName(libname);
+}
+
+
+/* Find a corresponding SectionInfo for the given vaddr */
+SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
+	// find a corresponding loader for the given vaddr
+	ElfProcessLoader *loader = this->findLoaderByAddress(vaddr);
+
+	SectionInfo *ret = loader->getSegmentForAddress(vaddr);
+	return ret;
+}
+
+/* Process load-time relocations of all libraries, which are mapped to the
+ * virtual address space of our main process. The following steps have to be
+ * taken:
+ *
+ *  - check which libraries are mapped to the VAS
+ *  - generate processing order based on cross-dependencies
+ *  - based on the order do for every library:
+ *      - retrieve all exported symbols from the respective library
+ *      - process relocation of the respective library
+ */
+void Process::processLoadRel() {
+	const std::unordered_set<ElfProcessLoader *> mappedLibs = this->getMappedLibs();
+
+	for (auto &lib : mappedLibs) {
+		// announce provided symbols
+		std::cout << " - adding syms of " << lib->getName() << std::endl;
+		this->registerSyms(lib);
+	}
+
+	for (auto &lib : mappedLibs) {
+		lib->elffile->applyRelocations(lib, this->kernel, this);
+	}
+
+	// last, apply the relocations on the executable image.
+	ElfProcessLoader *execLoader = this->getExecLoader();
+	execLoader->elffile->applyRelocations(execLoader, this->kernel, this);
+	this->registerSyms(execLoader);
+
+	return;
+}
+
+/* Add the symbols, announced by lib, to the nameRelSymMap
+ *
+ *  - sweep through all provided symbols of the lib
+ *  if symbol not in map or (symbol in map(WEAK) and exported symbol(GLOBAL))
+ *      add to relSymMap
+ */
+void Process::registerSyms(ElfProcessLoader *elf) {
+	std::vector<RelSym> syms = elf->getSymbols();
+
+	for (auto &it : syms) {
+		const std::string &name = it.name;
+		uint64_t location = it.value;
+
+		this->symbols.addSymbolAddress(name, location);
+
+		/**
+		TODO if mapped symbol is WEAK and cur symbol is GLOBAL . overwrite
+		if (ELF64_ST_BIND(sym.info) == STB_WEAK &&
+			ELF64_ST_BIND(it.info) == STB_GLOBAL) {
+			this->relSymMap[it.name] = it;
+		}
+		*/
+	}
+	return;
 }

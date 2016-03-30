@@ -114,7 +114,9 @@ ElfFile::ElfFile(FILE *fd, size_t fileSize, uint8_t *fileContent,
 	fileContent{fileContent},
 	type{type},
 	programType{programType},
-	filename{""} {}
+	filename{""},
+	doLazyBind{false} // < TODO set to true once the "this elf doesn't lazybind" detection works
+{}
 
 ElfFile::~ElfFile(){
 	if(this->fileContent != nullptr){
