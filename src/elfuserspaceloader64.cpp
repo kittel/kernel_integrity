@@ -12,6 +12,8 @@ ElfUserspaceLoader64::~ElfUserspaceLoader64() {
 }
 
 int ElfUserspaceLoader64::evalLazy(uint64_t addr, std::unordered_map<std::string, RelSym> *map) {
+	UNUSED(addr);
+	UNUSED(map);
 	std::cout << "TODO: eval lazy implementation" << std::endl;
 	assert(0);
 }

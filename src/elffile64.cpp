@@ -154,7 +154,7 @@ SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const
 			// printf("Found Strtab in Section %i: %s\n", i, tempBuf);
 		}
 	}
-	return SectionInfo();
+	assert(0);
 }
 
 SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
@@ -168,7 +168,7 @@ SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
 		                   elf64Shdr[sectionID].sh_addr,
 		                   elf64Shdr[sectionID].sh_size);
 	}
-	return SectionInfo();
+	assert(0);
 }
 
 bool ElfFile64::isCodeAddress(uint64_t address) {
@@ -294,6 +294,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	Elf32_Word sectionID    = this->elf64Shdr[relSectionID].sh_info;
 	Elf32_Word symindex     = this->elf64Shdr[relSectionID].sh_link;
 	Elf32_Word strindex     = this->elf64Shdr[symindex].sh_link;
+	assert(symindex);
 
 	std::string sectionName = this->sectionName(sectionID);
 	bool isAltinstrSection = false;
@@ -307,7 +308,6 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	SectionInfo relSectionInfo = this->findSectionByID(relSectionID);
 
 	Elf64_Rela *rel = reinterpret_cast<Elf64_Rela *>(relSectionInfo.index);
-	assert(symindex);
 	Elf64_Sym *symBase = reinterpret_cast<Elf64_Sym *>(this->sectionAddress(symindex));
 
 	// TODO move this to a dedicated function if used with kernel modules
@@ -323,19 +323,29 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	SectionInfo symRelSectionInfo;
 
 	for (uint32_t i = 0; i < relSectionInfo.size / sizeof(*rel); i++) {
-		uint8_t *locInElf = nullptr;  // on host
-		uint64_t locInMem = 0;  // on guest
+		uint8_t *locInElf = nullptr;      // on host
+		uint64_t locInMem = 0;            // on guest
 		size_t locOfRelSectionInElf = 0;  // on host
 		size_t locOfRelSectionInMem = 0;  // on guest
 
-		// This is where to make the change:
-		// on our host
+		// relocation target address in memory of host (the working copy)
+		// TODO: get sectioninfo.index from process as it's the working copy
+		// only in the case of process
 		locInElf = reinterpret_cast<uint8_t *>(sectionInfo.index) + rel[i].r_offset;
 
+		// TODO in process: write at data segment vector to
+		//         (r_offset - virtual segment start)
+		// (to eliminate the virtual address)
+
 		// in the guest
-		locInMem = reinterpret_cast<uint64_t>(reinterpret_cast<char *>(sectionInfo.memindex) + rel[i].r_offset);
+		locInMem = sectionInfo.memindex + rel[i].r_offset;
 
 		Elf64_Sym *sym = symBase + ELF64_R_SYM(rel[i].r_info);
+
+		std::cout << "relocate: r_offset: 0x" << std::hex << rel[i].r_offset
+		          << std::dec << " -- name: "
+		          << this->symbolName(sym->st_name, strindex)
+		          << std::endl;
 
 		if (symRelSectionInfo.segID != sym->st_shndx) {
 			symRelSectionInfo = this->findSectionByID(sym->st_shndx);
@@ -348,8 +358,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		if (process == nullptr) {
 			if (sym->st_shndx == percpuDataSegment.segID) {
 				Instance currentModule = loader->getKernel()->getKernelModuleInstance(loader->getName());
-				symRelSectionInfo.memindex = reinterpret_cast<uint8_t *>(
-					currentModule.memberByName("percpu").getRawValue<uint64_t>(false));
+				symRelSectionInfo.memindex = currentModule.memberByName("percpu").getRawValue<uint64_t>(false);
 			}
 		}
 

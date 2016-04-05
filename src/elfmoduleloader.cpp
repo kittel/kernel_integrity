@@ -162,7 +162,7 @@ void ElfModuleLoader::initData(void) {
 	this->roDataSection.size = this->roData.size();
 }
 
-uint8_t *ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
+uint64_t ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 	std::string segName = info.segName;
 	Instance module;
 	Instance currentModule = this->kernel->getKernelModuleInstance(this->modName);
@@ -176,11 +176,11 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 		(offset == 0) ? offset = currentModule.size()
 		              : offset = currentModule.size() + align - offset;
 
-		return (uint8_t *)currentModule.getAddress() + offset;
+		return currentModule.getAddress() + offset;
 	}
 
 	if (segName.compare("__ksymtab_gpl") == 0) {
-		return (uint8_t *)currentModule.memberByName("gpl_syms").getRawValue<uint64_t>();
+		return currentModule.memberByName("gpl_syms").getRawValue<uint64_t>();
 	}
 
 	// Find the address of the current section in the memory image
@@ -193,7 +193,7 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 		Instance attr = attrs.memberByName("attrs").arrayElem(j);
 		std::string sectionName = attr.memberByName("name", true).getValue<std::string>();
 		if (sectionName.compare(segName) == 0) {
-			return (uint8_t *)attr.memberByName("address").getValue<uint64_t>();
+			return attr.memberByName("address").getValue<uint64_t>();
 		}
 	}
 	return 0;

@@ -17,7 +17,7 @@ public:
 
 protected:
 	void updateSectionInfoMemAddress(SectionInfo &info);
-	uint8_t *findMemAddressOfSegment(SectionInfo &info);
+	uint64_t findMemAddressOfSegment(SectionInfo &info);
 
 	virtual void initText();
 	virtual void initData();

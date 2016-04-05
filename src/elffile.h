@@ -27,14 +27,17 @@ class Process;
 /* This class represents a symbol a loader may export for relocation */
 class RelSym {
 public:
-	std::string name;          // name of the symbol
-	uint64_t value;            // final vaddr after loading
-	uint8_t info;              // corresponding type and sym in parent
-	uint32_t shndx;            // linked section index in parent
-
 	RelSym();
-	RelSym(const std::string &, uint64_t, uint8_t, uint32_t);
+	RelSym(const std::string &name,
+	       uint64_t value,
+	       uint8_t info,
+	       uint32_t shndx);
 	~RelSym();
+
+	std::string name;     ///< name of the symbol
+	uint64_t value;       ///< final vaddr after loading
+	uint8_t info;         ///< corresponding type and sym in parent
+	uint32_t shndx;       ///< linked section index in parent
 };
 
 
@@ -43,24 +46,22 @@ public:
 	SectionInfo();
 	SectionInfo(const std::string &segName,
 	            uint32_t segID,
-	            uint8_t *i,
-	            uint64_t a,
-	            uint32_t s);
+	            uint8_t *index,
+	            uint64_t memindex,
+	            uint32_t size);
 	virtual ~SectionInfo();
 
-	std::string segName;  // name of the segment, init with first sec name
-	uint32_t segID;       // section ID in SHT
-	uint8_t *index;       // section offset from beginning of ELF file
-	                      // if dereferenced contains data of the section
-	uint8_t *memindex;    // target virtual address in process image
-	uint32_t size;        // size of the section content (in bytes?)
+	std::string segName;  ///< name of the segment, init with first sec name
+	uint32_t segID;       ///< section ID in section header table (SHT)
+	uint8_t *index;       ///< section offset from beginning of ELF file
+	                      ///< if dereferenced contains data of the section
+	uint64_t memindex;    ///< target virtual address within the VM
+	uint32_t size;        ///< size of the section content (in bytes?)
 
 	bool containsElfAddress(uint64_t address);
 	bool containsMemAddress(uint64_t address);
-
-private:
-	SectionInfo(uint8_t *i, uint32_t s);
 };
+
 
 class SegmentInfo {
 public:
@@ -76,14 +77,14 @@ public:
 
 	virtual ~SegmentInfo();
 
-	uint32_t type;
-	uint32_t flags;
-	uint64_t offset;
-	uint8_t *vaddr;
-	uint8_t *paddr;
-	uint64_t filesz;
-	uint64_t memsz;
-	uint64_t align;
+	uint32_t type;       ///< segment type
+	uint32_t flags;      ///< segment flags
+	uint64_t offset;     ///< byte offset where section starts in file
+	uint8_t *vaddr;      ///< virtual address of segment
+	uint8_t *paddr;      ///< physical address of segment (kernel thing)
+	uint64_t filesz;     ///< size of segment in in file
+	uint64_t memsz;      ///< size of segment in memory (larger!)
+	uint64_t align;      ///< segment alignment
 };
 
 class ElfFile {

@@ -23,67 +23,55 @@ RelSym::RelSym(const std::string &name,
                uint8_t info,
                uint32_t shndx)
 	:
-	name(name),
-	value(value),
-	info(info),
-	shndx(shndx) {}
+	name{name},
+	value{value},
+	info{info},
+	shndx{shndx} {}
 
 RelSym::~RelSym() {}
 
 SectionInfo::SectionInfo()
 	:
-	segName(),
-	segID(-1),
-	index(0),
-	memindex(0),
-	size(0) {}
+	segName{},
+	segID{0xffffffff},
+	index{0},
+	memindex{0},
+	size{0} {}
 
-SectionInfo::SectionInfo(uint8_t *i, unsigned int s)
+SectionInfo::SectionInfo(const std::string &segName,
+                         uint32_t segID,
+                         uint8_t *index,
+                         uint64_t memindex,
+                         uint32_t size)
 	:
-	segName(),
-	segID(),
-	index(i),
-	memindex(0),
-	size(s) {}
-
-SectionInfo::SectionInfo(const std::string &segName, uint32_t segID, uint8_t *i, uint64_t a, uint32_t s)
-	:
-	segName(segName),
-	segID(segID),
-	index(i),
-	memindex((uint8_t*) a),
-	size(s) {}
+	segName{segName},
+	segID{segID},
+	index{index},
+	memindex{memindex},
+	size{size} {}
 
 SectionInfo::~SectionInfo() {}
 
 bool SectionInfo::containsElfAddress(uint64_t address){
-	uint64_t addr = (uint64_t) this->index;
-	if (address >= addr &&
-	    address <= addr + this->size){
-		return true;
-	}
-	return false;
+	uint64_t addr = reinterpret_cast<uint64_t>(this->index);
+	return (address >= addr && address <= addr + this->size);
 }
 
 bool SectionInfo::containsMemAddress(uint64_t address){
-	uint64_t addr = (int64_t) this->memindex;
-	if (address >= addr &&
-	    address <= addr + this->size){
-		return true;
-	}
-	return false;
+	uint64_t addr = this->memindex;
+	return (address >= addr && address <= addr + this->size);
 }
 
 SegmentInfo::SegmentInfo()
 	:
-	type(0),
-	flags(0),
-	offset(0),
-	vaddr(0),
-	paddr(0),
-	filesz(0),
-	memsz(0),
-	align(0) {}
+	type{0},
+	flags{0},
+	offset{0},
+	vaddr{0},
+	paddr{0},
+	filesz{0},
+	memsz{0},
+	align{0} {}
 
 SegmentInfo::SegmentInfo(uint32_t p_type,
                          uint32_t p_flags,
@@ -93,14 +81,14 @@ SegmentInfo::SegmentInfo(uint32_t p_type,
                          uint64_t p_filesz,
                          uint64_t p_memsz,
                          uint64_t p_align):
-	type  (p_type),
-	flags (p_flags),
-	offset(p_offset),
-	vaddr (p_vaddr),
-	paddr (p_paddr),
-	filesz(p_filesz),
-	memsz (p_memsz),
-	align (p_align) {}
+	type  {p_type},
+	flags {p_flags},
+	offset{p_offset},
+	vaddr {p_vaddr},
+	paddr {p_paddr},
+	filesz{p_filesz},
+	memsz {p_memsz},
+	align {p_align} {}
 
 SegmentInfo::~SegmentInfo() {}
 
