@@ -18,6 +18,7 @@ kernint_HEADERS=kernint.h \
                 elffile64.h \
                 elfloader.h \
                 kernel.h \
+                elfkernelspaceloader.h \
                 elfkernelloader.h \
                 elfmoduleloader.h \
                 elfuserspaceloader.h \
@@ -39,6 +40,7 @@ kernint_SOURCES=kernint.cpp \
                 elffile64.cpp \
                 elfloader.cpp \
                 kernel.cpp \
+                elfkernelspaceloader.cpp \
                 elfkernelloader.cpp \
                 elfmoduleloader.cpp \
                 elfuserspaceloader.cpp \

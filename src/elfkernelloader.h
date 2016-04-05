@@ -1,27 +1,25 @@
 #ifndef ELFKERNELOADER_H
 #define ELFKERNELOADER_H
 
-#include "elfloader.h"
-#include "kernel.h"
+#include "elfkernelspaceloader.h"
 #include "paravirt_patch.h"
 
 
-class ElfKernelLoader : public ElfLoader, public Kernel {
+class ElfKernelLoader : public ElfKernelspaceLoader {
 	friend class KernelValidator;
 
 public:
 	ElfKernelLoader(ElfFile *elffile);
 	virtual ~ElfKernelLoader();
 
-	ElfLoader *getModuleForAddress(uint64_t address);
-	ElfLoader *getModuleForCodeAddress(uint64_t address);
+	ElfKernelspaceLoader *getModuleForAddress(uint64_t address);
+	ElfKernelspaceLoader *getModuleForCodeAddress(uint64_t address);
 
 	const std::string &getName() const override;
 	Kernel *getKernel() override;
 
 protected:
 	std::string name;
-	ParavirtPatcher pvpatcher;
 
 	SectionInfo vvarSegment;
 	SectionInfo dataNosaveSegment;

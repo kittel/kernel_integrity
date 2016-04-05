@@ -1,19 +1,23 @@
-#include <iostream>
-#include <iomanip>
+#include "processvalidator.h"
 
-#include <cassert>
-#include <iostream>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-#include <unordered_map>
 #include <algorithm>
-
-#include <processvalidator.h>
+#include <cassert>
+#include <iomanip>
+#include <iostream>
+#include <iostream>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <unordered_map>
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
+
+#include "elffile.h"
+#include "elfkernelloader.h"
+#include "elfuserspaceloader.h"
+#include "taskmanager.h"
+
 
 // TODO: retrieve paths from command line parameters
 ProcessValidator::ProcessValidator(ElfKernelLoader *kl,

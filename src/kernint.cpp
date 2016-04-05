@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include <memory>
 
+#include "elfkernelloader.h"
 #include "kernelvalidator.h"
 #include "processvalidator.h"
 #include "process.h"

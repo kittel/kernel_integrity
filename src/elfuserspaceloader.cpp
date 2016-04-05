@@ -1,5 +1,6 @@
 #include "elfuserspaceloader.h"
 
+#include "kernel.h"
 #include "process.h"
 
 ElfUserspaceLoader::ElfUserspaceLoader(ElfFile *file,

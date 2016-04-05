@@ -1,16 +1,22 @@
+#include "kernelvalidator.h"
+
 #include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <iostream>
 #include <list>
-#include <stdio.h>
-#include <stdlib.h>
+#include <memory>
+#include <cstdio>
+#include <cstdlib>
 #include <unistd.h>
+#include <unordered_map>
 
-#include "kernelvalidator.h"
+#include "elfkernelspaceloader.h"
+#include "elfkernelloader.h"
+#include "elfmoduleloader.h"
+#include "helpers.h"
 #include "kernel_headers.h"
 
 
@@ -114,7 +120,7 @@ void KernelValidator::validatePage(page_info_t * page) {
 		return;
 	}
 
-	ElfLoader *module = kernelLoader->getModuleForAddress(page->vaddr);
+	ElfKernelspaceLoader *module = kernelLoader->getModuleForAddress(page->vaddr);
 	//assert(module);
 	if (!module) {
 		if(this->kernelLoader->vmi->isPageExecutable(page)){
@@ -172,7 +178,7 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 			continue;
 		}
 
-		ElfLoader* elfloader = kernelLoader->getModuleForAddress(*longPtr);
+		ElfKernelspaceLoader *elfloader = kernelLoader->getModuleForAddress(*longPtr);
 		if (!elfloader || !elfloader->isCodeAddress(*longPtr)) {
 			continue;
 		}
@@ -183,7 +189,7 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 		if (kernelLoader->symbols.isSymbol(*longPtr))
 			continue;
 
-		uint64_t offset = *longPtr - (uint64_t)elfloader->textSegment.memindex;
+		uint64_t offset = *longPtr - elfloader->textSegment.memindex;
 
 		if (offset > elfloader->textSegmentContent.size()) {
 			stackInteresting = true;
@@ -202,20 +208,15 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 	std::string oldRetFuncName;
 
 	for (auto& retAddr : returnAddresses) {
-		ElfLoader* elfloader =
-		kernelLoader->getModuleForAddress(retAddr.second);
+		ElfKernelspaceLoader* elfloader = kernelLoader->getModuleForAddress(retAddr.second);
 
 		// Return Address (Stack)
-		uint64_t offset =
-		retAddr.second - (uint64_t)elfloader->textSegment.memindex;
+		uint64_t offset = retAddr.second - elfloader->textSegment.memindex;
 
 		std::vector<uint8_t> pageInMem = this->kernelLoader->vmi->readVectorFromVA(
-			(uint64_t)elfloader->textSegment.memindex, offset + 0x40);
+			elfloader->textSegment.memindex, offset + 0x40);
 
-		uint64_t callAddr =
-		isReturnAddress(elfloader->textSegmentContent.data(),
-		                offset,
-		                (uint64_t)elfloader->textSegment.memindex);
+		uint64_t callAddr = isReturnAddress(elfloader->textSegmentContent.data(), offset, elfloader->textSegment.memindex);
 
 		if (!callAddr) {
 			stackInteresting = true;
@@ -319,7 +320,7 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 bool KernelValidator::isValidJmpLabel(uint8_t* pageInMem,
                                       uint64_t codeAddress,
                                       int32_t i,
-                                      ElfLoader* elf) {
+                                      ElfKernelspaceLoader* elf) {
 	auto entry = elf->jumpEntries.find(codeAddress);
 
 	if (entry != elf->jumpEntries.end()) {
@@ -339,7 +340,8 @@ bool KernelValidator::isValidJmpLabel(uint8_t* pageInMem,
 	return false;
 }
 
-void KernelValidator::validateCodePage(page_info_t *page, ElfLoader *elf) {
+void KernelValidator::validateCodePage(page_info_t *page,
+                                       ElfKernelspaceLoader *elf) {
 	assert(page);
 	assert(elf);
 
@@ -506,7 +508,7 @@ void KernelValidator::validateCodePage(page_info_t *page, ElfLoader *elf) {
 	// return changeCount;
 }
 
-void KernelValidator::validateDataPage(page_info_t* page, ElfLoader* elf) {
+void KernelValidator::validateDataPage(page_info_t* page, ElfKernelspaceLoader* elf) {
 	assert(page);
 	assert(elf);
 
@@ -717,12 +719,12 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 				continue;
 			}
 
-			ElfLoader* elfloader = kernelLoader->getModuleForAddress(*longPtr);
+			ElfKernelspaceLoader* elfloader = kernelLoader->getModuleForAddress(*longPtr);
 			if (!elfloader || !elfloader->isCodeAddress(*longPtr)) {
 				continue;
 			}
 
-			uint64_t offset = *longPtr - (uint64_t)elfloader->textSegment.memindex;
+			uint64_t offset = *longPtr - elfloader->textSegment.memindex;
 
 			if (offset > elfloader->textSegmentContent.size()) {
 				std::cout << std::hex << COLOR_RED << COLOR_BOLD
@@ -757,8 +759,7 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 			// Return Address (Stack)
 			uint64_t callAddr =
 			isReturnAddress(elfloader->textSegmentContent.data(),
-			                offset,
-			                (uint64_t)elfloader->textSegment.memindex);
+			                offset, elfloader->textSegment.memindex);
 			if (callAddr) {
 				std::cout << std::hex << COLOR_BLUE << COLOR_BOLD
 				          << "return address: 0x" << *longPtr << " ( @ 0x"

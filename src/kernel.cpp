@@ -43,27 +43,27 @@ void Kernel::initTaskManager() {
 	this->tm.init();
 }
 
-ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
+ElfModuleLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
 	std::string moduleName{moduleNameOrig};
 	std::replace(moduleName.begin(), moduleName.end(), '-', '_');
 
 	moduleMapMutex.lock();
 	// Check if module is already loaded
-	if (moduleMap.find(moduleName) != moduleMap.end()) {
+	if (this->moduleMap.find(moduleName) != this->moduleMap.end()) {
 		// This might be nullptr! Think about
-		while (moduleMap[moduleName] == nullptr) {
-			moduleMapMutex.unlock();
+		while (this->moduleMap[moduleName] == nullptr) {
+			this->moduleMapMutex.unlock();
 			std::this_thread::yield();
-			moduleMapMutex.lock();
+			this->moduleMapMutex.lock();
 		}
-		auto module = moduleMap[moduleName];
-		moduleMapMutex.unlock();
+		auto module = this->moduleMap[moduleName];
+		this->moduleMapMutex.unlock();
 		return module;
 	}
-	moduleMap[moduleName] = nullptr;
-	moduleMapMutex.unlock();
+	this->moduleMap[moduleName] = nullptr;
+	this->moduleMapMutex.unlock();
 
-	std::string filename = findModuleFile(moduleName);
+	std::string filename = this->findModuleFile(moduleName);
 	if (filename.empty()) {
 		std::cout << moduleName << ": Module File not found" << std::endl;
 		assert(false);
@@ -74,9 +74,9 @@ ElfLoader *Kernel::loadModule(const std::string &moduleNameOrig) {
 	auto module = file->parseKernelModule(moduleName, this);
 	assert(module);
 
-	moduleMapMutex.lock();
-	moduleMap[moduleName] = module;
-	moduleMapMutex.unlock();
+	this->moduleMapMutex.lock();
+	this->moduleMap[moduleName] = module;
+	this->moduleMapMutex.unlock();
 
 	return module;
 }

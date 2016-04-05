@@ -1,18 +1,15 @@
 #ifndef ELFFILE_H
 #define ELFFILE_H
 
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <elf.h>
-
-#include <fcntl.h>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
-
-#include <sys/mman.h>
-
+#include <elf.h>
+#include <fcntl.h>
+#include <iostream>
 #include <map>
 #include <memory>
+#include <sys/mman.h>
 #include <vector>
 
 class ElfLoader;

@@ -1,10 +1,10 @@
 #ifndef ELFMODULELOADER_H
 #define ELFMODULELOADER_H
 
-#include "elfloader.h"
+#include "elfkernelspaceloader.h"
 #include "paravirt_patch.h"
 
-class ElfModuleLoader : public ElfLoader {
+class ElfModuleLoader : public ElfKernelspaceLoader {
 public:
 	ElfModuleLoader(ElfFile *elffile,
 	                const std::string &name="",
@@ -28,8 +28,6 @@ protected:
 
 	std::string modName;
 	Kernel *kernel;
-
-	ParavirtPatcher pvpatcher;
 };
 
 #include "elfmoduleloader64.h"

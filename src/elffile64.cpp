@@ -1,13 +1,14 @@
 #include "elffile64.h"
 
-#include "exceptions.h"
-#include "elfloader.h"
-
-#include "helpers.h"
-
-#include <stdio.h>
+#include <cstdio>
 #include <cassert>
 
+#include "elfloader.h"
+#include "elfkernelloader64.h"
+#include "elfmoduleloader64.h"
+#include "elfuserspaceloader64.h"
+#include "helpers.h"
+#include "kernel.h"
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
@@ -125,11 +126,12 @@ ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
 }
 
 ElfUserspaceLoader *ElfFile64::parseProcess(const std::string &name,
-                                          Kernel *kernel) {
+                                            Kernel *kernel) {
 	auto proc = new ElfUserspaceLoader64(this, kernel, name);
 
 	this->parseDwarf();
-	//TODO: this->symbols = &proc->symbols;
+	// TODO: symbols to elffile?
+	// this->symbols = &proc->symbols;
 	return proc;
 }
 

@@ -9,10 +9,9 @@ ElfModuleLoader::ElfModuleLoader(ElfFile *elffile,
                                  const std::string &name,
                                  Kernel *kernel)
 	:
-	ElfLoader(elffile),
+	ElfKernelspaceLoader(elffile, kernel->getParavirtState()),
 	modName(name),
-	kernel(kernel),
-	pvpatcher(kernel->getParavirtState()) {}
+	kernel(kernel) {}
 
 ElfModuleLoader::~ElfModuleLoader() {}
 

@@ -19,8 +19,8 @@ class Kernel;
 /**
  * An ElfLoader is a memory representation we construct from the whitelisted
  * file. After a full initialization (depending on the type of ELF file) one
- * should be able to bytewise compare the actual memory with an instance of this
- * class.
+ * should be able to bytewise compare the actual memory with an instance of
+ * this class.
  */
 class ElfLoader {
 	friend class ElfKernelLoader;
@@ -32,7 +32,7 @@ class ElfLoader {
 	friend class Process;
 
 public:
-	virtual ~ElfLoader();
+	virtual ~ElfLoader() = default;
 
 	virtual const std::string &getName() const = 0;
 	virtual Kernel *getKernel() = 0;
@@ -49,10 +49,6 @@ protected:
 	std::vector<uint8_t> jumpTable;
 	std::vector<uint8_t> roData;
 
-	std::map<uint64_t, int32_t> jumpEntries;
-	std::set<uint64_t> jumpDestinations;
-	std::set<uint64_t> smpOffsets;
-
 	SectionInfo textSegment;  // The first big memory segment
 	SectionInfo dataSection;  // The second big memory segment
 	SectionInfo bssSection;   // The last memory segment
@@ -60,14 +56,6 @@ protected:
 
 	std::vector<uint8_t> textSegmentContent;
 	std::vector<uint8_t> dataSegmentContent;
-
-	void applyMcount(const SectionInfo &info, ParavirtPatcher *patcher);
-	void applyAltinstr(ParavirtPatcher *patcher);
-	void applySmpLocks();
-	void applyJumpEntries(uint64_t jumpStart,
-	                      uint32_t numberOfEntries,
-	                      ParavirtPatcher *patcher);
-
 
 	/**
 	 * Load sections of this elf file.
@@ -78,9 +66,5 @@ protected:
 	virtual bool isCodeAddress(uint64_t addr);
 	virtual bool isDataAddress(uint64_t addr) = 0;
 };
-
-#include "elfkernelloader.h"
-#include "elfmoduleloader.h"
-#include "elfuserspaceloader.h"
 
 #endif /* ELFLOADER_H */
