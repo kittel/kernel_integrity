@@ -1,5 +1,5 @@
-#ifndef ELFPROCESSLOADER_H
-#define ELFPROCESSLOADER_H
+#ifndef ELFUSERSPACELOADER_H
+#define ELFUSERSPACELOADER_H
 
 #include "elffile.h"
 #include "elfloader.h"
@@ -9,20 +9,20 @@
 #include <unordered_map>
 
 // The beauty of forward declarations
-class ElfProcessLoader;
+class ElfUserspaceLoader;
 class ElfKernelLoader;
 class Process;
 class ProcessValidator;
 
-class ElfProcessLoader : public ElfLoader {
+class ElfUserspaceLoader : public ElfLoader {
 	friend class ProcessValidator;
 	friend class Process;
 
 public:
-	ElfProcessLoader(ElfFile *elffile, Kernel *kernel,
+	ElfUserspaceLoader(ElfFile *elffile, Kernel *kernel,
 	                 const std::string &name);
 
-	virtual ~ElfProcessLoader();
+	virtual ~ElfUserspaceLoader();
 
 	void parse() override;  // Initialize the complete image
 
@@ -63,6 +63,6 @@ protected:
 	virtual void updateSectionInfoMemAddress(SectionInfo& info);
 };
 
-#include "elfprocessloader64.h"
+#include "elfuserspaceloader64.h"
 
 #endif

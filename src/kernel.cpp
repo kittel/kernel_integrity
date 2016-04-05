@@ -15,7 +15,7 @@
 
 #include "elffile.h"
 
-#include "elfprocessloader.h"
+#include "elfuserspaceloader.h"
 
 #include "libdwarfparser/variable.h"
 #include "libdwarfparser/function.h"

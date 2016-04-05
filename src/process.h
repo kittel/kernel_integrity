@@ -12,7 +12,7 @@
 class Instance;
 class Kernel;
 class ElfLoader;
-class ElfProcessLoader;
+class ElfUserspaceLoader;
 class VMAInfo;
 
 class Process {
@@ -20,7 +20,7 @@ public:
 	Process(const std::string &binaryName, Kernel *kernel, pid_t pid);
 	virtual ~Process() = default;
 
-	ElfProcessLoader *getExecLoader();
+	ElfUserspaceLoader *getExecLoader();
 
 	const std::string &getName() const;
 
@@ -53,10 +53,10 @@ public:
 	const VMAInfo *findVMAByName(const std::string &name) const;
 	const VMAInfo *findVMAByAddress(const uint64_t address) const;
 
-	ElfProcessLoader *findLoaderByAddress(const uint64_t addr) const;
-	ElfProcessLoader *findLoaderByFileName(const std::string &name) const;
+	ElfUserspaceLoader *findLoaderByAddress(const uint64_t addr) const;
+	ElfUserspaceLoader *findLoaderByFileName(const std::string &name) const;
 
-	const std::unordered_set<ElfProcessLoader *> getMappedLibs() const;
+	const std::unordered_set<ElfUserspaceLoader *> getMappedLibs() const;
 	SectionInfo *getSegmentForAddress(uint64_t addr);
 
 	/**
@@ -64,7 +64,7 @@ public:
 	 * for the executable and all libraries.
 	 */
 	void processLoadRel();
-	void registerSyms(ElfProcessLoader *elf);
+	void registerSyms(ElfUserspaceLoader *elf);
 
 protected:
 	Kernel *kernel;
@@ -72,8 +72,8 @@ protected:
 	Instance *task_struct;
 	pid_t pid;
 
-	ElfProcessLoader *execLoader;
-	ElfProcessLoader *vdsoLoader;
+	ElfUserspaceLoader *execLoader;
+	ElfUserspaceLoader *vdsoLoader;
 	std::string binaryName;
 
 	std::vector<VMAInfo> mappedVMAs;
@@ -81,7 +81,7 @@ protected:
 	std::vector<std::string> getArgv();
 	std::unordered_map<std::string, std::string> getEnv();
 
-	ElfProcessLoader *findLibByName(const std::string &name);
+	ElfUserspaceLoader *findLibByName(const std::string &name);
 	typedef std::unordered_map<std::string, ElfLoader*> LibraryMap;
 	LibraryMap libraryMap;
 

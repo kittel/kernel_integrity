@@ -74,7 +74,7 @@ int ProcessValidator::validateProcess() {
 
 void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	std::vector<uint8_t> codevma;
-	ElfProcessLoader *binary = nullptr;
+	ElfUserspaceLoader *binary = nullptr;
 
 	if (this->process->getName().length() >= vma->name.length() &&
 	    this->process->getName().compare(this->process->getName().length()
@@ -83,7 +83,7 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	                                     vma->name) == 0) {
 		binary = this->process->getExecLoader();
 	} else {
-		ElfProcessLoader *lib = this->process->findLoaderByFileName(vma->name);
+		ElfUserspaceLoader *lib = this->process->findLoaderByFileName(vma->name);
 		if (!lib) {
 			// occurs when it's library is mapped but is not a dependency
 			// TODO find out why libnss* is always mapped to the process space

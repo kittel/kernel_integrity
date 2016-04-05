@@ -13,7 +13,7 @@
 /**
  * This is an instance of our Process Manager.
  * It conducts the loading and validation process by instances of
- * TaskManager, ElfProcessLoader and VMIInstance
+ * TaskManager, ElfUserspaceLoader and VMIInstance
  *
  * validatePage:    Check the given page for mutations.
  * checkEnv:        Validate the envVars, using the given default values

@@ -3,7 +3,7 @@
 #include <regex>
 
 #include "elffile.h"
-#include "elfprocessloader.h"
+#include "elfuserspaceloader.h"
 #include "kernel.h"
 #include "libdwarfparser/instance.h"
 #include "processvalidator.h"
@@ -35,7 +35,7 @@ const std::string &Process::getName() const {
 	return this->binaryName;
 }
 
-ElfProcessLoader *Process::getExecLoader() {
+ElfUserspaceLoader *Process::getExecLoader() {
 	assert(this->execLoader);
 	return this->execLoader;
 }
@@ -59,11 +59,11 @@ ElfLoader *Process::loadLibrary(const std::string &libraryName) {
 	return library;
 }
 
-ElfProcessLoader *Process::findLibByName(const std::string &name) {
+ElfUserspaceLoader *Process::findLibByName(const std::string &name) {
 	if (this->libraryMap.find(name) == this->libraryMap.end()) {
 		return nullptr;
 	}
-	return dynamic_cast<ElfProcessLoader *>(libraryMap[name]);
+	return dynamic_cast<ElfUserspaceLoader *>(libraryMap[name]);
 }
 
 std::vector<uint8_t> *Process::getDataSegmentForLib(const std::string &name) {
@@ -132,9 +132,9 @@ const VMAInfo *Process::findVMAByAddress(const uint64_t address) const {
  * => Reverse iterate through the mappedVMAs and find the corresponding loader,
  *    gives the loaders in the correct processing order.
  */
-const std::unordered_set<ElfProcessLoader *> Process::getMappedLibs() const {
-	std::unordered_set<ElfProcessLoader *> ret;
-	ElfProcessLoader *loader = nullptr;
+const std::unordered_set<ElfUserspaceLoader *> Process::getMappedLibs() const {
+	std::unordered_set<ElfUserspaceLoader *> ret;
+	ElfUserspaceLoader *loader = nullptr;
 
 	for (auto &vma : this->getMappedVMAs()) {
 		loader = this->findLoaderByFileName(vma.name);
@@ -146,9 +146,9 @@ const std::unordered_set<ElfProcessLoader *> Process::getMappedLibs() const {
 }
 
 /*
- * Find a corresponding ElfProcessLoader for the given vaddr
+ * Find a corresponding ElfUserspaceLoader for the given vaddr
  */
-ElfProcessLoader *Process::findLoaderByAddress(const uint64_t addr) const {
+ElfUserspaceLoader *Process::findLoaderByAddress(const uint64_t addr) const {
 	const VMAInfo *vma = this->findVMAByAddress(addr);
 	if (!vma) {
 		return nullptr;
@@ -159,7 +159,7 @@ ElfProcessLoader *Process::findLoaderByAddress(const uint64_t addr) const {
 /*
  * find loader by searching for a library name
  */
-ElfProcessLoader *Process::findLoaderByFileName(const std::string &name) const {
+ElfUserspaceLoader *Process::findLoaderByFileName(const std::string &name) const {
 	std::string libname = fs::path(name).filename().string();
 	return this->getKernel()
 	           ->getTaskManager()
@@ -170,7 +170,7 @@ ElfProcessLoader *Process::findLoaderByFileName(const std::string &name) const {
 /* Find a corresponding SectionInfo for the given vaddr */
 SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
 	// find a corresponding loader for the given vaddr
-	ElfProcessLoader *loader = this->findLoaderByAddress(vaddr);
+	ElfUserspaceLoader *loader = this->findLoaderByAddress(vaddr);
 
 	SectionInfo *ret = loader->getSegmentForAddress(vaddr);
 	return ret;
@@ -187,7 +187,7 @@ SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
  *      - process relocation of the respective library
  */
 void Process::processLoadRel() {
-	const std::unordered_set<ElfProcessLoader *> mappedLibs = this->getMappedLibs();
+	const std::unordered_set<ElfUserspaceLoader *> mappedLibs = this->getMappedLibs();
 
 	for (auto &lib : mappedLibs) {
 		// announce provided symbols
@@ -200,7 +200,7 @@ void Process::processLoadRel() {
 	}
 
 	// last, apply the relocations on the executable image.
-	ElfProcessLoader *execLoader = this->getExecLoader();
+	ElfUserspaceLoader *execLoader = this->getExecLoader();
 	execLoader->elffile->applyRelocations(execLoader, this->kernel, this);
 	this->registerSyms(execLoader);
 
@@ -213,7 +213,7 @@ void Process::processLoadRel() {
  *  if symbol not in map or (symbol in map(WEAK) and exported symbol(GLOBAL))
  *      add to relSymMap
  */
-void Process::registerSyms(ElfProcessLoader *elf) {
+void Process::registerSyms(ElfUserspaceLoader *elf) {
 	std::vector<RelSym> syms = elf->getSymbols();
 
 	for (auto &it : syms) {

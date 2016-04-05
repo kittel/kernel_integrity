@@ -1,8 +1,8 @@
-#include "elfprocessloader.h"
+#include "elfuserspaceloader.h"
 
 #include "process.h"
 
-ElfProcessLoader::ElfProcessLoader(ElfFile *file,
+ElfUserspaceLoader::ElfUserspaceLoader(ElfFile *file,
                                    Kernel *kernel,
                                    const std::string &name)
 	:
@@ -10,9 +10,9 @@ ElfProcessLoader::ElfProcessLoader(ElfFile *file,
 	kernel{kernel},
 	name{name} {}
 
-ElfProcessLoader::~ElfProcessLoader() {}
+ElfUserspaceLoader::~ElfUserspaceLoader() {}
 
-void ElfProcessLoader::loadDependencies() {
+void ElfUserspaceLoader::loadDependencies() {
 	auto dependencies = this->elffile->getDependencies();
 
 	for (auto &dep : dependencies) {
@@ -21,8 +21,8 @@ void ElfProcessLoader::loadDependencies() {
 	}
 }
 
-void ElfProcessLoader::initText() {
-	std::cout << "Initializing text segment for elfprocessloader: "
+void ElfUserspaceLoader::initText() {
+	std::cout << "Initializing text segment for elfuserspaceloader: "
 	          << this->name << std::endl;
 	this->textSegmentInfo = this->elffile->findCodeSegment();
 
@@ -34,8 +34,8 @@ void ElfProcessLoader::initText() {
 	                                index, index + pages * PAGESIZE);
 }
 
-void ElfProcessLoader::initData() {
-	std::cout << "Initializing data segment for elfprocessloader: "
+void ElfUserspaceLoader::initData() {
+	std::cout << "Initializing data segment for elfuserspaceloader: "
 	          << this->name << std::endl;
 
 	this->dataSegmentInfo = this->elffile->findDataSegment();
@@ -43,8 +43,10 @@ void ElfProcessLoader::initData() {
 	auto index = this->elffile->getFileContent() + this->dataSegmentInfo.offset;
 	this->dataSegmentContent.insert(this->dataSegmentContent.end(),
 	                                index,
-	                                index + this->dataSegmentInfo.filesz);
+	                                index + this->dataSegmentInfo.memsz);
 
+	// for all section in data segment:
+	// map section and fill up with zeroes until next section starts
 	// TODO: relocation stuff? lazy bind?
 }
 
@@ -52,9 +54,9 @@ void ElfProcessLoader::initData() {
  * Initialize a complete memory image for validation. Relocations are not yet
  * processed
  */
-void ElfProcessLoader::parse() {
+void ElfUserspaceLoader::parse() {
 	if (this->elffile->isExecutable()) {
-		std::cout << "ElfProcessLoader::parse(): TODO: load VDSO"
+		std::cout << "ElfUserspaceLoader::parse(): TODO: load VDSO"
 		          << std::endl;
 		//this->kernel->loadVDSO();
 
@@ -69,7 +71,7 @@ void ElfProcessLoader::parse() {
 }
 
 /* Return the SectionInfo, in which the given addr is contained. */
-SectionInfo *ElfProcessLoader::getSegmentForAddress(uint64_t addr) {
+SectionInfo *ElfUserspaceLoader::getSegmentForAddress(uint64_t addr) {
 	// check textSegment
 	if (addr >= (uint64_t) this->textSegment.memindex && addr < ((uint64_t) this->textSegment.memindex) + this->textSegment.size) {
 		return &this->textSegment;
@@ -94,12 +96,12 @@ SectionInfo *ElfProcessLoader::getSegmentForAddress(uint64_t addr) {
 	}
 }
 
-void ElfProcessLoader::updateSectionInfoMemAddress(SectionInfo &info) {
+void ElfUserspaceLoader::updateSectionInfoMemAddress(SectionInfo &info) {
 	UNUSED(info);
 }
 
 /* Check if the given virtual address is located in the textSegment */
-bool ElfProcessLoader::isCodeAddress(uint64_t addr) {
+bool ElfUserspaceLoader::isCodeAddress(uint64_t addr) {
 	// get offset to last page border
 	uint64_t endAddr = ((uint64_t)this->textSegment.memindex)
 	                    + (this->textSegmentInfo.offset & 0xfff)
@@ -117,12 +119,12 @@ bool ElfProcessLoader::isCodeAddress(uint64_t addr) {
 }
 
 /* Check if the given virtual address is located in the dataSection */
-bool ElfProcessLoader::isDataAddress(uint64_t addr) {
+bool ElfUserspaceLoader::isDataAddress(uint64_t addr) {
 	UNUSED(addr);
 	assert(false);
 }
 
-bool ElfProcessLoader::isDataAddress(uint64_t addr, Process *process) {
+bool ElfUserspaceLoader::isDataAddress(uint64_t addr, Process *process) {
 
 	auto dataSection = process->getSectionInfoForLib(this->name);
 	auto dataSegmentInfo = process->getSegmentInfoForLib(this->name);
@@ -143,32 +145,32 @@ bool ElfProcessLoader::isDataAddress(uint64_t addr, Process *process) {
 }
 
 /* Check if the given fileOffset (in bytes) lays in the textSegment */
-bool ElfProcessLoader::isTextOffset(uint64_t off) {
+bool ElfUserspaceLoader::isTextOffset(uint64_t off) {
 	return (off >= this->textSegmentInfo.offset &&
 	        off <= this->textSegmentInfo.filesz);
 
 }
 
 /* Check if the given fileOffset (in bytes) lays in the dataSection */
-bool ElfProcessLoader::isDataOffset(uint64_t off) {
+bool ElfUserspaceLoader::isDataOffset(uint64_t off) {
 	UNUSED(off);
 	assert(false);
 }
 
-bool ElfProcessLoader::isDataOffset(uint64_t off, Process *process) {
+bool ElfUserspaceLoader::isDataOffset(uint64_t off, Process *process) {
 	auto dataSegmentInfo = process->getSegmentInfoForLib(this->name);
 	return (off >= dataSegmentInfo->offset &&
 	        off <= dataSegmentInfo->filesz);
 }
 
-const std::string &ElfProcessLoader::getName() const {
+const std::string &ElfUserspaceLoader::getName() const {
 	return this->name;
 }
 
-Kernel *ElfProcessLoader::getKernel() {
+Kernel *ElfUserspaceLoader::getKernel() {
 	return this->kernel;
 }
 
-std::vector<RelSym> ElfProcessLoader::getSymbols() const {
+std::vector<RelSym> ElfUserspaceLoader::getSymbols() const {
 	return this->elffile->getSymbols();
 }

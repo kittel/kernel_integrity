@@ -100,10 +100,10 @@ public:
 	std::string findLibraryFile(const std::string &libName);
 
 	/** try to return an already loaded library by name */
-	ElfProcessLoader *findLibByName(const std::string &name);
+	ElfUserspaceLoader *findLibByName(const std::string &name);
 
 	/** create an executable from a process */
-	ElfProcessLoader *loadExec(Process *process);
+	ElfUserspaceLoader *loadExec(Process *process);
 
 protected:
 	Instance initTask;

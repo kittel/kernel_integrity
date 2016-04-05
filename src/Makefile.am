@@ -20,10 +20,10 @@ kernint_HEADERS=kernint.h \
                 kernel.h \
                 elfkernelloader.h \
                 elfmoduleloader.h \
-                elfprocessloader.h \
+                elfuserspaceloader.h \
                 elfkernelloader64.h \
                 elfmoduleloader64.h \
-                elfprocessloader64.h \
+                elfuserspaceloader64.h \
                 taskmanager.h \
                 exceptions.h \
                 paravirt_state.h \
@@ -41,10 +41,10 @@ kernint_SOURCES=kernint.cpp \
                 kernel.cpp \
                 elfkernelloader.cpp \
                 elfmoduleloader.cpp \
-                elfprocessloader.cpp \
+                elfuserspaceloader.cpp \
                 elfkernelloader64.cpp \
                 elfmoduleloader64.cpp \
-                elfprocessloader64.cpp \
+                elfuserspaceloader64.cpp \
                 taskmanager.cpp \
                 exceptions.cpp \
                 paravirt_state.cpp \

@@ -124,9 +124,9 @@ ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
 	return mod;
 }
 
-ElfProcessLoader *ElfFile64::parseProcess(const std::string &name,
+ElfUserspaceLoader *ElfFile64::parseProcess(const std::string &name,
                                           Kernel *kernel) {
-	auto proc = new ElfProcessLoader64(this, kernel, name);
+	auto proc = new ElfUserspaceLoader64(this, kernel, name);
 
 	this->parseDwarf();
 	//TODO: this->symbols = &proc->symbols;

@@ -1,6 +1,6 @@
 #include "taskmanager.h"
 
-#include "elfprocessloader.h"
+#include "elfuserspaceloader.h"
 #include "kernel.h"
 
 VMAInfo::VMAInfo(uint64_t start, uint64_t end, uint64_t ino,
@@ -292,12 +292,12 @@ ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig) {
 	return library;
 }
 
-ElfProcessLoader *TaskManager::findLibByName(const std::string &name) {
+ElfUserspaceLoader *TaskManager::findLibByName(const std::string &name) {
 	auto it = this->libraryMap.find(name);
 	if (it == this->libraryMap.end()) {
 		return nullptr;
 	}
-	return dynamic_cast<ElfProcessLoader *>(it->second);
+	return dynamic_cast<ElfUserspaceLoader *>(it->second);
 }
 
 std::string TaskManager::findLibraryFile(const std::string &libName) {
@@ -312,7 +312,7 @@ std::string TaskManager::findLibraryFile(const std::string &libName) {
 	return "";
 }
 
-ElfProcessLoader *TaskManager::loadExec(Process *process) {
+ElfUserspaceLoader *TaskManager::loadExec(Process *process) {
 	// Create ELF Object
 
 	// TODO XXX implement caching for binaries
@@ -321,7 +321,7 @@ ElfProcessLoader *TaskManager::loadExec(Process *process) {
 
 	std::string name = binaryName.substr(binaryName.rfind("/", std::string::npos) + 1, std::string::npos);
 
-	ElfProcessLoader *execLoader = execFile->parseProcess(name, this->kernel);
+	ElfUserspaceLoader *execLoader = execFile->parseProcess(name, this->kernel);
 	execLoader->parse();
 	return execLoader;
 }

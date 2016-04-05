@@ -1,12 +1,12 @@
-#ifndef ELFPROCESSLOADER64_H
-#define ELFPROCESSLOADER64_H
+#ifndef ELFUSERSPACELOADER64_H
+#define ELFUSERSPACELOADER64_H
 
 #include <algorithm>
 #include <vector>
 #include <unordered_map>
 #include <elf.h>
 
-#include "elfprocessloader.h"
+#include "elfuserspaceloader.h"
 #include "helpers.h"
 
 #ifndef ASLROFFTYPE_M
@@ -21,7 +21,7 @@
 
 
 /**
- * This class is a derivated ElfProcessLoader for use with 64-Bit Systems.
+ * This class is a derivated ElfUserspaceLoader for use with 64-Bit Systems.
  * It holds a process image for validation, which is derived from the original
  * ELF by retracing the building process in the target system.
  *
@@ -48,7 +48,7 @@
  *
  *      std::vector<uint8_t>    textSegmentContent; // actual textSegment data
  */
-class ElfProcessLoader64 : public ElfProcessLoader {
+class ElfUserspaceLoader64 : public ElfUserspaceLoader {
 	friend class ProcessValidator;
 
 private:
@@ -61,11 +61,11 @@ private:
 	std::unordered_map<std::string, uint32_t> neededSyms;
 
 public:
-	ElfProcessLoader64(ElfFile64 *elffile,
+	ElfUserspaceLoader64(ElfFile64 *elffile,
 	                   Kernel *parent,
 	                   const std::string &name);
 
-	virtual ~ElfProcessLoader64();
+	virtual ~ElfUserspaceLoader64();
 
 protected:
 	int evalLazy(uint64_t addr, std::unordered_map<std::string, RelSym> *map) override;
@@ -74,4 +74,4 @@ protected:
 };
 
 
-#endif  /* ELFPROCESSLOADER64_H */
+#endif  /* ELFUSERSPACELOADER64_H */

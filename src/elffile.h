@@ -18,7 +18,7 @@
 class ElfLoader;
 class ElfModuleLoader;
 class ElfKernelLoader;
-class ElfProcessLoader;
+class ElfUserspaceLoader;
 class Kernel;
 class Process;
 class SymbolManager;
@@ -154,7 +154,7 @@ public:
 	 * Parse this elf file as a executable/library
 	 * associated with a given process.
 	 */
-	virtual ElfProcessLoader *parseProcess(const std::string &name,
+	virtual ElfUserspaceLoader *parseProcess(const std::string &name,
 	                                       Kernel *kernel) = 0;
 
 	virtual bool isRelocatable() const = 0;

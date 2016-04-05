@@ -43,7 +43,7 @@ public:
 	ElfKernelLoader *parseKernel() override;
 	ElfModuleLoader *parseKernelModule(const std::string &name,
 	                                   Kernel *kernel) override;
-	ElfProcessLoader *parseProcess(const std::string &name,
+	ElfUserspaceLoader *parseProcess(const std::string &name,
 	                               Kernel *kernel) override;
 
 

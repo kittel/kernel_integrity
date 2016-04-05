@@ -26,7 +26,7 @@ class ElfLoader {
 	friend class ElfKernelLoader;
 	friend class ElfModuleLoader;
 	friend class KernelValidator;
-	friend class ElfProcessLoader;
+	friend class ElfUserspaceLoader;
 	friend class ProcessValidator;
 	friend class ParavirtPatcher;
 	friend class Process;
@@ -81,6 +81,6 @@ protected:
 
 #include "elfkernelloader.h"
 #include "elfmoduleloader.h"
-#include "elfprocessloader.h"
+#include "elfuserspaceloader.h"
 
 #endif /* ELFLOADER_H */
