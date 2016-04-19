@@ -162,13 +162,12 @@ void ElfModuleLoader::initData(void) {
 }
 
 uint64_t ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
-	std::string segName = info.segName;
 	Instance module;
 	Instance currentModule = this->kernel->getKernelModuleInstance(this->modName);
 
 	// If the searching for the .bss section
 	// This section is right after the modules struct
-	if (segName.compare(".bss") == 0) {
+	if (info.name.compare(".bss") == 0) {
 		uint64_t align = this->elffile->sectionAlign(info.segID);
 
 		uint64_t offset = currentModule.size() % align;
@@ -178,7 +177,7 @@ uint64_t ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 		return currentModule.getAddress() + offset;
 	}
 
-	if (segName.compare("__ksymtab_gpl") == 0) {
+	if (info.name.compare("__ksymtab_gpl") == 0) {
 		return currentModule.memberByName("gpl_syms").getRawValue<uint64_t>();
 	}
 
@@ -191,7 +190,7 @@ uint64_t ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 	for (uint j = 0; j < attr_cnt; ++j) {
 		Instance attr = attrs.memberByName("attrs").arrayElem(j);
 		std::string sectionName = attr.memberByName("name", true).getValue<std::string>();
-		if (sectionName.compare(segName) == 0) {
+		if (sectionName.compare(info.name) == 0) {
 			return attr.memberByName("address").getValue<uint64_t>();
 		}
 	}

@@ -27,7 +27,7 @@ public:
 	bool isCodeAddress(uint64_t address) override;
 	bool isDataAddress(uint64_t address) override;
 
-	std::string sectionName(int sectionID) override;
+	std::string sectionName(int sectionID) const override;
 	uint8_t *sectionAddress(int sectionID) override;
 	uint64_t sectionAlign(int sectionID) override;
 

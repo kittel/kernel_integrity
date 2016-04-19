@@ -44,7 +44,10 @@ protected:
 	// symbols provided by this elf
 	std::vector<RelSym> getSymbols() const;
 
+	/** copy .text etc to text segment */
 	void initText() override;
+
+	/** create data segment vector as origin for copies */
 	void initData() override;
 
 	SectionInfo *getSegmentForAddress(uint64_t addr);

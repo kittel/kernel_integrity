@@ -39,16 +39,50 @@ void ElfUserspaceLoader::initData() {
 	std::cout << "Initializing data segment for elfuserspaceloader: "
 	          << this->name << std::endl;
 
+	// information about the data segment
 	this->dataSegmentInfo = this->elffile->findDataSegment();
 
-	auto index = this->elffile->getFileContent() + this->dataSegmentInfo.offset;
-	this->dataSegmentContent.insert(this->dataSegmentContent.end(),
-	                                index,
-	                                index + this->dataSegmentInfo.memsz);
+	// create a vector filled with zeroes for the size of the data segment
+	auto begin = std::begin(this->dataSegmentContent);
 
-	// for all section in data segment:
-	// map section and fill up with zeroes until next section starts
-	// TODO: relocation stuff? lazy bind?
+	std::cout << " reserving segment of size 0x" << std::hex
+	          << this->dataSegmentInfo.memsz
+	          << " with offset 0x" << this->dataSegmentInfo.offset
+	          << std::dec << std::endl;
+	this->dataSegmentContent.insert(begin, this->dataSegmentInfo.memsz, 0);
+
+	// copy all sections in the data segment at their correct position
+	for (unsigned int i = 0; i < this->elffile->getNrOfSections(); i++) {
+		SectionInfo section = this->elffile->findSectionByID(i);
+
+		std::cout << " trying " << section.name
+		          << " at 0x" << std::hex
+		          << section.offset
+		          << std::dec << std::endl;
+
+		// if this section is within the data segment
+		// the section size is subtracted so the start offset check
+		// is enough to verify it's in the segment.
+		if (CONTAINS(this->dataSegmentInfo.offset,
+		             this->dataSegmentInfo.filesz - section.size,
+		             section.offset)) {
+
+			std::cout << " adding section: " << section.name << std::endl;
+
+			uint8_t *data = (this->elffile->getFileContent() +
+			                 section.offset);
+
+			// TODO: vaddr or paddr?
+			auto position = (std::begin(this->dataSegmentContent) +
+			                 section.memindex - this->dataSegmentInfo.vaddr);
+
+			this->dataSegmentContent.insert(
+				position,
+				data,
+				data + section.size
+			);
+		}
+	}
 }
 
 /*

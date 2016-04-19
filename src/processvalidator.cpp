@@ -244,17 +244,17 @@ int ProcessValidator::validatePage(page_info_t *page) {
 		return 0;
 	}
 
-	SectionInfo *targetSegment = this->process->getSegmentForAddress(page->vaddr);
+	SectionInfo *targetSection = this->process->getSegmentForAddress(page->vaddr);
 
-	if (targetSegment == nullptr) {
+	if (targetSection == nullptr) {
 		std::cout << "Located in heap." << std::endl;
 		return 0;
 	}
 
-	// check if the targetSegment is a heapSegment (might check name cont. heap)
-	// if(targetSegment->index == 0 && targetSegment->segID == 0){
-	if (targetSegment->segName.find("<heap>") != std::string::npos) {
-		std::cout << "Located in heap of " << targetSegment->segName
+	// check if the targetSection is a heapSegment (might check name cont. heap)
+	// if(targetSection->index == 0 && targetSection->segID == 0){
+	if (targetSection->name.find("<heap>") != std::string::npos) {
+		std::cout << "Located in heap of " << targetSection->name
 		          << ". Skipping..." << std::endl;
 		return 0;
 	} else {
@@ -276,12 +276,12 @@ int ProcessValidator::validatePage(page_info_t *page) {
 #ifdef DEBUG
 	printf("debug: page->vaddr:0x%lx, memindex=0x%lx\n",
 	       page->vaddr,
-	       (uint64_t)targetSegment->memindex);
+	       (uint64_t)targetSection->memindex);
 #endif
 
-	pageOffset = (page->vaddr - ((uint64_t)targetSegment->memindex));
+	pageOffset = (page->vaddr - ((uint64_t)targetSection->memindex));
 	pageIndex =
-	    (page->vaddr - ((uint64_t)targetSegment->memindex)) / page->size;
+	    (page->vaddr - ((uint64_t)targetSection->memindex)) / page->size;
 
 #ifdef DEBUG
 	std::cout << "debug: Initialized pageOffset=0x" << pageOffset
@@ -293,13 +293,13 @@ int ProcessValidator::validatePage(page_info_t *page) {
 
 	// get Page from exec
 	// check if the loaded procimage already contains the page we just retrieved
-	if (targetSegment->size < pageOffset) {
+	if (targetSection->size < pageOffset) {
 		// This section is not completely loaded
 		assert(false);
 	}
 
 	// the corresponding page out of our procimage
-	uint8_t *loadedPage = targetSegment->index + pageOffset;
+	uint8_t *loadedPage = targetSection->index + pageOffset;
 	// uint8_t* loadedPage = (execLoader->getImageForAddress(page->vaddr,
 	//                                                       pageOffset));
 	// execLoader->textSegmentContent.data() + pageOffset;
@@ -350,7 +350,7 @@ for(auto &it : pageInMem) {
 			// if we have _not_ written recently due to lazyEval we may write
 			if (remain == 0) {
 				// Lazy Evaluation TODO this can be optimized by giving the
-				// targetSegment->index directly
+				// targetSection->index directly
 			}
 			// if we have written recently, the error should be resolved or
 			// malicious

@@ -141,19 +141,21 @@ unsigned int ElfFile64::getNrOfSections() const {
 
 /* This function actually searches for a _section_ in the ELF file */
 SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const {
-	char *tempBuf = 0;
+	char *tempBuf = nullptr;
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 		tempBuf = (char *)this->fileContent +
-		          elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
-		          elf64Shdr[i].sh_name;
+		          this->elf64Shdr[this->elf64Ehdr->e_shstrndx].sh_offset +
+		          this->elf64Shdr[i].sh_name;
 
 		if (sectionName.compare(tempBuf) == 0) {
-			return SectionInfo(sectionName,
-			                   i,
-			                   this->fileContent + elf64Shdr[i].sh_offset,
-			                   elf64Shdr[i].sh_addr,
-			                   elf64Shdr[i].sh_size);
-			// printf("Found Strtab in Section %i: %s\n", i, tempBuf);
+			return SectionInfo(
+				sectionName,
+				i,
+				this->elf64Shdr[i].sh_offset,
+				this->fileContent + this->elf64Shdr[i].sh_offset,
+				this->elf64Shdr[i].sh_addr,
+				this->elf64Shdr[i].sh_size
+			);
 		}
 	}
 	assert(0);
@@ -161,21 +163,22 @@ SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const
 
 SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
 	if (sectionID < this->getNrOfSections()) {
-		std::string sectionName = toString(
-		    this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
-		    elf64Shdr[sectionID].sh_name);
-		return SectionInfo(sectionName,
-		                   sectionID,
-		                   this->fileContent + elf64Shdr[sectionID].sh_offset,
-		                   elf64Shdr[sectionID].sh_addr,
-		                   elf64Shdr[sectionID].sh_size);
+		return SectionInfo(
+			this->sectionName(sectionID),
+			sectionID,
+			this->elf64Shdr[sectionID].sh_offset,
+			this->fileContent + this->elf64Shdr[sectionID].sh_offset,
+			this->elf64Shdr[sectionID].sh_addr,
+			this->elf64Shdr[sectionID].sh_size
+		);
 	}
 	assert(0);
 }
 
 bool ElfFile64::isCodeAddress(uint64_t address) {
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)) {
+		if (CONTAINS(this->elf64Shdr[i].sh_addr,
+		             this->elf64Shdr[i].sh_size, address)) {
 			if (CHECKFLAGS(this->elf64Shdr[i].sh_flags,
 			               (SHF_ALLOC & SHF_EXECINSTR))) {
 				return true;
@@ -189,7 +192,8 @@ bool ElfFile64::isCodeAddress(uint64_t address) {
 
 bool ElfFile64::isDataAddress(uint64_t address) {
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)) {
+		if (CONTAINS(this->elf64Shdr[i].sh_addr,
+		             this->elf64Shdr[i].sh_size, address)) {
 			if (CHECKFLAGS(this->elf64Shdr[i].sh_flags, (SHF_ALLOC)) &&
 			    !CHECKFLAGS(this->elf64Shdr[i].sh_flags, (SHF_EXECINSTR))) {
 				return true;
@@ -201,10 +205,10 @@ bool ElfFile64::isDataAddress(uint64_t address) {
 	return false;
 }
 
-std::string ElfFile64::sectionName(int sectionID) {
+std::string ElfFile64::sectionName(int sectionID) const {
 	return toString(this->fileContent +
-	                elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
-	                elf64Shdr[sectionID].sh_name);
+	                this->elf64Shdr[this->elf64Ehdr->e_shstrndx].sh_offset +
+	                this->elf64Shdr[sectionID].sh_name);
 }
 
 uint8_t *ElfFile64::sectionAddress(int sectionID) {
@@ -216,7 +220,7 @@ uint64_t ElfFile64::sectionAlign(int sectionID) {
 }
 
 std::string ElfFile64::symbolName(Elf64_Word index, uint32_t strindex) const {
-	return toString(&((this->fileContent + elf64Shdr[strindex].sh_offset)[index]));
+	return toString(&((this->fileContent + this->elf64Shdr[strindex].sh_offset)[index]));
 }
 
 uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
@@ -224,11 +228,11 @@ uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
 }
 
 bool ElfFile64::isRelocatable() const {
-	return (elf64Ehdr->e_type == ET_REL);
+	return (this->elf64Ehdr->e_type == ET_REL);
 }
 
 bool ElfFile64::isDynamic() const {
-	return (elf64Ehdr->e_type == ET_DYN);
+	return (this->elf64Ehdr->e_type == ET_DYN);
 }
 
 bool ElfFile64::isDynamicLibrary() const {
@@ -249,7 +253,7 @@ bool ElfFile64::isDynamicLibrary() const {
 }
 
 bool ElfFile64::isExecutable() const {
-	return (elf64Ehdr->e_type == ET_EXEC);
+	return (this->elf64Ehdr->e_type == ET_EXEC);
 }
 
 
@@ -261,7 +265,7 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
 	          << this->filename << COLOR_NORM
 	          << std::endl;
 
-	switch(elf64Ehdr->e_type) {
+	switch(this->elf64Ehdr->e_type) {
 	case ET_REL:
 	case ET_DYN:
 		for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
@@ -333,7 +337,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		// relocation target address in memory of host (the working copy)
 		// TODO: get sectioninfo.index from process as it's the working copy
 		// only in the case of process
-		locInElf = reinterpret_cast<uint8_t *>(sectionInfo.index) + rel[i].r_offset;
+		locInElf = sectionInfo.index + rel[i].r_offset;
 
 		// TODO in process: write at data segment vector to
 		//         (r_offset - virtual segment start)
@@ -516,8 +520,8 @@ SegmentInfo ElfFile64::findCodeSegment() {
 				return SegmentInfo(hdr.p_type,
 				                   hdr.p_flags,
 				                   hdr.p_offset,
-				                   (uint8_t *)hdr.p_vaddr,
-				                   (uint8_t *)hdr.p_paddr,
+				                   hdr.p_vaddr,
+				                   hdr.p_paddr,
 				                   hdr.p_filesz,
 				                   hdr.p_memsz,
 				                   hdr.p_align);
@@ -535,8 +539,8 @@ SegmentInfo ElfFile64::findDataSegment() {
 				return SegmentInfo(hdr.p_type,
 				                   hdr.p_flags,
 				                   hdr.p_offset,
-				                   (uint8_t *)hdr.p_vaddr,
-				                   (uint8_t *)hdr.p_paddr,
+				                   hdr.p_vaddr,
+				                   hdr.p_paddr,
 				                   hdr.p_filesz,
 				                   hdr.p_memsz,
 				                   hdr.p_align);

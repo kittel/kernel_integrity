@@ -41,19 +41,21 @@ public:
 class SectionInfo {
 public:
 	SectionInfo();
-	SectionInfo(const std::string &segName,
+	SectionInfo(const std::string &name,
 	            uint32_t segID,
+	            uint64_t offset,
 	            uint8_t *index,
 	            uint64_t memindex,
 	            uint32_t size);
 	virtual ~SectionInfo();
 
-	std::string segName;  ///< name of the segment, init with first sec name
+	std::string name;     ///< name of the section, init with first sec name
 	uint32_t segID;       ///< section ID in section header table (SHT)
-	uint8_t *index;       ///< section offset from beginning of ELF file
-	                      ///< if dereferenced contains data of the section
+	uint64_t offset;      ///< section offset from beginning of ELF file
+	uint8_t *index;       ///< section offset actual data pointer,
+	                      ///< equals &elffilecontent[offset]
 	uint64_t memindex;    ///< target virtual address within the VM
-	uint32_t size;        ///< size of the section content (in bytes?)
+	uint32_t size;        ///< size of the section content
 
 	bool containsElfAddress(uint64_t address);
 	bool containsMemAddress(uint64_t address);
@@ -66,8 +68,8 @@ public:
 	SegmentInfo(uint32_t p_type,
 	            uint32_t p_flags,
 	            uint64_t p_offset,
-	            uint8_t *p_vaddr,
-	            uint8_t *p_paddr,
+	            uint64_t p_vaddr,
+	            uint64_t p_paddr,
 	            uint64_t p_filesz,
 	            uint64_t p_memsz,
 	            uint64_t p_align);
@@ -77,8 +79,8 @@ public:
 	uint32_t type;       ///< segment type
 	uint32_t flags;      ///< segment flags
 	uint64_t offset;     ///< byte offset where section starts in file
-	uint8_t *vaddr;      ///< virtual address of segment
-	uint8_t *paddr;      ///< physical address of segment (kernel thing)
+	uint64_t vaddr;      ///< virtual address of segment
+	uint64_t paddr;      ///< physical address of segment (kernel thing)
 	uint64_t filesz;     ///< size of segment in in file
 	uint64_t memsz;      ///< size of segment in memory (larger!)
 	uint64_t align;      ///< segment alignment
@@ -103,7 +105,7 @@ public:
 	virtual SectionInfo findSectionByID(uint32_t sectionID) const = 0;
 	virtual bool isCodeAddress(uint64_t address) = 0;
 	virtual bool isDataAddress(uint64_t address) = 0;
-	virtual std::string sectionName(int sectionID) = 0;
+	virtual std::string sectionName(int sectionID) const = 0;
 
 	virtual SegmentInfo findCodeSegment() = 0;
 	virtual SegmentInfo findDataSegment() = 0;

@@ -49,8 +49,10 @@ pid_t Process::getPID() const {
 }
 
 ElfLoader *Process::loadLibrary(const std::string &libraryName) {
-	// TODO create a local mapping here.
+	// TODO create working copy of data segment.
+
 	// Also relocate the data section according to this process.
+	// copy the data section to local mapping
 	ElfLoader *library = this->findLibByName(libraryName);
 	if(library) return library;
 
@@ -72,7 +74,7 @@ std::vector<uint8_t> *Process::getDataSegmentForLib(const std::string &name) {
 
 SectionInfo *Process::getSectionInfoForLib(const std::string &name) {
 	auto sectionInfoIt = this->dataSectionInfoMap.find(name);
-	if(sectionInfoIt != this->dataSectionInfoMap.end()) {
+	if (sectionInfoIt != this->dataSectionInfoMap.end()) {
 		return &sectionInfoIt->second;
 	}
 

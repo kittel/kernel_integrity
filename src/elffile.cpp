@@ -13,7 +13,7 @@
 
 RelSym::RelSym()
 	:
-	name{""},
+	name{},
 	value{0},
 	info{0},
 	shndx{0} {}
@@ -32,20 +32,22 @@ RelSym::~RelSym() {}
 
 SectionInfo::SectionInfo()
 	:
-	segName{},
+	name{},
 	segID{0xffffffff},
 	index{0},
 	memindex{0},
 	size{0} {}
 
-SectionInfo::SectionInfo(const std::string &segName,
+SectionInfo::SectionInfo(const std::string &name,
                          uint32_t segID,
+                         uint64_t offset,
                          uint8_t *index,
                          uint64_t memindex,
                          uint32_t size)
 	:
-	segName{segName},
+	name{name},
 	segID{segID},
+	offset{offset},
 	index{index},
 	memindex{memindex},
 	size{size} {}
@@ -76,8 +78,8 @@ SegmentInfo::SegmentInfo()
 SegmentInfo::SegmentInfo(uint32_t p_type,
                          uint32_t p_flags,
                          uint64_t p_offset,
-                         uint8_t* p_vaddr,
-                         uint8_t* p_paddr,
+                         uint64_t p_vaddr,
+                         uint64_t p_paddr,
                          uint64_t p_filesz,
                          uint64_t p_memsz,
                          uint64_t p_align):
