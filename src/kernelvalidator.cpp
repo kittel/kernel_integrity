@@ -191,7 +191,7 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 
 		uint64_t offset = *longPtr - elfloader->textSegment.memindex;
 
-		if (offset > elfloader->textSegmentContent.size()) {
+		if (offset > elfloader->getTextSegment().size()) {
 			stackInteresting = true;
 			ss << std::hex << COLOR_RED << COLOR_BOLD
 			   << "Found possible malicious pointer: 0x" << *longPtr

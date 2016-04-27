@@ -25,7 +25,7 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	dataSegmentInfoMap{} {
 
 	std::cout << COLOR_GREEN << "Loading process " << binaryName
-	    << COLOR_NORM << std::endl;
+	          << COLOR_NORM << std::endl;
 	this->mappedVMAs = this->kernel->getTaskManager()->getVMAInfo(pid);
 	this->execLoader = this->kernel->getTaskManager()->loadExec(this);
 }
@@ -54,7 +54,9 @@ ElfLoader *Process::loadLibrary(const std::string &libraryName) {
 	// Also relocate the data section according to this process.
 	// copy the data section to local mapping
 	ElfLoader *library = this->findLibByName(libraryName);
-	if(library) return library;
+	if (library) {
+		return library;
+	}
 
 	library = this->kernel->getTaskManager()->loadLibrary(libraryName);
 	this->libraryMap[libraryName] = library;

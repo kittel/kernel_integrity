@@ -1,9 +1,10 @@
 #include "elfmoduleloader.h"
 
-#include "helpers.h"
+#include <cassert>
 
 #include "exceptions.h"
-#include <cassert>
+#include "helpers.h"
+
 
 ElfModuleLoader::ElfModuleLoader(ElfFile *elffile,
                                  const std::string &name,
