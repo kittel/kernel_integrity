@@ -154,8 +154,8 @@ public:
 	 * Parse this elf file as a executable/library
 	 * associated with a given process.
 	 */
-	virtual ElfUserspaceLoader *parseProcess(const std::string &name,
-	                                       Kernel *kernel) = 0;
+	virtual ElfUserspaceLoader *parseUserspace(const std::string &name,
+	                                           Kernel *kernel) = 0;
 
 	virtual bool isRelocatable() const = 0;
 	virtual void applyRelocations(ElfLoader *loader,

@@ -14,17 +14,16 @@ public:
 	const std::string &getName() const override;
 	Kernel *getKernel() override;
 
-
 protected:
-	void updateSectionInfoMemAddress(SectionInfo &info);
+	void updateSectionInfoMemAddress(SectionInfo &info) override;
 	uint64_t findMemAddressOfSegment(SectionInfo &info);
 
-	virtual void initText();
-	virtual void initData();
+	void initText() override;
+	void initData() override;
 
 	void loadDependencies();
 
-	bool isDataAddress(uint64_t addr);
+	bool isDataAddress(uint64_t addr) override;
 
 	std::string modName;
 	Kernel *kernel;

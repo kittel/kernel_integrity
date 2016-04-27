@@ -279,13 +279,15 @@ ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig) {
 	std::string libraryName = file.filename().string();
 
 	auto library = this->findLibByName(libraryName);
-	if (library) return library;
+	if (library) {
+		return library;
+	}
 
 	// create ELF Object
 	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
 
-	library = libraryFile->parseProcess(libraryName, this->kernel);
-	library->parse();
+	library = libraryFile->parseUserspace(libraryName, this->kernel);
+	library->initImage();
 
 	this->libraryMap[libraryName] = library;
 
@@ -321,8 +323,8 @@ ElfUserspaceLoader *TaskManager::loadExec(Process *process) {
 
 	std::string name = binaryName.substr(binaryName.rfind("/", std::string::npos) + 1, std::string::npos);
 
-	ElfUserspaceLoader *execLoader = execFile->parseProcess(name, this->kernel);
-	execLoader->parse();
+	ElfUserspaceLoader *execLoader = execFile->parseUserspace(name, this->kernel);
+	execLoader->initImage();
 	return execLoader;
 }
 
@@ -353,8 +355,8 @@ ElfLoader *TaskManager::loadVDSO() {
 	// Load VDSO page
 	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(vdso.data(), vdso.size());
 
-	vdsoLoader = vdsoFile->parseProcess(vdsoString, this->kernel);
-	vdsoLoader->parse();
+	vdsoLoader = vdsoFile->parseUserspace(vdsoString, this->kernel);
+	vdsoLoader->initImage();
 
 	this->libraryMap[vdsoString] = vdsoLoader;
 	return vdsoLoader;

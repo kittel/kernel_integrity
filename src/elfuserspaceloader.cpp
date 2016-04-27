@@ -89,7 +89,7 @@ void ElfUserspaceLoader::initData() {
  * Initialize a complete memory image for validation. Relocations are not yet
  * processed
  */
-void ElfUserspaceLoader::parse() {
+void ElfUserspaceLoader::initImage() {
 	if (this->elffile->isExecutable()) {
 		std::cout << "ElfUserspaceLoader::parse(): TODO: load VDSO"
 		          << std::endl;

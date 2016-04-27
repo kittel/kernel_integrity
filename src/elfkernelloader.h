@@ -34,12 +34,12 @@ protected:
 
 	int apply_relocate();
 
-	void updateSectionInfoMemAddress(SectionInfo &info);
+	void updateSectionInfoMemAddress(SectionInfo &info) override;
 
-	virtual void initText();
-	virtual void initData();
+	void initText() override;
+	void initData() override;
 
-	bool isDataAddress(uint64_t addr);
+	bool isDataAddress(uint64_t addr) override;
 };
 
 #include "elfkernelloader64.h"

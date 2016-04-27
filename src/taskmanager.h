@@ -116,6 +116,11 @@ protected:
 	std::unordered_map<std::string, Process *> processMap;
 
 	using LibraryMap = std::unordered_map<std::string, ElfLoader *>;
+
+	/**
+	 * Maps library name to elfloader, these are the known raw
+	 * library images.
+	 */
 	LibraryMap libraryMap;
 
 	std::vector<std::string> libDirName;

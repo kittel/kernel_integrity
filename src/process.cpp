@@ -49,8 +49,6 @@ pid_t Process::getPID() const {
 }
 
 ElfLoader *Process::loadLibrary(const std::string &libraryName) {
-	// TODO create working copy of data segment.
-
 	// Also relocate the data section according to this process.
 	// copy the data section to local mapping
 	ElfLoader *library = this->findLibByName(libraryName);
@@ -58,7 +56,9 @@ ElfLoader *Process::loadLibrary(const std::string &libraryName) {
 		return library;
 	}
 
-	library = this->kernel->getTaskManager()->loadLibrary(libraryName);
+	// TODO create working copy of data segment.
+
+	library = this->getKernel()->getTaskManager()->loadLibrary(libraryName);
 	this->libraryMap[libraryName] = library;
 	return library;
 }

@@ -43,8 +43,8 @@ public:
 	ElfKernelLoader *parseKernel() override;
 	ElfModuleLoader *parseKernelModule(const std::string &name,
 	                                   Kernel *kernel) override;
-	ElfUserspaceLoader *parseProcess(const std::string &name,
-	                               Kernel *kernel) override;
+	ElfUserspaceLoader *parseUserspace(const std::string &name,
+	                                   Kernel *kernel) override;
 
 
 	bool isRelocatable() const override;

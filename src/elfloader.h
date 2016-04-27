@@ -30,7 +30,7 @@ public:
 	virtual Kernel *getKernel() = 0;
 	virtual void updateSectionInfoMemAddress(SectionInfo &info) = 0;
 
-	virtual void parse();
+	virtual void initImage();
 
 	const std::vector<uint8_t> &getTextSegment();
 	const std::vector<uint8_t> &getDataSegment();

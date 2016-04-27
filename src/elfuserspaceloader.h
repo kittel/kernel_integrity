@@ -24,7 +24,7 @@ public:
 
 	virtual ~ElfUserspaceLoader();
 
-	void parse() override;  // Initialize the complete image
+	void initImage() override;  // Initialize the complete image
 
 	const std::string &getName() const override;
 	Kernel *getKernel() override;
@@ -63,7 +63,7 @@ protected:
 	virtual int evalLazy(uint64_t addr,
 	                     std::unordered_map<std::string, RelSym> *map) = 0;
 
-	virtual void updateSectionInfoMemAddress(SectionInfo& info);
+	void updateSectionInfoMemAddress(SectionInfo& info) override;
 };
 
 #include "elfuserspaceloader64.h"

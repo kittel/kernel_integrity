@@ -120,18 +120,17 @@ ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
 	auto mod = new ElfModuleLoader64(this, name, kernel);
 	assert(kernel);
 	this->symbols = &kernel->symbols;
-	mod->parse();
+	mod->initImage();
 	this->parseDwarf();
 	return mod;
 }
 
-ElfUserspaceLoader *ElfFile64::parseProcess(const std::string &name,
-                                            Kernel *kernel) {
+ElfUserspaceLoader *ElfFile64::parseUserspace(const std::string &name,
+                                              Kernel *kernel) {
 	auto proc = new ElfUserspaceLoader64(this, kernel, name);
 
 	this->parseDwarf();
-	// TODO: symbols to elffile?
-	// this->symbols = &proc->symbols;
+	// TODO: transfer symbols from loader this->symbols
 	return proc;
 }
 

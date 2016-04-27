@@ -9,7 +9,7 @@ public:
 	ElfException() throw();
 	ElfException(const char* reason) throw();
 	virtual ~ElfException() throw();
-	virtual const char* what() const throw();
+	const char* what() const throw() override;
 
 private:
 	std::string reason;
@@ -20,7 +20,7 @@ public:
 	NotImplementedException() throw();
 	NotImplementedException(const char* reason) throw();
 	virtual ~NotImplementedException() throw();
-	virtual const char* what() const throw();
+	const char* what() const throw() override;
 
 private:
 	std::string reason;
@@ -31,7 +31,7 @@ public:
 	VMIException() throw();
 	VMIException(const char* reason) throw();
 	virtual ~VMIException() throw();
-	virtual const char* what() const throw();
+	const char* what() const throw() override;
 
 private:
 	std::string reason;

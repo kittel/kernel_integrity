@@ -10,7 +10,7 @@ ElfLoader::ElfLoader(ElfFile *elffile)
 }
 
 
-void ElfLoader::parse() {
+void ElfLoader::initImage() {
 	this->initText();
 	this->initData();
 }
