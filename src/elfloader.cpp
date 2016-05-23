@@ -20,10 +20,10 @@ bool ElfLoader::isCodeAddress(uint64_t addr) {
 	return this->textSegment.containsMemAddress(addr);
 }
 
-const std::vector<uint8_t> &ElfLoader::getTextSegment() {
+const std::vector<uint8_t> &ElfLoader::getTextSegment() const {
 	return this->textSegmentContent;
 }
 
-const std::vector<uint8_t> &ElfLoader::getDataSegment() {
+const std::vector<uint8_t> &ElfLoader::getDataSegment() const {
 	return this->dataSegmentContent;
 }

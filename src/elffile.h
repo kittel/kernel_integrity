@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <sys/mman.h>
+#include <unordered_map>
 #include <vector>
 
 class ElfLoader;
@@ -166,7 +167,7 @@ public:
 	virtual bool isExecutable() const = 0;
 
 	virtual std::vector<std::string> getDependencies() = 0;
-	virtual std::vector<RelSym> getSymbols() = 0;
+	virtual std::vector<RelSym> getSymbols() const = 0;
 
 	virtual std::vector<Elf64_Rel> getRelEntries() const = 0;
 	virtual std::vector<Elf64_Rela> getRelaEntries() const = 0;

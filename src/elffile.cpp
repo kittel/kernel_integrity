@@ -145,22 +145,24 @@ ElfFile *ElfFile::loadElfFile(const std::string &filename) {
 			fileSize = ftell(fd);
 
 			// MMAP the file to memory
-			fileContent = (uint8_t *)mmap(
-				0,
-				fileSize,
-				PROT_READ | PROT_WRITE,
-				MAP_PRIVATE,
-				fileno(fd),
-				0
+			fileContent = reinterpret_cast<uint8_t *>(
+				mmap(
+					0,
+					fileSize,
+					PROT_READ | PROT_WRITE,
+					MAP_PRIVATE,
+					fileno(fd),
+					0
+				)
 			);
 			if (fileContent == MAP_FAILED) {
 				std::cout << "mmap failed" << std::endl;
-				throw ElfException("MMAP failed!!!\n");
+				throw ElfException{"MMAP failed!!!\n"};
 			}
 		}
 	} else {
 		std::cout << "cannot load file" << std::endl;
-		throw ElfException("Cannot load file");
+		throw ElfException{"Cannot load file"};
 	}
 
 	if (fileContent[4] == ELFCLASS64) {
@@ -174,6 +176,7 @@ ElfFile *ElfFile::loadElfFile(const std::string &filename) {
 	return elfFile;
 }
 
+/* used for loading VDSO */
 ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) {
 
 	ElfFile* elfFile = 0;

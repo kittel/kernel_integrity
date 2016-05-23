@@ -48,26 +48,12 @@ pid_t Process::getPID() const {
 	return this->pid;
 }
 
-ElfLoader *Process::loadLibrary(const std::string &libraryName) {
-	// Also relocate the data section according to this process.
-	// copy the data section to local mapping
-	ElfLoader *library = this->findLibByName(libraryName);
-	if (library) {
-		return library;
-	}
-
-	// TODO create working copy of data segment.
-
-	library = this->getKernel()->getTaskManager()->loadLibrary(libraryName);
-	this->libraryMap[libraryName] = library;
-	return library;
-}
-
 ElfUserspaceLoader *Process::findLibByName(const std::string &name) {
-	if (this->libraryMap.find(name) == this->libraryMap.end()) {
+	auto it = this->libraryMap.find(name);
+	if (it == this->libraryMap.end()) {
 		return nullptr;
 	}
-	return dynamic_cast<ElfUserspaceLoader *>(libraryMap[name]);
+	return it->second;
 }
 
 std::vector<uint8_t> *Process::getDataSegmentForLib(const std::string &name) {
@@ -90,6 +76,7 @@ SegmentInfo *Process::getSegmentInfoForLib(const std::string &name) {
 		return &segmentInfoIt->second;
 	}
 
+	// TODO segment info
 	assert(false);
 	return nullptr;
 	//auto segmentInfo = this->findLibByName(name)->elffile->findDataSegment();
@@ -193,6 +180,10 @@ SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
 void Process::processLoadRel() {
 	const std::unordered_set<ElfUserspaceLoader *> mappedLibs = this->getMappedLibs();
 
+
+	// TODO symbol registration by dependency graph
+
+
 	for (auto &lib : mappedLibs) {
 		// announce provided symbols
 		std::cout << " - adding syms of " << lib->getName() << std::endl;
@@ -200,8 +191,21 @@ void Process::processLoadRel() {
 	}
 
 	for (auto &lib : mappedLibs) {
+		// TODO: perform relocations on this->image
+		// TODO: the process segments were already inited,
+		//       this will now update the sections and
+		//       won't affect the segment! -> cyclic dependency.
 		lib->elffile->applyRelocations(lib, this->kernel, this);
 	}
+
+
+	// TODO ================
+	// for each elf component: component->initData()
+	// to get process-local data segments
+
+	// else:
+	// TODO use this->elffile->getDependencies as source for
+	// the relocation processing graph
 
 	// last, apply the relocations on the executable image.
 	ElfUserspaceLoader *execLoader = this->getExecLoader();

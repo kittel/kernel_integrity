@@ -46,7 +46,6 @@ public:
 	ElfUserspaceLoader *parseUserspace(const std::string &name,
 	                                   Kernel *kernel) override;
 
-
 	bool isRelocatable() const override;
 	void applyRelocations(ElfLoader *loader,
 	                      Kernel *kernel,
@@ -55,7 +54,7 @@ public:
 	bool isDynamicLibrary() const override;
 	bool isExecutable() const override;
 
-	std::vector<RelSym> getSymbols() override;
+	std::vector<RelSym> getSymbols() const override;
 
 	std::vector<std::string> getDependencies() override;
 

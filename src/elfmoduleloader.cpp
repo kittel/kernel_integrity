@@ -166,19 +166,22 @@ uint64_t ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 	Instance module;
 	Instance currentModule = this->kernel->getKernelModuleInstance(this->modName);
 
-	// If the searching for the .bss section
 	// This section is right after the modules struct
 	if (info.name.compare(".bss") == 0) {
 		uint64_t align = this->elffile->sectionAlign(info.segID);
 
 		uint64_t offset = currentModule.size() % align;
-		(offset == 0) ? offset = currentModule.size()
-		              : offset = currentModule.size() + align - offset;
+
+		if (offset == 0) {
+			offset = currentModule.size();
+		}
+		else {
+			offset = currentModule.size() + align - offset;
+		}
 
 		return currentModule.getAddress() + offset;
 	}
-
-	if (info.name.compare("__ksymtab_gpl") == 0) {
+	else if (info.name.compare("__ksymtab_gpl") == 0) {
 		return currentModule.memberByName("gpl_syms").getRawValue<uint64_t>();
 	}
 

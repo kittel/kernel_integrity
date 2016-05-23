@@ -287,7 +287,10 @@ ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig) {
 	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
 
 	library = libraryFile->parseUserspace(libraryName, this->kernel);
-	library->initImage();
+
+	// TODO: move somewhere where we can also do relocations in the
+	//       process context. (to loaddependencies)
+	library->initImage(); // TODO: this has to be done once per process.
 
 	this->libraryMap[libraryName] = library;
 

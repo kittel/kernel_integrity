@@ -34,7 +34,7 @@ protected:
 
 	std::string name;
 
-	void loadDependencies();
+	std::vector<ElfUserspaceLoader *> getDependencies();
 
 	SegmentInfo textSegmentInfo;
 	SegmentInfo dataSegmentInfo;

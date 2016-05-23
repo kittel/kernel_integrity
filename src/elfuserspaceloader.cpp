@@ -4,23 +4,14 @@
 #include "process.h"
 
 ElfUserspaceLoader::ElfUserspaceLoader(ElfFile *file,
-                                   Kernel *kernel,
-                                   const std::string &name)
+                                       Kernel *kernel,
+                                       const std::string &name)
 	:
 	ElfLoader(file),
 	kernel{kernel},
 	name{name} {}
 
 ElfUserspaceLoader::~ElfUserspaceLoader() {}
-
-void ElfUserspaceLoader::loadDependencies() {
-	auto dependencies = this->elffile->getDependencies();
-
-	for (auto &dep : dependencies) {
-		ElfLoader *lib = this->kernel->getTaskManager()->loadLibrary(dep);
-		std::cout << "Loaded library " << lib->getName() << std::endl;
-	}
-}
 
 void ElfUserspaceLoader::initText() {
 	std::cout << "Initializing text segment for elfuserspaceloader: "
@@ -33,6 +24,8 @@ void ElfUserspaceLoader::initText() {
 	size_t pages = (this->textSegmentInfo.filesz + PAGESIZE) / PAGESIZE;
 	this->textSegmentContent.insert(this->textSegmentContent.end(),
 	                                index, index + pages * PAGESIZE);
+
+	// TODO: create section info entries.
 }
 
 void ElfUserspaceLoader::initData() {
@@ -81,28 +74,64 @@ void ElfUserspaceLoader::initData() {
 				data,
 				data + section.size
 			);
+
+			// XXX TODO: save new SectionInfo!!!
 		}
 	}
 }
+
+
+std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies() {
+	auto dependencies = this->elffile->getDependencies();
+
+	std::vector<ElfUserspaceLoader *> ret;
+
+	for (auto &dep : dependencies) {
+		ElfLoader *lib = this->kernel->getTaskManager()->loadLibrary(dep);
+		std::cout << "Loaded library " << lib->getName() << std::endl;
+
+		ElfUserspaceLoader *usLib = dynamic_cast<ElfUserspaceLoader *>(lib);
+		if (usLib == nullptr) {
+			std::cout << "depended on non-userspace elf" << std::endl;
+			assert(0);
+		}
+		ret.push_back(usLib);
+	}
+
+	return ret;
+}
+
 
 /*
  * Initialize a complete memory image for validation. Relocations are not yet
  * processed
  */
+// TODO: return vector of image
 void ElfUserspaceLoader::initImage() {
 	if (this->elffile->isExecutable()) {
 		std::cout << "ElfUserspaceLoader::parse(): TODO: load VDSO"
 		          << std::endl;
 		//this->kernel->loadVDSO();
 
-		//create_process
-		//store process to kernel
+		// TODO: create_process
+		// TODO: store process to kernel
 	}
 
-	// Load Dependencies
-	this->loadDependencies();
+	// load linked libraries for this executable
+	// this parses the library files
+	// TODO: perform relocations
+	// TODO: init image for a process here
+	//this->getDependencies();
+
+	// TODO: relocate here?
+
+	// craft text segment
 	this->initText();
+
+	// craft data segment
 	this->initData();
+
+	// XXX TODO: relocation!!!!!!!!
 }
 
 /* Return the SectionInfo, in which the given addr is contained. */

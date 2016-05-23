@@ -9,12 +9,18 @@
 #include "elffile.h"
 #include "libdwarfparser/symbolmanager.h"
 
+
 class Instance;
 class Kernel;
 class ElfLoader;
 class ElfUserspaceLoader;
 class VMAInfo;
 
+/**
+ * Tracks a userland process.
+ * Can reproduce the loading actions done in a VM
+ * on a working copy (the image) to verify correctness.
+ */
 class Process {
 public:
 	Process(const std::string &binaryName, Kernel *kernel, pid_t pid);
@@ -38,7 +44,6 @@ public:
 	Kernel *getKernel() const;
 	pid_t getPID() const;
 
-	ElfLoader *loadLibrary(const std::string &libraryName);
 	SymbolManager symbols;
 
 	std::vector<uint8_t> *getDataSegmentForLib(const std::string &name);
@@ -82,7 +87,7 @@ protected:
 	std::unordered_map<std::string, std::string> getEnv();
 
 	ElfUserspaceLoader *findLibByName(const std::string &name);
-	typedef std::unordered_map<std::string, ElfLoader*> LibraryMap;
+	typedef std::unordered_map<std::string, ElfUserspaceLoader*> LibraryMap;
 	LibraryMap libraryMap;
 
 	typedef std::unordered_map<std::string, std::vector<uint8_t>> DataSegmentMap;

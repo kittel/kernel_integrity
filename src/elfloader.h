@@ -17,8 +17,11 @@ class ParavirtPatcher;
 class Kernel;
 
 /**
- * An ElfLoader is a memory representation we construct from the whitelisted
- * file. After a full initialization (depending on the type of ELF file) one
+ * An ElfLoader is the "working copy" of some elf file.
+ * This equals the memory image.
+ * A process has multiple file mappings, each of those is a Loader.
+ *
+ * After a full initialization (depending on the type of ELF file) one
  * should be able to bytewise compare the actual memory with an instance of
  * this class.
  */
@@ -32,18 +35,21 @@ public:
 
 	virtual void initImage();
 
-	const std::vector<uint8_t> &getTextSegment();
-	const std::vector<uint8_t> &getDataSegment();
+	const std::vector<uint8_t> &getTextSegment() const;
+	const std::vector<uint8_t> &getDataSegment() const;
 
 	virtual bool isCodeAddress(uint64_t addr);
 	virtual bool isDataAddress(uint64_t addr) = 0;
-
-	ElfFile *elffile;         // Wrapped ElfFile, provides to file and seg
 
 	SectionInfo textSegment;  // The first big memory segment
 	SectionInfo dataSection;  // The second big memory segment
 	SectionInfo bssSection;   // The last memory segment
 	SectionInfo roDataSection;
+
+	/**
+	 * Elf file where the loaded information came from .
+	 */
+	ElfFile *elffile;
 
 protected:
 	ElfLoader(ElfFile *elffile);

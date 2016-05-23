@@ -307,6 +307,12 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		isAltinstrSection = true;
 	}
 
+	// TODO: use inheritance or callbacks to differentiate
+	//       between elf file types instead of totally clobbering
+	//       this function with special cases.
+	bool is_userspace = process != nullptr;
+
+	// TODO: create "right" section info in the fly
 	SectionInfo sectionInfo = this->findSectionByID(sectionID);
 	loader->updateSectionInfoMemAddress(sectionInfo);
 
@@ -320,7 +326,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	// loader->pre_relocation_hook()...
 	SectionInfo percpuDataSegment;
 
-	if (process == nullptr) {
+	if (not is_userspace) {
 		percpuDataSegment = this->findSectionWithName(".data..percpu");
 	}
 
@@ -360,7 +366,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		// TODO: move to dedicated function as unusable
 		//       for userspace processes
 		// loader->relocation_hook(sym->st_shndx)
-		if (process == nullptr) {
+		if (not is_userspace) {
 			if (sym->st_shndx == percpuDataSegment.segID) {
 				Instance currentModule = loader->getKernel()->getKernelModuleInstance(loader->getName());
 				symRelSectionInfo.memindex = currentModule.memberByName("percpu").getRawValue<uint64_t>(false);
@@ -382,7 +388,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		case SHN_ABS:
 			break;
 		case SHN_UNDEF:
-			if (process) {
+			if (is_userspace) {
 				std::cout << "Need to find address of process symbol: "
 				          << this->symbolName(sym->st_name, strindex)
 				          << std::endl;
@@ -503,10 +509,12 @@ std::vector<std::string> ElfFile64::getDependencies() {
 				std::string(&strtab[dynamicEntries[i].d_un.d_val]));
 		}
 
+		/*
 		// TODO: lazy binding!
 		if (dynamicEntries[i].d_tag == DT_BIND_NOW) {
 			this->doLazyBind = false;
 		}
+		*/
 	}
 	return dependencies;
 }
@@ -581,7 +589,7 @@ std::vector<Elf64_Rela> ElfFile64::getRelaEntries() const {
 }
 
 
-std::vector<RelSym> ElfFile64::getSymbols() {
+std::vector<RelSym> ElfFile64::getSymbols() const {
 	std::vector<RelSym> ret;
 
 	if (!this->isDynamic()) {
