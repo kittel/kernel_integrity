@@ -1,13 +1,6 @@
 #ifndef KERNINT_HELPERS_H_
 #define KERNINT_HELPERS_H_
 
-#define UNUSED(expr) do { (void)(expr); } while (0)
-#define DELETE(expr) do { if(expr){ delete expr; expr = 0; }; } while (0)
-
-#define CHECKFLAGS(byte, flags)    !!((byte & flags) == flags)
-#define CONTAINS(min, size, what)  (what >= min && what <= min + size)
-#define IN_RANGE(value, left, right) (value >= left && value <= right)
-
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -42,6 +35,25 @@ namespace fs = boost::filesystem;
 #define COLOR_ITALIC_OFF    "\033[23m"
 #define COLOR_UNDERLINE     "\033[4m"
 #define COLOR_UNDERLINE_OFF "\033[24m"
+
+
+#define UNUSED(expr) do { (void)(expr); } while (0)
+#define DELETE(expr) do { if(expr){ delete expr; expr = 0; }; } while (0)
+
+#define CHECKFLAGS(byte, flags)    !!((byte & flags) == flags)
+#define CONTAINS(min, size, what)  (what >= min && what <= min + size)
+#define IN_RANGE(value, left, right) (value >= left && value <= right)
+
+
+/*
+ * Branch prediction tuning.
+ * The expression is expected to be true (=likely) or false (=unlikely).
+ */
+#define likely(x)    __builtin_expect(!!(x), 1)
+#define unlikely(x)  __builtin_expect(!!(x), 0)
+
+
+namespace kernint {
 
 inline std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
 	std::stringstream ss(s);
@@ -94,7 +106,7 @@ void dumpToFile(const std::string &filename,
 }
 
 inline uint32_t appendDataToVector(const void *data, uint32_t len,
-                                   std::vector<uint8_t> *target){
+                                   std::vector<uint8_t> *target) {
 	uint8_t *input = (uint8_t*) data;
 	target->insert(target->end(), input, (input + len));
 	return len;
@@ -148,5 +160,23 @@ inline
 size_t offset(const char* buf, size_t len, const char* str) {
 	return std::search(buf, buf + len, str, str + strlen(str)) - buf;
 }
+
+
+namespace util {
+
+/**
+ * Demangles a symbol name.
+ *
+ * On failure, the mangled symbol name is returned.
+ */
+std::string demangle(const char *symbol);
+
+/**
+ * Return the demangled symbol name for a given code address.
+ */
+std::string symbol_name(const void *addr, bool require_exact_addr=true, bool no_pure_addrs=false);
+
+} // namespace util
+} // namespace kernint
 
 #endif
