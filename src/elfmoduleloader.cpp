@@ -6,6 +6,8 @@
 #include "helpers.h"
 
 
+namespace kernint {
+
 ElfModuleLoader::ElfModuleLoader(ElfFile *elffile,
                                  const std::string &name,
                                  Kernel *kernel)
@@ -211,3 +213,5 @@ bool ElfModuleLoader::isDataAddress(uint64_t addr) {
 	return (this->dataSection.containsMemAddress(addr) ||
 	        this->bssSection.containsMemAddress(addr));
 }
+
+} // namespace kernint

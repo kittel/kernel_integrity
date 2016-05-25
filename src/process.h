@@ -1,5 +1,5 @@
-#ifndef PROCESS_H_
-#define PROCESS_H_
+#ifndef KERNINT_PROCESS_H_
+#define KERNINT_PROCESS_H_
 
 #include <vector>
 #include <string>
@@ -11,6 +11,9 @@
 
 
 class Instance;
+
+namespace kernint {
+
 class Kernel;
 class ElfLoader;
 class ElfUserspaceLoader;
@@ -97,5 +100,7 @@ protected:
 	typedef std::unordered_map<std::string, SegmentInfo> DataSegmentInfoMap;
 	DataSegmentInfoMap dataSegmentInfoMap;
 };
+
+} // namespace kernint
 
 #endif

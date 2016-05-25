@@ -12,6 +12,9 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
+
+namespace kernint {
+
 ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 	:
 	ElfFile(fd,
@@ -632,3 +635,5 @@ std::vector<RelSym> ElfFile64::getSymbols() const {
 	}
 	return ret;
 }
+
+} // namespace kernint

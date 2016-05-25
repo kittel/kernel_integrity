@@ -11,6 +11,8 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
+namespace kernint {
+
 RelSym::RelSym()
 	:
 	name{},
@@ -283,3 +285,5 @@ size_t ElfFile::getFileSize() {
 std::string ElfFile::getFilename() {
 	return this->filename;
 }
+
+} // namespace kernint

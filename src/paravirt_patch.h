@@ -1,7 +1,9 @@
-#ifndef PARAVIRT_PATCH_H_
-#define PARAVIRT_PATCH_H_
+#ifndef KERNINT_PARAVIRT_PATCH_H_
+#define KERNINT_PARAVIRT_PATCH_H_
 
 #include <cstdint>
+
+namespace kernint {
 
 class ElfLoader;
 class ParavirtState;
@@ -46,5 +48,7 @@ public:
 
 	void applyParainstr(ElfLoader *target);
 };
+
+} // namespace kernint
 
 #endif

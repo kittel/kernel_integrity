@@ -1,10 +1,11 @@
-#ifndef ELFKERNELSPACELOADER_H
-#define ELFKERNELSPACELOADER_H
+#ifndef KERNINT_ELFKERNELSPACELOADER_H_
+#define KERNINT_ELFKERNELSPACELOADER_H_
 
 #include "elfloader.h"
 #include "kernel.h"
 #include "paravirt_patch.h"
 
+namespace kernint {
 
 class ElfKernelspaceLoader : public ElfLoader, public Kernel {
 	friend class KernelValidator;
@@ -26,5 +27,7 @@ protected:
 
 	ParavirtPatcher pvpatcher;
 };
+
+} // namespace kernint
 
 #endif

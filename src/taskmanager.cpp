@@ -3,6 +3,9 @@
 #include "elfuserspaceloader.h"
 #include "kernel.h"
 
+
+namespace kernint {
+
 VMAInfo::VMAInfo(uint64_t start, uint64_t end, uint64_t ino,
                  uint64_t off, uint64_t flags, std::string name)
 	:
@@ -364,3 +367,5 @@ ElfLoader *TaskManager::loadVDSO() {
 	this->libraryMap[vdsoString] = vdsoLoader;
 	return vdsoLoader;
 }
+
+} // namespace kernint

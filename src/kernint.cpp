@@ -1,3 +1,5 @@
+#include "kernint.h"
+
 #include <cassert>
 #include <typeinfo>
 #include <ctype.h>
@@ -16,6 +18,11 @@
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
+
+
+// TODO: move stuff out of here
+using namespace kernint;
+
 
 // used in the signal handler
 KernelValidator *validator = nullptr;

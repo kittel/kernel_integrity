@@ -1,5 +1,5 @@
-#ifndef ELFFILE64_H
-#define ELFFILE64_H
+#ifndef KERNINT_ELFFILE64_H_
+#define KERNINT_ELFFILE64_H_
 
 #include <elffile.h>
 
@@ -14,6 +14,8 @@
 #include <sys/mman.h>
 
 #include <map>
+
+namespace kernint {
 
 class ElfFile64 : public ElfFile {
 public:
@@ -75,4 +77,6 @@ private:
 	                        Process *process);
 };
 
-#endif /* ELFFILE64_H */
+} // namespace kernint
+
+#endif

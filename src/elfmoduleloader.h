@@ -1,8 +1,10 @@
-#ifndef ELFMODULELOADER_H
-#define ELFMODULELOADER_H
+#ifndef KERNINT_ELFMODULELOADER_H_
+#define KERNINT_ELFMODULELOADER_H_
 
 #include "elfkernelspaceloader.h"
 #include "paravirt_patch.h"
+
+namespace kernint {
 
 class ElfModuleLoader : public ElfKernelspaceLoader {
 public:
@@ -29,6 +31,9 @@ protected:
 	Kernel *kernel;
 };
 
+} // namespace kernint
+
+// TODO: REMOVE!!!!
 #include "elfmoduleloader64.h"
 
-#endif  /* ELFMODULELOADER_H */
+#endif

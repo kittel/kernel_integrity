@@ -1,5 +1,5 @@
-#ifndef KERNELMANAGER_H
-#define KERNELMANAGER_H
+#ifndef KERNINT_KERNEL_H_
+#define KERNINT_KERNEL_H_
 
 #include <iostream>
 #include <list>
@@ -14,6 +14,8 @@
 
 #include "paravirt_state.h"
 #include "taskmanager.h"
+
+namespace kernint {
 
 class ElfKernelspaceLoader;
 
@@ -67,4 +69,6 @@ private:
 };
 
 
-#endif  /* KERNELMANAGER_H */
+} // namespace kernint
+
+#endif

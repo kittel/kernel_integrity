@@ -14,6 +14,8 @@ namespace fs = boost::filesystem;
 //#include <filesystem>
 //namespace fs = std::filesystem;
 
+namespace kernint {
+
 Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	:
 	kernel{kernel},
@@ -240,3 +242,5 @@ void Process::registerSyms(ElfUserspaceLoader *elf) {
 	}
 	return;
 }
+
+} // namespace kernint

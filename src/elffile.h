@@ -1,5 +1,5 @@
-#ifndef ELFFILE_H
-#define ELFFILE_H
+#ifndef KERNINT_ELFFILE_H_
+#define KERNINT_ELFFILE_H_
 
 #include <cstdio>
 #include <cstdlib>
@@ -13,13 +13,16 @@
 #include <unordered_map>
 #include <vector>
 
+class SymbolManager;
+
+namespace kernint {
+
 class ElfLoader;
 class ElfModuleLoader;
 class ElfKernelLoader;
 class ElfUserspaceLoader;
 class Kernel;
 class Process;
-class SymbolManager;
 class Process;
 
 /* This class represents a symbol a loader may export for relocation */
@@ -202,6 +205,9 @@ protected:
 	bool doLazyBind;
 };
 
+} // namespace kernint
+
+// TODO: REMOVE!!!!
 #include "elffile64.h"
 
-#endif /* ELFFILE_H */
+#endif

@@ -1,6 +1,8 @@
 #include "exceptions.h"
 
 
+namespace kernint {
+
 ElfException::ElfException() throw() {}
 
 ElfException::ElfException(const char* reason) throw()
@@ -38,3 +40,5 @@ const char *NotImplementedException::what() const throw() {
 	std::string result = std::string("NotImplementedException: ");
 	return result.append(this->reason).c_str();
 }
+
+} // namespace kernint

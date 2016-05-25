@@ -1,5 +1,5 @@
-#ifndef PROCESSVALIDATOR_H
-#define PROCESSVALIDATOR_H
+#ifndef KERNINT_PROCESSVALIDATOR_H_
+#define KERNINT_PROCESSVALIDATOR_H_
 
 #include <memory>
 
@@ -9,6 +9,8 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 #include "process.h"
+
+namespace kernint {
 
 /**
  * This is an instance of our Process Manager.
@@ -50,5 +52,7 @@ protected:
 	void validateDataPage(const VMAInfo *vma) const;
 	int validatePage(page_info_t *page);
 };
+
+} // namespace kernint
 
 #endif /* PROCESSVALIDATOR_H */

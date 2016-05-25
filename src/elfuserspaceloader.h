@@ -1,5 +1,5 @@
-#ifndef ELFUSERSPACELOADER_H
-#define ELFUSERSPACELOADER_H
+#ifndef KERNINT_ELFUSERSPACELOADER_H_
+#define KERNINT_ELFUSERSPACELOADER_H_
 
 #include "elffile.h"
 #include "elfloader.h"
@@ -8,7 +8,8 @@
 
 #include <unordered_map>
 
-// The beauty of forward declarations
+namespace kernint {
+
 class ElfUserspaceLoader;
 class ElfKernelLoader;
 class Process;
@@ -66,6 +67,9 @@ protected:
 	void updateSectionInfoMemAddress(SectionInfo& info) override;
 };
 
+} // namespace kernint
+
+// TODO: REMOVE!!!!!!
 #include "elfuserspaceloader64.h"
 
 #endif

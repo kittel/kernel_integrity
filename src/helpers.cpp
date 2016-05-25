@@ -1,5 +1,11 @@
 #include "helpers.h"
 
+#include <cxxabi.h>
+#include <dlfcn.h>
+
+
+namespace kernint {
+
 void printHexDump(const std::vector<uint8_t> *bytes) {
 	using namespace std;
 

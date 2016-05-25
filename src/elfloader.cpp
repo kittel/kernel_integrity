@@ -1,5 +1,8 @@
 #include "elfloader.h"
 
+
+namespace kernint {
+
 ElfLoader::ElfLoader(ElfFile *elffile)
 	:
 	elffile(elffile) {
@@ -27,3 +30,5 @@ const std::vector<uint8_t> &ElfLoader::getTextSegment() const {
 const std::vector<uint8_t> &ElfLoader::getDataSegment() const {
 	return this->dataSegmentContent;
 }
+
+} // namespace kernint

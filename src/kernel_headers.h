@@ -1,5 +1,5 @@
-#ifndef KERNELHEADERS_H
-#define KERNELHEADERS_H
+#ifndef KERNINT_KERNELHEADERS_H_
+#define KERNINT_KERNELHEADERS_H_
 
 #include <inttypes.h>
 
@@ -42,6 +42,9 @@
 	asm("start_" #ops "_" #name ": " code "; end_" #ops "_" #name ":")
 
 #define tostr(x) #x
+
+
+namespace kernint {
 
 extern const unsigned char p6nops[];
 extern const unsigned char k8nops[];
@@ -87,6 +90,8 @@ struct tracepoint {
 	void (*unregfunc)(void);
 	struct tracepoint_func *funcs;
 };
+
+} // namespace kernint
 
 DEF_NATIVE(pv_irq_ops, irq_disable, "cli");
 DEF_NATIVE(pv_irq_ops, irq_enable, "sti");

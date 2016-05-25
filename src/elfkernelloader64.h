@@ -1,7 +1,9 @@
-#ifndef ELFKERNELOADER64_H
-#define ELFKERNELOADER64_H
+#ifndef KERNINT_ELFKERNELOADER64_H_
+#define KERNINT_ELFKERNELOADER64_H_
 
 #include "elfkernelloader.h"
+
+namespace kernint {
 
 class ElfKernelLoader64 : public ElfKernelLoader {
 public:
@@ -12,4 +14,6 @@ protected:
 };
 
 
-#endif  /* ELFKERNELOADER64_H */
+} // namespace kernint
+
+#endif

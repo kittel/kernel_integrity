@@ -1,9 +1,11 @@
-#ifndef ELFKERNELOADER_H
-#define ELFKERNELOADER_H
+#ifndef KERNINT_ELFKERNELOADER_H_
+#define KERNINT_ELFKERNELOADER_H_
 
 #include "elfkernelspaceloader.h"
 #include "paravirt_patch.h"
 
+
+namespace kernint {
 
 class ElfKernelLoader : public ElfKernelspaceLoader {
 	friend class KernelValidator;
@@ -42,6 +44,9 @@ protected:
 	bool isDataAddress(uint64_t addr) override;
 };
 
+} // namespace kernint
+
+// TODO: REMOVE!!!
 #include "elfkernelloader64.h"
 
-#endif  /* ELFKERNELOADER_H */
+#endif

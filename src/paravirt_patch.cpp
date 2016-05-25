@@ -5,6 +5,8 @@
 #include "kernel_headers.h"
 #include "paravirt_state.h"
 
+namespace kernint {
+
 ParavirtPatcher::ParavirtPatcher(ParavirtState *pvstate)
 	:
 	pvstate{pvstate} {}
@@ -264,3 +266,5 @@ void ParavirtPatcher::applyParainstr(ElfLoader *target) {
 		memcpy(instrInElf, insnbuf, p->len);      // memcpy
 	}
 }
+
+} // namespace kernint

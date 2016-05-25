@@ -3,6 +3,8 @@
 #include "kernel.h"
 #include "process.h"
 
+namespace kernint {
+
 ElfUserspaceLoader::ElfUserspaceLoader(ElfFile *file,
                                        Kernel *kernel,
                                        const std::string &name)
@@ -238,3 +240,5 @@ Kernel *ElfUserspaceLoader::getKernel() {
 std::vector<RelSym> ElfUserspaceLoader::getSymbols() const {
 	return this->elffile->getSymbols();
 }
+
+} // namespace kernint

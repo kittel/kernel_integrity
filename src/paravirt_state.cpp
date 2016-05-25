@@ -7,6 +7,8 @@
 #include "libdwarfparser/variable.h"
 
 
+namespace kernint {
+
 ParavirtState::ParavirtState(Kernel *kernel)
 	:
 	kernel{kernel} {}
@@ -63,3 +65,5 @@ void ParavirtState::updateState() {
 	this->pv_cpu_opsOffset = pptS->memberOffset("pv_cpu_ops");
 	this->pv_mmu_opsOffset = pptS->memberOffset("pv_mmu_ops");
 }
+
+} // namespace kernint

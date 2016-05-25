@@ -1,4 +1,4 @@
-#ifndef KERNINT_H
-#define KERNINT_H
+#ifndef KERNINT_KERNINT_H_
+#define KERNINT_KERNINT_H_
 
 #endif

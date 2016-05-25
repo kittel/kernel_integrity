@@ -6,6 +6,8 @@
 #include "exceptions.h"
 #include "helpers.h"
 
+namespace kernint {
+
 ElfKernelLoader::ElfKernelLoader(ElfFile *elffile)
 	:
 	ElfKernelspaceLoader{elffile, this->getParavirtState()},
@@ -164,3 +166,5 @@ Kernel *ElfKernelLoader::getKernel() {
 	return this;
 }
 
+
+} // namespace kernint

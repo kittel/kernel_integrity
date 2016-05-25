@@ -21,6 +21,8 @@
 #include "libdwarfparser/function.h"
 #include "libdwarfparser/array.h"
 
+namespace kernint {
+
 Kernel::Kernel()
 	:
 	paravirt{this},
@@ -209,3 +211,5 @@ void Kernel::parseSystemMap() {
 ParavirtState *Kernel::getParavirtState() {
 	return &this->paravirt;
 }
+
+} // namespace kernint

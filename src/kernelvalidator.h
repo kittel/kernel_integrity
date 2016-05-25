@@ -1,11 +1,14 @@
-#ifndef KERNELVALIDATOR_H
-#define KERNELVALIDATOR_H
+#ifndef KERNINT_KERNELVALIDATOR_H_
+#define KERNINT_KERNELVALIDATOR_H_
 
 #include <cstdint>
 #include <map>
 
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
+
+
+namespace kernint {
 
 class ElfKernelLoader;
 class ElfKernelspaceLoader;
@@ -52,5 +55,7 @@ private:
 	uint64_t findCodePtrs(page_info_t *page, uint8_t *pageInMem);
 	uint64_t isReturnAddress(uint8_t *ptr, uint32_t offset, uint64_t index);
 };
+
+} // namespace kernint
 
 #endif /* KERNELVALIDATOR_H */

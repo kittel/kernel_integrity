@@ -19,6 +19,7 @@
 #include "helpers.h"
 #include "kernel_headers.h"
 
+namespace kernint {
 
 KernelValidator::KernelValidator(ElfKernelLoader *kernelLoader,
                                  const std::string &targetsFile)
@@ -826,3 +827,6 @@ void KernelValidator::updateStackAddresses() {
 		task = task.changeBaseType("task_struct", "tasks");
 	} while (task != init_task);
 }
+
+
+} // namespace kernint

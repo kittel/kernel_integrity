@@ -1,5 +1,5 @@
-#ifndef ELFUSERSPACELOADER64_H
-#define ELFUSERSPACELOADER64_H
+#ifndef KERNINT_ELFUSERSPACELOADER64_H_
+#define KERNINT_ELFUSERSPACELOADER64_H_
 
 #include <algorithm>
 #include <vector>
@@ -19,6 +19,7 @@
 #endif //ASLROFFTYPE_M
 
 
+namespace kernint {
 
 /**
  * This class is a derivated ElfUserspaceLoader for use with 64-Bit Systems.
@@ -51,4 +52,6 @@ protected:
 };
 
 
-#endif  /* ELFUSERSPACELOADER64_H */
+} // namespace kernint
+
+#endif

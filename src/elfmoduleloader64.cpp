@@ -4,7 +4,8 @@
 
 #include "exceptions.h"
 
-//#define PRINTDEBUG
+
+namespace kernint {
 
 ElfModuleLoader64::ElfModuleLoader64(ElfFile64 *elffile,
                                      const std::string &name,
@@ -14,3 +15,5 @@ ElfModuleLoader64::ElfModuleLoader64(ElfFile64 *elffile,
 
 ElfModuleLoader64::~ElfModuleLoader64() {}
 
+
+} // namespace kernint

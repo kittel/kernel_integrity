@@ -15,6 +15,8 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 
 
+namespace kernint {
+
 ElfKernelspaceLoader::ElfKernelspaceLoader(ElfFile *elffile, ParavirtState *pvstate)
 	:
 	ElfLoader(elffile),
@@ -233,3 +235,5 @@ void ElfKernelspaceLoader::applyJumpEntries(uint64_t jumpStart,
 		}
 	}
 }
+
+} // namespace kernint

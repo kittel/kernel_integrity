@@ -1,8 +1,11 @@
-#ifndef EXCEPTION_H
-#define EXCEPTION_H
+#ifndef KERNINT_EXCEPTION_H_
+#define KERNINT_EXCEPTION_H_
 
 #include <exception>
 #include <string>
+
+
+namespace kernint {
 
 class ElfException : std::exception {
 public:
@@ -37,4 +40,6 @@ private:
 	std::string reason;
 };
 
-#endif /* EXCEPTION_H */
+} // namespace kernint
+
+#endif

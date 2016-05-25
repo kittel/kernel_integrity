@@ -19,6 +19,8 @@ namespace fs = boost::filesystem;
 #include "taskmanager.h"
 
 
+namespace kernint {
+
 // TODO: retrieve paths from command line parameters
 ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
                                    Process *process,
@@ -387,3 +389,5 @@ for(auto &it : pageInMem) {
 
 	return changeCount;
 }
+
+} // namespace kernint

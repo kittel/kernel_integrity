@@ -1,5 +1,5 @@
-#ifndef TASKMANAGER_H
-#define TASKMANAGER_H
+#ifndef KERNINT_TASKMANAGER_H_
+#define KERNINT_TASKMANAGER_H_
 
 #include <cstdlib>
 #include <iostream>
@@ -14,6 +14,8 @@
 #include "helpers.h"
 
 #define PAGESIZE 0x1000
+
+namespace kernint {
 
 /**
  * This class contains the extracted information of an address space's VMAs
@@ -134,4 +136,6 @@ private:
 	std::string getPathFromDentry(Instance& dentry) const;
 };
 
-#endif //TASKMANAGER_H
+} // namespace kernint
+
+#endif

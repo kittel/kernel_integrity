@@ -1,5 +1,5 @@
-#ifndef ELFLOADER_H
-#define ELFLOADER_H
+#ifndef KERNINT_ELFLOADER_H_
+#define KERNINT_ELFLOADER_H_
 
 #include "elffile.h"
 
@@ -12,6 +12,8 @@
 #include <vector>
 #include <map>
 #include <set>
+
+namespace kernint {
 
 class ParavirtPatcher;
 class Kernel;
@@ -79,4 +81,6 @@ protected:
 	virtual void initData() = 0;
 };
 
-#endif /* ELFLOADER_H */
+} // namespace kernint
+
+#endif
