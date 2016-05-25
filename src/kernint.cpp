@@ -55,50 +55,50 @@ void validateUserspace(ProcessValidator *val) {
 }
 
 const char *helpString = R"EOF(
-	Usage: %s [options]
+    Usage: %s [options]
 
-	Possible options are:
+    Possible options are:
 
-	-h, --help
-		Display the help page.
+    -h, --help
+        Display the help page.
 
-	--hypervisor_kvm
-	--hypervisor_xen
-	--hypervisor_file
-		Use KVM, XEN, or FILE as the VM Backend the default is autodetect
+    --hypervisor_kvm
+    --hypervisor_xen
+    --hypervisor_file
+        Use KVM, XEN, or FILE as the VM Backend the default is autodetect
 
-	-g, --guest=<guest(File)>
-		Analyse guest(File)
+    -g, --guest=<guest(File)>
+        Analyse guest(File)
 
-	-l, --loop
-		Run introspection component until external interrupt.
+    -l, --loop
+        Run introspection component until external interrupt.
 
-	-k, --checkKernel=<kernelDir>
-		Check for kernel integrity. Use binaries in <kernelDir> as
-		trusted reference.
+    -k, --checkKernel=<kernelDir>
+        Check for kernel integrity. Use binaries in <kernelDir> as
+        trusted reference.
 
-	-c, --disableCodeValidation
-		Disable CodeValidation Component. Enabled by default.
+    -c, --disableCodeValidation
+        Disable CodeValidation Component. Enabled by default.
 
-	-e, --disablePointerExam
-		Disable Pointer Examination. Enabled by default.
+    -e, --disablePointerExam
+        Disable Pointer Examination. Enabled by default.
 
-	-t, --targetsFile=<targets>
-		Use call targets in <targets> for stackvalidation.
+    -t, --targetsFile=<targets>
+        Use call targets in <targets> for stackvalidation.
 
-	-u, --checkUserspace=<binaryName>
-		Check userspace process for integrity. Load binary <binaryName>
-		as trusted reference.
+    -u, --checkUserspace=<binaryName>
+        Check userspace process for integrity. Load binary <binaryName>
+        as trusted reference.
 
-	-p, --pid=<pid>
-		Check <pid> for integrity
+    -p, --pid=<pid>
+        Check <pid> for integrity
 
-	-l, --libraryPath=<libraryPath>
-		Use <libraryPath> to load trusted libraries.
+    -l, --libraryPath=<libraryPath>
+        Use <libraryPath> to load trusted libraries.
 
-	Note: If the guest os is mounted via sshfs the transform_symlinks
-	      option needs to be used!
-		  sshfs -o transform_symlinks <user>@<ip>:/ <dir>/
+    Note: If the guest os is mounted via sshfs the transform_symlinks
+          option needs to be used!
+          sshfs -o transform_symlinks <user>@<ip>:/ <dir>/
 )EOF";
 
 void displayHelp(const char *argv0) {
