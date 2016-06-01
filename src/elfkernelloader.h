@@ -7,7 +7,7 @@
 
 namespace kernint {
 
-class ElfKernelLoader : public ElfKernelspaceLoader {
+class ElfKernelLoader : public ElfKernelspaceLoader, public Kernel {
 	friend class KernelValidator;
 
 public:
