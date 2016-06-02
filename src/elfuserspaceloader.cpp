@@ -87,6 +87,8 @@ std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies() {
 	std::vector<ElfUserspaceLoader *> ret;
 
 	for (auto &dep : dependencies) {
+		// TODO: NO NO NO NO NO this is a getter function, it must not
+		//       magically load libraries!!!
 		ElfLoader *lib = this->kernel->getTaskManager()->loadLibrary(dep);
 		std::cout << "Loaded library " << lib->getName() << std::endl;
 
@@ -121,7 +123,7 @@ void ElfUserspaceLoader::initImage() {
 	// this parses the library files
 	// TODO: perform relocations
 	// TODO: init image for a process here
-	//this->getDependencies();
+	this->getDependencies();
 
 	// TODO: relocate here?
 

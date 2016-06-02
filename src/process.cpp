@@ -133,6 +133,10 @@ const std::unordered_set<ElfUserspaceLoader *> Process::getMappedLibs() const {
 		loader = this->findLoaderByFileName(vma.name);
 		if (loader) {
 			ret.insert(loader);
+		} else {
+			std::cout << "ignoring VMA '"
+			          << vma.name << "' because no loader found."
+			          << std::endl;
 		}
 	}
 	return ret;
@@ -182,9 +186,9 @@ SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
 void Process::processLoadRel() {
 	const std::unordered_set<ElfUserspaceLoader *> mappedLibs = this->getMappedLibs();
 
-
 	// TODO symbol registration by dependency graph
-
+	// use this->elffile->getDependencies as source for
+	// the relocation processing graph
 
 	for (auto &lib : mappedLibs) {
 		// announce provided symbols
@@ -200,19 +204,24 @@ void Process::processLoadRel() {
 		lib->elffile->applyRelocations(lib, this->kernel, this);
 	}
 
+	for (auto &lib : mappedLibs) {
+		// TODO: it's already initialized in the taskmanager...
+		//       but probably initializing again will include the
+		//       relocation patches.
 
-	// TODO ================
-	// for each elf component: component->initData()
-	// to get process-local data segments
+		// for each elf component: component->initData()
+		// to get process-local data segments
+		lib->initImage();
+	}
 
-	// else:
-	// TODO use this->elffile->getDependencies as source for
-	// the relocation processing graph
 
 	// last, apply the relocations on the executable image.
 	ElfUserspaceLoader *execLoader = this->getExecLoader();
 	execLoader->elffile->applyRelocations(execLoader, this->kernel, this);
 	this->registerSyms(execLoader);
+
+	// TODO: again, reinitialize the image to include relocation patches
+	execLoader->initImage();
 
 	return;
 }

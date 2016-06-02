@@ -280,7 +280,7 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
 
-	std::cout << COLOR_GREEN << "Relocating: "
+	std::cout << std::endl << COLOR_GREEN << " == Relocating: "
 	          << this->filename << COLOR_NORM
 	          << std::endl;
 
@@ -363,6 +363,9 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		uint64_t locInMem = 0;            // on guest
 		size_t locOfRelSectionInElf = 0;  // on host
 		size_t locOfRelSectionInMem = 0;  // on guest
+
+		std::cout << "# processing relocation " << i << "in "
+		          << relSectionInfo.name << std::endl;
 
 		// r_offset is the offset from section start
 		locInElf = targetSection.index + rel[i].r_offset;
@@ -461,8 +464,16 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 				// this fetches the value to be written from the process.
 				// it can provide all symbol positions, even from
 				// libraries it depends on.
-				sym->st_value = process->symbols.getSymbolAddress(
+				auto addr = process->symbols.getSymbolAddress(
 					this->symbolName(sym->st_name, strindex));
+
+				std::cout << "addr = " << addr << std::endl;
+
+				if (addr == 0) {
+					throw Error{"undefined symbol encountered"};
+				}
+
+				sym->st_value = addr;
 			}
 			else {
 				sym->st_value = kernel->symbols.getSymbolAddress(
