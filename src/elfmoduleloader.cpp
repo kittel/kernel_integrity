@@ -170,7 +170,7 @@ uint64_t ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 
 	// This section is right after the modules struct
 	if (info.name.compare(".bss") == 0) {
-		uint64_t align = this->elffile->sectionAlign(info.segID);
+		uint64_t align = this->elffile->sectionAlign(info.secID);
 
 		uint64_t offset = currentModule.size() % align;
 

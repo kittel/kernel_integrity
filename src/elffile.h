@@ -54,7 +54,7 @@ public:
 	virtual ~SectionInfo();
 
 	std::string name;     ///< name of the section, init with first sec name
-	uint32_t segID;       ///< section ID in section header table (SHT)
+	uint32_t secID;       ///< section ID in section header table (SHT)
 	uint64_t offset;      ///< section offset from beginning of ELF file
 	uint8_t *index;       ///< section offset actual data pointer,
 	                      ///< equals &elffilecontent[offset]

@@ -76,8 +76,6 @@ void ElfUserspaceLoader::initData() {
 				data,
 				data + section.size
 			);
-
-			// XXX TODO: save new SectionInfo!!!
 		}
 	}
 }

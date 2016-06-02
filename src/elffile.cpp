@@ -35,20 +35,20 @@ RelSym::~RelSym() {}
 SectionInfo::SectionInfo()
 	:
 	name{},
-	segID{0xffffffff},
+	secID{0xffffffff},
 	index{0},
 	memindex{0},
 	size{0} {}
 
 SectionInfo::SectionInfo(const std::string &name,
-                         uint32_t segID,
+                         uint32_t secID,
                          uint64_t offset,
                          uint8_t *index,
                          uint64_t memindex,
                          uint32_t size)
 	:
 	name{name},
-	segID{segID},
+	secID{secID},
 	offset{offset},
 	index{index},
 	memindex{memindex},

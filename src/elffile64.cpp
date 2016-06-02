@@ -7,6 +7,7 @@
 #include "elfkernelloader64.h"
 #include "elfmoduleloader64.h"
 #include "elfuserspaceloader64.h"
+#include "error.h"
 #include "helpers.h"
 #include "kernel.h"
 #include "libdwarfparser/libdwarfparser.h"
@@ -165,11 +166,27 @@ SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const
 
 SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
 	if (sectionID < this->getNrOfSections()) {
+		auto dataptr = this->fileContent + this->elf64Shdr[sectionID].sh_offset;
+
+		// TODO: really `infosec`? not just sectionID?
+		unsigned int infosec = this->elf64Shdr[sectionID].sh_info;
+		if (infosec < this->getNrOfSections()) {
+			if (this->elf64Shdr[infosec].sh_type == SHT_NOBITS) {
+				if (this->elf64Shdr[infosec].sh_flags & SHF_ALLOC) {
+					// TODO: create vector
+					std::cout << "TODO: alloc NOBITS section: "
+					          << this->sectionName(sectionID)
+					          << std::endl;
+					throw InternalError("NOBITS implementation");
+				}
+			}
+		}
+
 		return SectionInfo(
 			this->sectionName(sectionID),
 			sectionID,
 			this->elf64Shdr[sectionID].sh_offset,
-			this->fileContent + this->elf64Shdr[sectionID].sh_offset,
+			dataptr,
 			this->elf64Shdr[sectionID].sh_addr,
 			this->elf64Shdr[sectionID].sh_size
 		);
@@ -270,6 +287,7 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
 	switch(this->elf64Ehdr->e_type) {
 	case ET_REL:
 	case ET_DYN:
+	case ET_EXEC:
 		for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 			unsigned int infosec = this->elf64Shdr[i].sh_info;
 			if (infosec >= this->getNrOfSections())
@@ -299,7 +317,9 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
                                    Kernel *kernel,
                                    Process *process) {
 
+	// TODO: this is wrong! somehow it's a different section!
 	Elf32_Word sectionID    = this->elf64Shdr[relSectionID].sh_info;
+
 	Elf32_Word symindex     = this->elf64Shdr[relSectionID].sh_link;
 	Elf32_Word strindex     = this->elf64Shdr[symindex].sh_link;
 	assert(symindex);
@@ -315,9 +335,11 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	//       this function with special cases.
 	bool is_userspace = process != nullptr;
 
-	// TODO: create "right" section info in the fly
-	SectionInfo sectionInfo = this->findSectionByID(sectionID);
-	loader->updateSectionInfoMemAddress(sectionInfo);
+	// the section where to apply the relocations to
+	SectionInfo targetSection = this->findSectionByID(sectionID);
+
+	// TODO: what does this do??
+	loader->updateSectionInfoMemAddress(targetSection);
 
 	SectionInfo relSectionInfo = this->findSectionByID(relSectionID);
 
@@ -327,10 +349,10 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 	// TODO move this to a dedicated function if used with kernel modules
 	//      a userspace process doesn't have this section.
 	// loader->pre_relocation_hook()...
-	SectionInfo percpuDataSegment;
+	SectionInfo percpuDataSection;
 
 	if (not is_userspace) {
-		percpuDataSegment = this->findSectionWithName(".data..percpu");
+		percpuDataSection = this->findSectionWithName(".data..percpu");
 	}
 
 	// static member within the for loop
@@ -342,17 +364,57 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		size_t locOfRelSectionInElf = 0;  // on host
 		size_t locOfRelSectionInMem = 0;  // on guest
 
-		// relocation target address in memory of host (the working copy)
-		// TODO: get sectioninfo.index from process as it's the working copy
-		// only in the case of process
-		locInElf = sectionInfo.index + rel[i].r_offset;
-
-		// TODO in process: write at data segment vector to
-		//         (r_offset - virtual segment start)
-		// (to eliminate the virtual address)
+		// r_offset is the offset from section start
+		locInElf = targetSection.index + rel[i].r_offset;
 
 		// in the guest
-		locInMem = sectionInfo.memindex + rel[i].r_offset;
+		locInMem = targetSection.memindex + rel[i].r_offset;
+
+		switch (this->elf64Ehdr->e_type) {
+		case ET_EXEC:
+		case ET_DYN: {
+			// r_offset is the virtual address of the patch position
+
+			// TODO: this is ultra-dirty!
+			//       we are trying to find the section where
+			//       the relocation should be applied to
+			//       by looking which section start address
+			//       is the closest one.
+			int sectionCandidate = -1;
+			Elf64_Addr closest = 0;
+			for (unsigned int j = 0; j < this->getNrOfSections(); j++) {
+				if (this->elf64Shdr[j].sh_addr < rel[i].r_offset) {
+					// if the virtual base address of the section is
+					// smaller than the relocation target,
+					// it might be the section start
+					// try to find the section start that is closest
+					// to the relocation target
+					if (closest < this->elf64Shdr[j].sh_addr) {
+						sectionCandidate = j;
+						closest = this->elf64Shdr[j].sh_addr;
+					}
+				}
+			}
+			if (sectionCandidate == -1) {
+				throw InternalError{"no section can be the target for the relocation"};
+			}
+
+
+			targetSection = this->findSectionByID(sectionCandidate);
+			std::cout << "relocation will patch section " << targetSection.name << std::endl;
+
+			// remove the base address of the section
+			// so we can operate on the mapped file address later:
+			//         (r_offset - virtual segment start)
+			// (to eliminate the virtual address)
+			locInElf -= targetSection.memindex;
+
+			break;
+		}
+		case ET_REL:
+		default:
+			break;
+		}
 
 		Elf64_Sym *sym = symBase + ELF64_R_SYM(rel[i].r_info);
 
@@ -361,7 +423,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		          << this->symbolName(sym->st_name, strindex)
 		          << std::endl;
 
-		if (symRelSectionInfo.segID != sym->st_shndx) {
+		if (symRelSectionInfo.secID != sym->st_shndx) {
 			symRelSectionInfo = this->findSectionByID(sym->st_shndx);
 			loader->updateSectionInfoMemAddress(symRelSectionInfo);
 		}
@@ -370,7 +432,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		//       for userspace processes
 		// loader->relocation_hook(sym->st_shndx)
 		if (not is_userspace) {
-			if (sym->st_shndx == percpuDataSegment.segID) {
+			if (sym->st_shndx == percpuDataSection.secID) {
 				Instance currentModule = loader->getKernel()->getKernelModuleInstance(loader->getName());
 				symRelSectionInfo.memindex = currentModule.memberByName("percpu").getRawValue<uint64_t>(false);
 			}
