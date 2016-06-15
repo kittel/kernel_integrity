@@ -4,6 +4,7 @@
 
 #include "elffile.h"
 #include "elfuserspaceloader.h"
+#include "error.h"
 #include "kernel.h"
 #include "libdwarfparser/instance.h"
 #include "processvalidator.h"
@@ -239,15 +240,29 @@ void Process::registerSyms(ElfUserspaceLoader *elf) {
 		const std::string &name = it.name;
 		uint64_t location = it.value;
 
-		this->symbols.addSymbolAddress(name, location);
+		if (location == 0) {
+			std::cout << "NULL-symbol: " << name << std::endl;
+			//throw InternalError{"symbol with location 0 registered"};
+		}
+
+		bool replaced = this->symbols.addSymbolAddress(name, location, true);
+		if (replaced) {
+			std::cout << "reregistered symbol: " << name
+			          << " with different address " << location << std::endl
+			          << "previous address was: "
+			          << this->symbols.getSymbolAddress(name) <<  std::endl;
+
+			//throw Error{"symbol overwritten!"};
+		}
 
 		/**
 		TODO if mapped symbol is WEAK and cur symbol is GLOBAL . overwrite
 		if (ELF64_ST_BIND(sym.info) == STB_WEAK &&
-			ELF64_ST_BIND(it.info) == STB_GLOBAL) {
+		    ELF64_ST_BIND(it.info) == STB_GLOBAL) {
 			this->relSymMap[it.name] = it;
 		}
 		*/
+
 	}
 	return;
 }

@@ -254,6 +254,10 @@ bool ElfFile64::isDynamic() const {
 	return (this->elf64Ehdr->e_type == ET_DYN);
 }
 
+bool ElfFile64::isExecutable() const {
+	return (this->elf64Ehdr->e_type == ET_EXEC);
+}
+
 bool ElfFile64::isDynamicLibrary() const {
 	// if this is a static exec we don't have any dependencies
 	if (!this->isDynamic() && !this->isExecutable())
@@ -269,10 +273,6 @@ bool ElfFile64::isDynamicLibrary() const {
 		}
 	}
 	return false;
-}
-
-bool ElfFile64::isExecutable() const {
-	return (this->elf64Ehdr->e_type == ET_EXEC);
 }
 
 
@@ -453,27 +453,48 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		case SHN_COMMON:
 			assert(false);
 			break;
+
 		case SHN_ABS:
 			break;
+
 		case SHN_UNDEF:
 			if (is_userspace) {
-				std::cout << "Need to find address of process symbol: "
-				          << this->symbolName(sym->st_name, strindex)
-				          << std::endl;
-
 				// this fetches the value to be written from the process.
 				// it can provide all symbol positions, even from
 				// libraries it depends on.
-				auto addr = process->symbols.getSymbolAddress(
-					this->symbolName(sym->st_name, strindex));
+				uint64_t addr;
 
-				std::cout << "addr = " << addr << std::endl;
+				switch (ELF64_R_TYPE(rel[i].r_info)) {
+				case R_X86_64_JUMP_SLOT:
+				case R_X86_64_GLOB_DAT: {
+					std::cout << "Need to find address of process symbol: "
+					          << this->symbolName(sym->st_name, strindex)
+					          << std::endl;
 
-				if (addr == 0) {
-					throw Error{"undefined symbol encountered"};
+					std::string target_symbol = this->symbolName(sym->st_name, strindex);
+
+					addr = process->symbols.getSymbolAddress(target_symbol);
+
+					std::cout << "addr = " << addr << std::endl;
+
+					if (addr == 0) {
+						throw Error{"undefined symbol (=0) encountered"};
+					}
+
+
+					sym->st_value = addr;
+
+					break;
 				}
+				case R_X86_64_RELATIVE:   /* Adjust by program base */
+				case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
+					// TODO:
+					std::cout << "TODO: irelative relocation" << std::endl;
+					break;
 
-				sym->st_value = addr;
+				default:
+					throw Error{"unknown relocation type"};
+				}
 			}
 			else {
 				sym->st_value = kernel->symbols.getSymbolAddress(
@@ -539,11 +560,14 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			break;
 
 		case R_X86_64_RELATIVE:   /* Adjust by program base */
-		case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
 			// TODO: don't patch JUMP_SLOT if we have lazy binding.
 			// instead, write in the _dl_runtime_resolve_{sse,avx,avx512}
 
-			std::cout << "(i)relative relication at 0x"
+			// calculation:
+			// RELATIVE: B + A
+			// where A = addend, B = base address of shared object
+
+			std::cout << "TODO relative relication at 0x"
 			          << std::hex << reinterpret_cast<uint64_t>(locInElf)
 			          << " to 0x" << val << " off=0x" << sym->st_value
 			          << std::dec << std::endl;
@@ -551,9 +575,40 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			// maybe: address has to be relative, not absolute
 
 			// write: sectionoffset + addend
+			// TODO: add l_addr (aka link map address) here (sectionoffset)
+			// val = sym->st_value + addend
+			// -> to write: sectionoffset + addend
+			// -> write: val - sym->st_value + l_addr
 			*reinterpret_cast<uint64_t *>(locInElf) = val - sym->st_value;
 			break;
 
+		case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
+
+			std::cout << "TODO irelative relication at 0x"
+			          << std::hex << reinterpret_cast<uint64_t>(locInElf)
+			          << " to 0x" << val << " off=0x" << sym->st_value
+			          << std::dec << std::endl;
+
+			// calculation:
+			// IRELATIVE: indirect (B + A)
+			// where A = addend, B = base address of shared object
+
+			// the value used in this relocation is the program address
+			// returned by the func- tion, which takes no arguments, at the
+			// address of the result of the corresponding R_X86_64_RELATIVE
+			// relocation. One use of the R_X86_64_IRELATIVE relocation is to
+			// avoid name lookup for the locally defined STT_GNU_IFUNC symbols
+			// at load-time. Support for this relocation is optional, but is
+			// required for the STT_GNU_IFUNC symbols
+
+			// TODO!
+			*reinterpret_cast<uint64_t *>(locInElf) = val - sym->st_value;
+
+			break;
+		case R_X86_64_COPY:
+			std::cout << "R_X86_64_COPY relocation, doing nothing!"
+			          << std::endl;
+			break;
 		default:
 			std::cout << COLOR_RED << "Unknown RELA: "
 			          << "Requested Type: " << ELF64_R_TYPE(rel[i].r_info)
@@ -668,7 +723,7 @@ std::vector<Elf64_Rela> ElfFile64::getRelaEntries() const {
 std::vector<RelSym> ElfFile64::getSymbols() const {
 	std::vector<RelSym> ret;
 
-	if (!this->isDynamic()) {
+	if (not (this->isDynamic() or this->isExecutable())) {
 		return ret;
 	}
 
@@ -693,15 +748,14 @@ std::vector<RelSym> ElfFile64::getSymbols() const {
 		    symtab[i].st_shndx != SHN_ABS &&
 		    symtab[i].st_shndx != SHN_COMMON) {
 
-			// TODO: implement getVAForAddr!!!!!!
-			targetAddr = 0;
-			// targetAddr = this->getVAForAddr(symtab[i].st_value,
-			//                                 symtab[i].st_shndx);
+			targetAddr = symtab[i].st_value;
 
-			RelSym sym = RelSym(std::string{&strtab[symtab[i].st_name]},
-			                    targetAddr,
-			                    symtab[i].st_info,
-			                    symtab[i].st_shndx);
+			RelSym sym = RelSym{
+				std::string{&strtab[symtab[i].st_name]},
+				targetAddr,
+				symtab[i].st_info,
+				symtab[i].st_shndx
+			};
 
 			ret.push_back(sym);
 		}
