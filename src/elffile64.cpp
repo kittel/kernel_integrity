@@ -477,7 +477,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 
 					std::cout << "addr = " << addr << std::endl;
 
-					if (addr == 0) {
+					if (addr == 0 and not (target_symbol == "__gmon_start__")) {
 						throw Error{"undefined symbol (=0) encountered"};
 					}
 

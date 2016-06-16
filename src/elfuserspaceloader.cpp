@@ -37,6 +37,11 @@ void ElfUserspaceLoader::initData() {
 	// information about the data segment
 	this->dataSegmentInfo = this->elffile->findDataSegment();
 
+	if (this->dataSegmentInfo.vaddr == 0) {
+		// this elffile does not have a data segment!
+		return;
+	}
+
 	// create a vector filled with zeroes for the size of the data segment
 	auto begin = std::begin(this->dataSegmentContent);
 
@@ -111,9 +116,8 @@ std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies() {
 // TODO: return vector of image
 void ElfUserspaceLoader::initImage() {
 	if (this->elffile->isExecutable()) {
-		std::cout << "ElfUserspaceLoader::parse(): TODO: load VDSO"
-		          << std::endl;
-		//this->kernel->loadVDSO();
+		std::cout << "ElfUserspaceLoader::parse(): loading vdso" << std::endl;
+		this->kernel->getTaskManager()->loadVDSO();
 
 		// TODO: create_process
 		// TODO: store process to kernel
@@ -121,19 +125,13 @@ void ElfUserspaceLoader::initImage() {
 
 	// load linked libraries for this executable
 	// this parses the library files
-	// TODO: perform relocations
-	// TODO: init image for a process here
 	this->getDependencies();
-
-	// TODO: relocate here?
 
 	// craft text segment
 	this->initText();
 
 	// craft data segment
 	this->initData();
-
-	// XXX TODO: relocation!!!!!!!!
 }
 
 /* Return the SectionInfo, in which the given addr is contained. */

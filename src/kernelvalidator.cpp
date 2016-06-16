@@ -230,7 +230,7 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 
 		uint64_t retFunc = kernelLoader->symbols.getContainingSymbol(retAddr.second);
 
-		std::string retFuncName = kernelLoader->symbols.getModuleSymbolName(retFunc);
+		std::string retFuncName = kernelLoader->symbols.getElfSymbolName(retFunc);
 
 		ss << std::hex << COLOR_GREEN << COLOR_BOLD << "return address: 0x"
 		   << retAddr.second << " ( @ 0x" << retAddr.first << " )" << std::endl
@@ -296,7 +296,7 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 
 		stackInteresting = true;
 		ss << std::hex << "callAddr:      " << callAddr << " "
-		   << kernelLoader->symbols.getModuleSymbolName(callAddr) << std::endl
+		   << kernelLoader->symbols.getElfSymbolName(callAddr) << std::endl
 		   << "retFunc:       " << retFunc << " " << retFuncName << std::endl
 		   << "oldRetFunc:    " << oldRetFunc << " " << oldRetFuncName
 		   << std::endl
