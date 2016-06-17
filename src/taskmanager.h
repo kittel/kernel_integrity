@@ -1,5 +1,5 @@
-#ifndef TASKMANAGER_H
-#define TASKMANAGER_H
+#ifndef KERNINT_TASKMANAGER_H_
+#define KERNINT_TASKMANAGER_H_
 
 #include <cstdlib>
 #include <iostream>
@@ -14,6 +14,8 @@
 #include "helpers.h"
 
 #define PAGESIZE 0x1000
+
+namespace kernint {
 
 /**
  * This class contains the extracted information of an address space's VMAs
@@ -100,10 +102,10 @@ public:
 	std::string findLibraryFile(const std::string &libName);
 
 	/** try to return an already loaded library by name */
-	ElfProcessLoader *findLibByName(const std::string &name);
+	ElfUserspaceLoader *findLibByName(const std::string &name);
 
 	/** create an executable from a process */
-	ElfProcessLoader *loadExec(Process *process);
+	ElfUserspaceLoader *loadExec(Process *process);
 
 protected:
 	Instance initTask;
@@ -115,7 +117,13 @@ protected:
 
 	std::unordered_map<std::string, Process *> processMap;
 
+
 	using LibraryMap = std::unordered_map<std::string, ElfLoader *>;
+
+	/**
+	 * Maps library name to elfloader, these are the known raw
+	 * library images.
+	 */
 	LibraryMap libraryMap;
 
 	std::vector<std::string> libDirName;
@@ -128,4 +136,6 @@ private:
 	std::string getPathFromDentry(Instance& dentry) const;
 };
 
-#endif //TASKMANAGER_H
+} // namespace kernint
+
+#endif

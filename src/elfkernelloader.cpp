@@ -1,21 +1,23 @@
 #include "elfkernelloader.h"
 
+#include <cassert>
+
+#include "elfmoduleloader.h"
+#include "exceptions.h"
 #include "helpers.h"
 
-#include "exceptions.h"
-#include <cassert>
+namespace kernint {
 
 ElfKernelLoader::ElfKernelLoader(ElfFile *elffile)
 	:
-	ElfLoader{elffile},
+	ElfKernelspaceLoader{elffile, this->getParavirtState()},
 	name{"kernel"},
-	pvpatcher(this->getParavirtState()),
 	fentryAddress{0},
 	genericUnrolledAddress{0} {}
 
 ElfKernelLoader::~ElfKernelLoader() {}
 
-void ElfKernelLoader::initText(void) {
+void ElfKernelLoader::initText() {
 	ElfFile64 *elffile = dynamic_cast<ElfFile64*>(this->elffile);
 
 	this->textSegment = elffile->findSectionWithName(".text");
@@ -51,7 +53,7 @@ void ElfKernelLoader::initText(void) {
 
 	// Apply Ftrace changes
 	info                    = elffile->findSectionWithName(".init.text");
-	uint64_t initTextOffset = -(uint64_t)info.memindex + (uint64_t)info.index;
+	uint64_t initTextOffset = -info.memindex + (uint64_t)info.index;
 
 	info.index = (uint8_t*)elffile->findAddressOfVariable("__start_mcount_loc") +
 	initTextOffset;
@@ -124,22 +126,22 @@ bool ElfKernelLoader::isDataAddress(uint64_t addr) {
 	return this->elffile->isDataAddress(addr | 0xffff000000000000);
 }
 
-ElfLoader* ElfKernelLoader::getModuleForCodeAddress(uint64_t address) {
+ElfKernelspaceLoader* ElfKernelLoader::getModuleForCodeAddress(uint64_t address) {
 	// Does the address belong to the kernel?
 	if (this->isCodeAddress(address)) {
 		return this;
 	}
 
 	for (auto &modulePair : this->moduleMap) {
-		ElfLoader *module = dynamic_cast<ElfLoader*>(modulePair.second);
+		ElfKernelspaceLoader *module = dynamic_cast<ElfKernelspaceLoader*>(modulePair.second);
 		if (module->isCodeAddress(address)) {
 			return module;
 		}
 	}
-	return 0;
+	return nullptr;
 }
 
-ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address) {
+ElfKernelspaceLoader* ElfKernelLoader::getModuleForAddress(uint64_t address) {
 	// Does the address belong to the kernel?
 	if (this->isCodeAddress(address) || this->isDataAddress(address)) {
 		return this;
@@ -147,13 +149,13 @@ ElfLoader* ElfKernelLoader::getModuleForAddress(uint64_t address) {
 
 	for (auto &modulePair : this->moduleMap) {
 		assert(modulePair.second);
-		ElfLoader *module = dynamic_cast<ElfLoader*>(modulePair.second);
+		ElfKernelspaceLoader *module = dynamic_cast<ElfKernelspaceLoader*>(modulePair.second);
 		assert(module);
 		if (module->isCodeAddress(address) || module->isDataAddress(address)) {
 			return module;
 		}
 	}
-	return 0;
+	return nullptr;
 }
 
 const std::string &ElfKernelLoader::getName() const {
@@ -164,3 +166,5 @@ Kernel *ElfKernelLoader::getKernel() {
 	return this;
 }
 
+
+} // namespace kernint

@@ -1,10 +1,13 @@
 #include "exceptions.h"
 
+
+namespace kernint {
+
 ElfException::ElfException() throw() {}
 
 ElfException::ElfException(const char* reason) throw()
 	:
-	reason(reason) {}
+	reason{reason} {}
 
 ElfException::~ElfException() throw() {}
 
@@ -17,11 +20,11 @@ VMIException::VMIException() throw() {}
 
 VMIException::VMIException(const char* reason) throw()
 	:
-	reason(reason) {}
+	reason{reason} {}
 
 VMIException::~VMIException() throw() {}
 
-const char* VMIException::what() const throw() {
+const char *VMIException::what() const throw() {
 	std::string result = std::string("VMIException: ");
 	return result.append(this->reason).c_str();
 }
@@ -29,11 +32,13 @@ const char* VMIException::what() const throw() {
 NotImplementedException::NotImplementedException() throw() {}
 NotImplementedException::NotImplementedException(const char* reason) throw()
 	:
-	reason(reason) {}
+	reason{reason} {}
 
 NotImplementedException::~NotImplementedException() throw() {}
 
-const char* NotImplementedException::what() const throw() {
+const char *NotImplementedException::what() const throw() {
 	std::string result = std::string("NotImplementedException: ");
 	return result.append(this->reason).c_str();
 }
+
+} // namespace kernint

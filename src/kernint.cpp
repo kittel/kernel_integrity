@@ -1,3 +1,5 @@
+#include "kernint.h"
+
 #include <cassert>
 #include <typeinfo>
 #include <ctype.h>
@@ -9,12 +11,18 @@
 #include <getopt.h>
 #include <memory>
 
+#include "elfkernelloader.h"
 #include "kernelvalidator.h"
 #include "processvalidator.h"
 #include "process.h"
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
+
+
+// TODO: move stuff out of here
+using namespace kernint;
+
 
 // used in the signal handler
 KernelValidator *validator = nullptr;
@@ -47,50 +55,50 @@ void validateUserspace(ProcessValidator *val) {
 }
 
 const char *helpString = R"EOF(
-	Usage: %s [options]
+    Usage: %s [options]
 
-	Possible options are:
+    Possible options are:
 
-	-h, --help
-		Display the help page.
+    -h, --help
+        Display the help page.
 
-	--hypervisor_kvm
-	--hypervisor_xen
-	--hypervisor_file
-		Use KVM, XEN, or FILE as the VM Backend the default is autodetect
+    --hypervisor_kvm
+    --hypervisor_xen
+    --hypervisor_file
+        Use KVM, XEN, or FILE as the VM Backend the default is autodetect
 
-	-g, --guest=<guest(File)>
-		Analyse guest(File)
+    -g, --guest=<guest(File)>
+        Analyse guest(File)
 
-	-l, --loop
-		Run introspection component until external interrupt.
+    -l, --loop
+        Run introspection component until external interrupt.
 
-	-k, --checkKernel=<kernelDir>
-		Check for kernel integrity. Use binaries in <kernelDir> as
-		trusted reference.
+    -k, --checkKernel=<kernelDir>
+        Check for kernel integrity. Use binaries in <kernelDir> as
+        trusted reference.
 
-	-c, --disableCodeValidation
-		Disable CodeValidation Component. Enabled by default.
+    -c, --disableCodeValidation
+        Disable CodeValidation Component. Enabled by default.
 
-	-e, --disablePointerExam
-		Disable Pointer Examination. Enabled by default.
+    -e, --disablePointerExam
+        Disable Pointer Examination. Enabled by default.
 
-	-t, --targetsFile=<targets>
-		Use call targets in <targets> for stackvalidation.
+    -t, --targetsFile=<targets>
+        Use call targets in <targets> for stackvalidation.
 
-	-u, --checkUserspace=<binaryName>
-		Check userspace process for integrity. Load binary <binaryName>
-		as trusted reference.
+    -u, --checkUserspace=<binaryName>
+        Check userspace process for integrity. Load binary <binaryName>
+        as trusted reference.
 
-	-p, --pid=<pid>
-		Check <pid> for integrity
+    -p, --pid=<pid>
+        Check <pid> for integrity
 
-	-l, --libraryPath=<libraryPath>
-		Use <libraryPath> to load trusted libraries.
+    -l, --libraryPath=<libraryPath>
+        Use <libraryPath> to load trusted libraries.
 
-	Note: If the guest os is mounted via sshfs the transform_symlinks
-	      option needs to be used!
-		  sshfs -o transform_symlinks <user>@<ip>:/ <dir>/
+    Note: If the guest os is mounted via sshfs the transform_symlinks
+          option needs to be used!
+          sshfs -o transform_symlinks <user>@<ip>:/ <dir>/
 )EOF";
 
 void displayHelp(const char *argv0) {
@@ -278,9 +286,9 @@ int main(int argc, char **argv) {
 
 	if (!binaryName.empty() && pid != 0) {
 		kl->getTaskManager()->setLibraryDir(libraryDir);
+		std::cout << "Creating process image to verify..." << std::endl;
 		Process proc{binaryName, kl, pid};
-		// Ensure that all arguments make sense at this point
-		std::cout << "Starting Process Validation..." << std::endl;
+		std::cout << "Starting process validation..." << std::endl;
 		ProcessValidator val{kl, &proc, &vmi};
 		validateUserspace(&val);
 	}

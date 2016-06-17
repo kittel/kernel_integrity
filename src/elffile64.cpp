@@ -1,15 +1,20 @@
 #include "elffile64.h"
 
-#include "exceptions.h"
-#include "elfloader.h"
-
-#include "helpers.h"
-
-#include <stdio.h>
+#include <cstdio>
 #include <cassert>
 
+#include "elfloader.h"
+#include "elfkernelloader64.h"
+#include "elfmoduleloader64.h"
+#include "elfuserspaceloader64.h"
+#include "error.h"
+#include "helpers.h"
+#include "kernel.h"
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
+
+
+namespace kernint {
 
 ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 	:
@@ -119,17 +124,17 @@ ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
 	auto mod = new ElfModuleLoader64(this, name, kernel);
 	assert(kernel);
 	this->symbols = &kernel->symbols;
-	mod->parse();
+	mod->initImage();
 	this->parseDwarf();
 	return mod;
 }
 
-ElfProcessLoader *ElfFile64::parseProcess(const std::string &name,
-                                          Kernel *kernel) {
-	auto proc = new ElfProcessLoader64(this, kernel, name);
+ElfUserspaceLoader *ElfFile64::parseUserspace(const std::string &name,
+                                              Kernel *kernel) {
+	auto proc = new ElfUserspaceLoader64(this, kernel, name);
 
 	this->parseDwarf();
-	//TODO: this->symbols = &proc->symbols;
+	// TODO: transfer symbols from loader this->symbols
 	return proc;
 }
 
@@ -139,41 +144,60 @@ unsigned int ElfFile64::getNrOfSections() const {
 
 /* This function actually searches for a _section_ in the ELF file */
 SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const {
-	char *tempBuf = 0;
+	char *tempBuf = nullptr;
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 		tempBuf = (char *)this->fileContent +
-		          elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
-		          elf64Shdr[i].sh_name;
+		          this->elf64Shdr[this->elf64Ehdr->e_shstrndx].sh_offset +
+		          this->elf64Shdr[i].sh_name;
 
 		if (sectionName.compare(tempBuf) == 0) {
-			return SectionInfo(sectionName,
-			                   i,
-			                   this->fileContent + elf64Shdr[i].sh_offset,
-			                   elf64Shdr[i].sh_addr,
-			                   elf64Shdr[i].sh_size);
-			// printf("Found Strtab in Section %i: %s\n", i, tempBuf);
+			return SectionInfo(
+				sectionName,
+				i,
+				this->elf64Shdr[i].sh_offset,
+				this->fileContent + this->elf64Shdr[i].sh_offset,
+				this->elf64Shdr[i].sh_addr,
+				this->elf64Shdr[i].sh_size
+			);
 		}
 	}
-	return SectionInfo();
+	assert(0);
 }
 
 SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
 	if (sectionID < this->getNrOfSections()) {
-		std::string sectionName = toString(
-		    this->fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
-		    elf64Shdr[sectionID].sh_name);
-		return SectionInfo(sectionName,
-		                   sectionID,
-		                   this->fileContent + elf64Shdr[sectionID].sh_offset,
-		                   elf64Shdr[sectionID].sh_addr,
-		                   elf64Shdr[sectionID].sh_size);
+		auto dataptr = this->fileContent + this->elf64Shdr[sectionID].sh_offset;
+
+		// TODO: really `infosec`? not just sectionID?
+		unsigned int infosec = this->elf64Shdr[sectionID].sh_info;
+		if (infosec < this->getNrOfSections()) {
+			if (this->elf64Shdr[infosec].sh_type == SHT_NOBITS) {
+				if (this->elf64Shdr[infosec].sh_flags & SHF_ALLOC) {
+					// TODO: create vector
+					std::cout << "TODO: alloc NOBITS section: "
+					          << this->sectionName(sectionID)
+					          << std::endl;
+					throw InternalError("NOBITS implementation");
+				}
+			}
+		}
+
+		return SectionInfo(
+			this->sectionName(sectionID),
+			sectionID,
+			this->elf64Shdr[sectionID].sh_offset,
+			dataptr,
+			this->elf64Shdr[sectionID].sh_addr,
+			this->elf64Shdr[sectionID].sh_size
+		);
 	}
-	return SectionInfo();
+	assert(0);
 }
 
 bool ElfFile64::isCodeAddress(uint64_t address) {
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)) {
+		if (CONTAINS(this->elf64Shdr[i].sh_addr,
+		             this->elf64Shdr[i].sh_size, address)) {
 			if (CHECKFLAGS(this->elf64Shdr[i].sh_flags,
 			               (SHF_ALLOC & SHF_EXECINSTR))) {
 				return true;
@@ -187,7 +211,8 @@ bool ElfFile64::isCodeAddress(uint64_t address) {
 
 bool ElfFile64::isDataAddress(uint64_t address) {
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		if (CONTAINS(elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size, address)) {
+		if (CONTAINS(this->elf64Shdr[i].sh_addr,
+		             this->elf64Shdr[i].sh_size, address)) {
 			if (CHECKFLAGS(this->elf64Shdr[i].sh_flags, (SHF_ALLOC)) &&
 			    !CHECKFLAGS(this->elf64Shdr[i].sh_flags, (SHF_EXECINSTR))) {
 				return true;
@@ -199,10 +224,10 @@ bool ElfFile64::isDataAddress(uint64_t address) {
 	return false;
 }
 
-std::string ElfFile64::sectionName(int sectionID) {
+std::string ElfFile64::sectionName(int sectionID) const {
 	return toString(this->fileContent +
-	                elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset +
-	                elf64Shdr[sectionID].sh_name);
+	                this->elf64Shdr[this->elf64Ehdr->e_shstrndx].sh_offset +
+	                this->elf64Shdr[sectionID].sh_name);
 }
 
 uint8_t *ElfFile64::sectionAddress(int sectionID) {
@@ -214,19 +239,23 @@ uint64_t ElfFile64::sectionAlign(int sectionID) {
 }
 
 std::string ElfFile64::symbolName(Elf64_Word index, uint32_t strindex) const {
-	return toString(&((this->fileContent + elf64Shdr[strindex].sh_offset)[index]));
+	return toString(&((this->fileContent + this->elf64Shdr[strindex].sh_offset)[index]));
 }
 
 uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
-	return symbolNameMap[symbolName];
+	return this->symbolNameMap[symbolName];
 }
 
 bool ElfFile64::isRelocatable() const {
-	return (elf64Ehdr->e_type == ET_REL);
+	return (this->elf64Ehdr->e_type == ET_REL);
 }
 
 bool ElfFile64::isDynamic() const {
-	return (elf64Ehdr->e_type == ET_DYN);
+	return (this->elf64Ehdr->e_type == ET_DYN);
+}
+
+bool ElfFile64::isExecutable() const {
+	return (this->elf64Ehdr->e_type == ET_EXEC);
 }
 
 bool ElfFile64::isDynamicLibrary() const {
@@ -246,21 +275,19 @@ bool ElfFile64::isDynamicLibrary() const {
 	return false;
 }
 
-bool ElfFile64::isExecutable() const {
-	return (elf64Ehdr->e_type == ET_EXEC);
-}
-
 
 void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
 
-	std::cout << COLOR_GREEN << "Relocating: " << this->filename << COLOR_NORM
+	std::cout << std::endl << COLOR_GREEN << " == Relocating: "
+	          << this->filename << COLOR_NORM
 	          << std::endl;
 
-	switch(elf64Ehdr->e_type) {
+	switch(this->elf64Ehdr->e_type) {
 	case ET_REL:
 	case ET_DYN:
+	case ET_EXEC:
 		for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
 			unsigned int infosec = this->elf64Shdr[i].sh_info;
 			if (infosec >= this->getNrOfSections())
@@ -270,7 +297,9 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
 			if (!(this->elf64Shdr[infosec].sh_flags & SHF_ALLOC))
 				continue;
 
-			if (this->elf64Shdr[i].sh_type == SHT_REL){
+			if (this->elf64Shdr[i].sh_type == SHT_REL) {
+				std::cout << "wtf? REL relocations are not used, "
+				             "instead expecting RELA!" << std::endl;
 				assert(false);
 			}
 			if (this->elf64Shdr[i].sh_type == SHT_RELA) {
@@ -288,9 +317,12 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
                                    Kernel *kernel,
                                    Process *process) {
 
+	// TODO: this is wrong! somehow it's a different section!
 	Elf32_Word sectionID    = this->elf64Shdr[relSectionID].sh_info;
+
 	Elf32_Word symindex     = this->elf64Shdr[relSectionID].sh_link;
 	Elf32_Word strindex     = this->elf64Shdr[symindex].sh_link;
+	assert(symindex);
 
 	std::string sectionName = this->sectionName(sectionID);
 	bool isAltinstrSection = false;
@@ -298,44 +330,115 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		isAltinstrSection = true;
 	}
 
-	SectionInfo sectionInfo = this->findSectionByID(sectionID);
-	loader->updateSectionInfoMemAddress(sectionInfo);
+	// TODO: use inheritance or callbacks to differentiate
+	//       between elf file types instead of totally clobbering
+	//       this function with special cases.
+	bool is_userspace = process != nullptr;
+
+	// the section where to apply the relocations to
+	SectionInfo targetSection = this->findSectionByID(sectionID);
+
+	// TODO: what does this do??
+	loader->updateSectionInfoMemAddress(targetSection);
 
 	SectionInfo relSectionInfo = this->findSectionByID(relSectionID);
 
 	Elf64_Rela *rel = reinterpret_cast<Elf64_Rela *>(relSectionInfo.index);
-	assert(symindex);
 	Elf64_Sym *symBase = reinterpret_cast<Elf64_Sym *>(this->sectionAddress(symindex));
 
 	// TODO move this to a dedicated function if used with kernel modules
-	SectionInfo percpuDataSegment = this->findSectionWithName(".data..percpu");
+	//      a userspace process doesn't have this section.
+	// loader->pre_relocation_hook()...
+	SectionInfo percpuDataSection;
+
+	if (not is_userspace) {
+		percpuDataSection = this->findSectionWithName(".data..percpu");
+	}
 
 	// static member within the for loop
 	SectionInfo symRelSectionInfo;
 
 	for (uint32_t i = 0; i < relSectionInfo.size / sizeof(*rel); i++) {
-		uint8_t *locInElf = nullptr;  // on host
-		uint64_t locInMem = 0;  // on guest
+		uint8_t *locInElf = nullptr;      // on host
+		uint64_t locInMem = 0;            // on guest
 		size_t locOfRelSectionInElf = 0;  // on host
 		size_t locOfRelSectionInMem = 0;  // on guest
 
-		// This is where to make the change:
-		// on our host
-		locInElf = reinterpret_cast<uint8_t *>(sectionInfo.index) + rel[i].r_offset;
+		std::cout << "# processing relocation " << i << "in "
+		          << relSectionInfo.name << std::endl;
+
+		// r_offset is the offset from section start
+		locInElf = targetSection.index + rel[i].r_offset;
 
 		// in the guest
-		locInMem = reinterpret_cast<uint64_t>(reinterpret_cast<char *>(sectionInfo.memindex) + rel[i].r_offset);
+		locInMem = targetSection.memindex + rel[i].r_offset;
+
+		switch (this->elf64Ehdr->e_type) {
+		case ET_EXEC:
+		case ET_DYN: {
+			// r_offset is the virtual address of the patch position
+
+			// TODO: this is ultra-dirty!
+			//       we are trying to find the section where
+			//       the relocation should be applied to
+			//       by looking which section start address
+			//       is the closest one.
+			int sectionCandidate = -1;
+			Elf64_Addr closest = 0;
+			for (unsigned int j = 0; j < this->getNrOfSections(); j++) {
+				if (this->elf64Shdr[j].sh_addr < rel[i].r_offset) {
+					// if the virtual base address of the section is
+					// smaller than the relocation target,
+					// it might be the section start
+					// try to find the section start that is closest
+					// to the relocation target
+					if (closest < this->elf64Shdr[j].sh_addr) {
+						sectionCandidate = j;
+						closest = this->elf64Shdr[j].sh_addr;
+					}
+				}
+			}
+			if (sectionCandidate == -1) {
+				throw InternalError{"no section can be the target for the relocation"};
+			}
+
+
+			targetSection = this->findSectionByID(sectionCandidate);
+			std::cout << "relocation will patch section " << targetSection.name << std::endl;
+
+			// remove the base address of the section
+			// so we can operate on the mapped file address later:
+			//         (r_offset - virtual segment start)
+			// (to eliminate the virtual address)
+			locInElf -= targetSection.memindex;
+
+			break;
+		}
+		case ET_REL:
+		default:
+			break;
+		}
 
 		Elf64_Sym *sym = symBase + ELF64_R_SYM(rel[i].r_info);
 
-		if (symRelSectionInfo.segID != sym->st_shndx) {
+		std::cout << "relocate: r_offset: 0x" << std::hex << rel[i].r_offset
+		          << std::dec << " -- name: "
+		          << this->symbolName(sym->st_name, strindex)
+		          << std::endl;
+
+		if (symRelSectionInfo.secID != sym->st_shndx) {
 			symRelSectionInfo = this->findSectionByID(sym->st_shndx);
 			loader->updateSectionInfoMemAddress(symRelSectionInfo);
 		}
 
-		if (sym->st_shndx == percpuDataSegment.segID) {
-			Instance currentModule = loader->getKernel()->getKernelModuleInstance(loader->getName());
-			symRelSectionInfo.memindex = reinterpret_cast<uint8_t *>(currentModule.memberByName("percpu").getRawValue<uint64_t>(false));
+		// TODO: move to dedicated function as unusable
+		//       for userspace processes
+		// loader->relocation_hook(sym->st_shndx)
+		if (not is_userspace) {
+			if (sym->st_shndx == percpuDataSection.secID) {
+				Instance currentModule = loader->getKernel()->getKernelModuleInstance(loader->getName());
+				symRelSectionInfo.memindex = currentModule.memberByName("percpu").getRawValue<uint64_t>(false);
+			}
 		}
 
 		// store section starts for host and guest
@@ -343,26 +446,59 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		locOfRelSectionInMem = reinterpret_cast<size_t>(symRelSectionInfo.memindex);
 
 		std::cout << "Relocating: "
-		          << this->symbolName(sym->st_name, strindex) << " -> "
+		          << this->symbolName(sym->st_name, strindex) << " -> 0x"
 		          << std::hex << sym->st_value << std::dec << std::endl;
 
 		switch (sym->st_shndx) {
 		case SHN_COMMON:
 			assert(false);
 			break;
+
 		case SHN_ABS:
 			break;
-		case SHN_UNDEF:
-			if (process) {
-				std::cout << "Need to find address of symbol: "
-				          << this->symbolName(sym->st_name, strindex)
-				          << std::endl;
 
+		case SHN_UNDEF:
+			if (is_userspace) {
 				// this fetches the value to be written from the process.
-				sym->st_value = process->symbols.getSymbolAddress(this->symbolName(sym->st_name, strindex));
+				// it can provide all symbol positions, even from
+				// libraries it depends on.
+				uint64_t addr;
+
+				switch (ELF64_R_TYPE(rel[i].r_info)) {
+				case R_X86_64_JUMP_SLOT:
+				case R_X86_64_GLOB_DAT: {
+					std::cout << "Need to find address of process symbol: "
+					          << this->symbolName(sym->st_name, strindex)
+					          << std::endl;
+
+					std::string target_symbol = this->symbolName(sym->st_name, strindex);
+
+					addr = process->symbols.getSymbolAddress(target_symbol);
+
+					std::cout << "addr = " << addr << std::endl;
+
+					if (addr == 0 and not (target_symbol == "__gmon_start__")) {
+						throw Error{"undefined symbol (=0) encountered"};
+					}
+
+
+					sym->st_value = addr;
+
+					break;
+				}
+				case R_X86_64_RELATIVE:   /* Adjust by program base */
+				case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
+					// TODO:
+					std::cout << "TODO: irelative relocation" << std::endl;
+					break;
+
+				default:
+					throw Error{"unknown relocation type"};
+				}
 			}
 			else {
-				sym->st_value = kernel->symbols.getSymbolAddress(this->symbolName(sym->st_name, strindex));
+				sym->st_value = kernel->symbols.getSymbolAddress(
+					this->symbolName(sym->st_name, strindex));
 			}
 			break;
 		default:
@@ -406,11 +542,16 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 				val -= locInMem;
 			}
 
-			*(reinterpret_cast<uint32_t *>(locInElf)) = val;
+			*reinterpret_cast<uint32_t *>(locInElf) = val;
 			break;
 
 		case R_X86_64_GLOB_DAT:   /* Create GOT entry */
 		case R_X86_64_JUMP_SLOT:  /* Create PLT entry */
+
+			std::cout << "got/plt relocation at 0x"
+			          << std::hex << reinterpret_cast<uint64_t>(locInElf)
+			          << " to 0x" << val << " off=0x" << sym->st_value
+			          << std::dec << std::endl;
 
 			// TODO: does this get the correct memindex?
 			//       the process has to return it
@@ -419,20 +560,55 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			break;
 
 		case R_X86_64_RELATIVE:   /* Adjust by program base */
-		case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
 			// TODO: don't patch JUMP_SLOT if we have lazy binding.
 			// instead, write in the _dl_runtime_resolve_{sse,avx,avx512}
 
-			std::cout << "relocating 0x" << std::hex << locInElf
+			// calculation:
+			// RELATIVE: B + A
+			// where A = addend, B = base address of shared object
+
+			std::cout << "TODO relative relication at 0x"
+			          << std::hex << reinterpret_cast<uint64_t>(locInElf)
 			          << " to 0x" << val << " off=0x" << sym->st_value
 			          << std::dec << std::endl;
 
 			// maybe: address has to be relative, not absolute
 
 			// write: sectionoffset + addend
+			// TODO: add l_addr (aka link map address) here (sectionoffset)
+			// val = sym->st_value + addend
+			// -> to write: sectionoffset + addend
+			// -> write: val - sym->st_value + l_addr
 			*reinterpret_cast<uint64_t *>(locInElf) = val - sym->st_value;
 			break;
 
+		case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
+
+			std::cout << "TODO irelative relication at 0x"
+			          << std::hex << reinterpret_cast<uint64_t>(locInElf)
+			          << " to 0x" << val << " off=0x" << sym->st_value
+			          << std::dec << std::endl;
+
+			// calculation:
+			// IRELATIVE: indirect (B + A)
+			// where A = addend, B = base address of shared object
+
+			// the value used in this relocation is the program address
+			// returned by the func- tion, which takes no arguments, at the
+			// address of the result of the corresponding R_X86_64_RELATIVE
+			// relocation. One use of the R_X86_64_IRELATIVE relocation is to
+			// avoid name lookup for the locally defined STT_GNU_IFUNC symbols
+			// at load-time. Support for this relocation is optional, but is
+			// required for the STT_GNU_IFUNC symbols
+
+			// TODO!
+			*reinterpret_cast<uint64_t *>(locInElf) = val - sym->st_value;
+
+			break;
+		case R_X86_64_COPY:
+			std::cout << "R_X86_64_COPY relocation, doing nothing!"
+			          << std::endl;
+			break;
 		default:
 			std::cout << COLOR_RED << "Unknown RELA: "
 			          << "Requested Type: " << ELF64_R_TYPE(rel[i].r_info)
@@ -454,20 +630,22 @@ std::vector<std::string> ElfFile64::getDependencies() {
 	// get .dynamic section
 	SectionInfo dynamic       = this->findSectionWithName(".dynamic");
 	SectionInfo dynstr        = this->findSectionWithName(".dynstr");
-	Elf64_Dyn *dynamicEntries = (Elf64_Dyn *)(dynamic.index);
-	char *strtab              = (char *)(dynstr.index);
+	Elf64_Dyn *dynamicEntries = reinterpret_cast<Elf64_Dyn *>(dynamic.index);
+	char *strtab              = reinterpret_cast<char *>(dynstr.index);
 
 	for (int i = 0; (dynamicEntries[i].d_tag != DT_NULL); i++) {
 		if (dynamicEntries[i].d_tag == DT_NEEDED) {
 			// insert name from symbol table on which the d_val is pointing
 			dependencies.push_back(
-			    std::string(&strtab[(dynamicEntries[i].d_un.d_val)]));
+				std::string(&strtab[dynamicEntries[i].d_un.d_val]));
 		}
 
-		// TODO: lazy binding?
-		//if (dynamicEntries[i].d_tag == DT_BIND_NOW) {
-		//	this->bindLazy = false;
-		//}
+		/*
+		// TODO: lazy binding!
+		if (dynamicEntries[i].d_tag == DT_BIND_NOW) {
+			this->doLazyBind = false;
+		}
+		*/
 	}
 	return dependencies;
 }
@@ -480,8 +658,8 @@ SegmentInfo ElfFile64::findCodeSegment() {
 				return SegmentInfo(hdr.p_type,
 				                   hdr.p_flags,
 				                   hdr.p_offset,
-				                   (uint8_t *)hdr.p_vaddr,
-				                   (uint8_t *)hdr.p_paddr,
+				                   hdr.p_vaddr,
+				                   hdr.p_paddr,
 				                   hdr.p_filesz,
 				                   hdr.p_memsz,
 				                   hdr.p_align);
@@ -499,8 +677,8 @@ SegmentInfo ElfFile64::findDataSegment() {
 				return SegmentInfo(hdr.p_type,
 				                   hdr.p_flags,
 				                   hdr.p_offset,
-				                   (uint8_t *)hdr.p_vaddr,
-				                   (uint8_t *)hdr.p_paddr,
+				                   hdr.p_vaddr,
+				                   hdr.p_paddr,
 				                   hdr.p_filesz,
 				                   hdr.p_memsz,
 				                   hdr.p_align);
@@ -542,10 +720,10 @@ std::vector<Elf64_Rela> ElfFile64::getRelaEntries() const {
 }
 
 
-std::vector<RelSym> ElfFile64::getSymbols() {
+std::vector<RelSym> ElfFile64::getSymbols() const {
 	std::vector<RelSym> ret;
 
-	if (!this->isDynamic()) {
+	if (not (this->isDynamic() or this->isExecutable())) {
 		return ret;
 	}
 
@@ -570,18 +748,19 @@ std::vector<RelSym> ElfFile64::getSymbols() {
 		    symtab[i].st_shndx != SHN_ABS &&
 		    symtab[i].st_shndx != SHN_COMMON) {
 
-			// TODO: implement getVAForAddr!!!!!!
-			targetAddr = 0;
-			// targetAddr = this->getVAForAddr(symtab[i].st_value,
-			//                                 symtab[i].st_shndx);
+			targetAddr = symtab[i].st_value;
 
-			RelSym sym = RelSym(std::string{&strtab[symtab[i].st_name]},
-			                    targetAddr,
-			                    symtab[i].st_info,
-			                    symtab[i].st_shndx);
+			RelSym sym = RelSym{
+				std::string{&strtab[symtab[i].st_name]},
+				targetAddr,
+				symtab[i].st_info,
+				symtab[i].st_shndx
+			};
 
 			ret.push_back(sym);
 		}
 	}
 	return ret;
 }
+
+} // namespace kernint

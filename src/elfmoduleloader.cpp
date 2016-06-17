@@ -1,18 +1,20 @@
 #include "elfmoduleloader.h"
 
-#include "helpers.h"
+#include <cassert>
 
 #include "exceptions.h"
-#include <cassert>
+#include "helpers.h"
+
+
+namespace kernint {
 
 ElfModuleLoader::ElfModuleLoader(ElfFile *elffile,
                                  const std::string &name,
                                  Kernel *kernel)
 	:
-	ElfLoader(elffile),
+	ElfKernelspaceLoader(elffile, kernel->getParavirtState()),
 	modName(name),
-	kernel(kernel),
-	pvpatcher(kernel->getParavirtState()) {}
+	kernel(kernel) {}
 
 ElfModuleLoader::~ElfModuleLoader() {}
 
@@ -24,7 +26,7 @@ Kernel *ElfModuleLoader::getKernel() {
 	return this->kernel;
 }
 
-void ElfModuleLoader::loadDependencies(void) {
+void ElfModuleLoader::loadDependencies() {
 	SectionInfo miS = this->elffile->findSectionWithName(".modinfo");
 
 	// parse .modinfo and load dependencies
@@ -162,25 +164,27 @@ void ElfModuleLoader::initData(void) {
 	this->roDataSection.size = this->roData.size();
 }
 
-uint8_t *ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
-	std::string segName = info.segName;
+uint64_t ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 	Instance module;
 	Instance currentModule = this->kernel->getKernelModuleInstance(this->modName);
 
-	// If the searching for the .bss section
 	// This section is right after the modules struct
-	if (segName.compare(".bss") == 0) {
-		uint64_t align = this->elffile->sectionAlign(info.segID);
+	if (info.name.compare(".bss") == 0) {
+		uint64_t align = this->elffile->sectionAlign(info.secID);
 
 		uint64_t offset = currentModule.size() % align;
-		(offset == 0) ? offset = currentModule.size()
-		              : offset = currentModule.size() + align - offset;
 
-		return (uint8_t *)currentModule.getAddress() + offset;
+		if (offset == 0) {
+			offset = currentModule.size();
+		}
+		else {
+			offset = currentModule.size() + align - offset;
+		}
+
+		return currentModule.getAddress() + offset;
 	}
-
-	if (segName.compare("__ksymtab_gpl") == 0) {
-		return (uint8_t *)currentModule.memberByName("gpl_syms").getRawValue<uint64_t>();
+	else if (info.name.compare("__ksymtab_gpl") == 0) {
+		return currentModule.memberByName("gpl_syms").getRawValue<uint64_t>();
 	}
 
 	// Find the address of the current section in the memory image
@@ -192,8 +196,8 @@ uint8_t *ElfModuleLoader::findMemAddressOfSegment(SectionInfo &info) {
 	for (uint j = 0; j < attr_cnt; ++j) {
 		Instance attr = attrs.memberByName("attrs").arrayElem(j);
 		std::string sectionName = attr.memberByName("name", true).getValue<std::string>();
-		if (sectionName.compare(segName) == 0) {
-			return (uint8_t *)attr.memberByName("address").getValue<uint64_t>();
+		if (sectionName.compare(info.name) == 0) {
+			return attr.memberByName("address").getValue<uint64_t>();
 		}
 	}
 	return 0;
@@ -209,3 +213,5 @@ bool ElfModuleLoader::isDataAddress(uint64_t addr) {
 	return (this->dataSection.containsMemAddress(addr) ||
 	        this->bssSection.containsMemAddress(addr));
 }
+
+} // namespace kernint

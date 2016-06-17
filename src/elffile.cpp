@@ -11,9 +11,11 @@
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
 
+namespace kernint {
+
 RelSym::RelSym()
 	:
-	name{""},
+	name{},
 	value{0},
 	info{0},
 	shndx{0} {}
@@ -23,84 +25,74 @@ RelSym::RelSym(const std::string &name,
                uint8_t info,
                uint32_t shndx)
 	:
-	name(name),
-	value(value),
-	info(info),
-	shndx(shndx) {}
+	name{name},
+	value{value},
+	info{info},
+	shndx{shndx} {}
 
 RelSym::~RelSym() {}
 
 SectionInfo::SectionInfo()
 	:
-	segName(),
-	segID(-1),
-	index(0),
-	memindex(0),
-	size(0) {}
+	name{},
+	secID{0xffffffff},
+	index{0},
+	memindex{0},
+	size{0} {}
 
-SectionInfo::SectionInfo(uint8_t *i, unsigned int s)
+SectionInfo::SectionInfo(const std::string &name,
+                         uint32_t secID,
+                         uint64_t offset,
+                         uint8_t *index,
+                         uint64_t memindex,
+                         uint32_t size)
 	:
-	segName(),
-	segID(),
-	index(i),
-	memindex(0),
-	size(s) {}
-
-SectionInfo::SectionInfo(const std::string &segName, uint32_t segID, uint8_t *i, uint64_t a, uint32_t s)
-	:
-	segName(segName),
-	segID(segID),
-	index(i),
-	memindex((uint8_t*) a),
-	size(s) {}
+	name{name},
+	secID{secID},
+	offset{offset},
+	index{index},
+	memindex{memindex},
+	size{size} {}
 
 SectionInfo::~SectionInfo() {}
 
 bool SectionInfo::containsElfAddress(uint64_t address){
-	uint64_t addr = (uint64_t) this->index;
-	if (address >= addr &&
-	    address <= addr + this->size){
-		return true;
-	}
-	return false;
+	uint64_t addr = reinterpret_cast<uint64_t>(this->index);
+	return (address >= addr && address <= addr + this->size);
 }
 
 bool SectionInfo::containsMemAddress(uint64_t address){
-	uint64_t addr = (int64_t) this->memindex;
-	if (address >= addr &&
-	    address <= addr + this->size){
-		return true;
-	}
-	return false;
+	uint64_t addr = this->memindex;
+	return (address >= addr && address <= addr + this->size);
 }
 
 SegmentInfo::SegmentInfo()
 	:
-	type(0),
-	flags(0),
-	offset(0),
-	vaddr(0),
-	paddr(0),
-	filesz(0),
-	memsz(0),
-	align(0) {}
+	type{0},
+	flags{0},
+	offset{0},
+	vaddr{0},
+	paddr{0},
+	filesz{0},
+	memsz{0},
+	align{0} {}
 
 SegmentInfo::SegmentInfo(uint32_t p_type,
                          uint32_t p_flags,
                          uint64_t p_offset,
-                         uint8_t* p_vaddr,
-                         uint8_t* p_paddr,
+                         uint64_t p_vaddr,
+                         uint64_t p_paddr,
                          uint64_t p_filesz,
                          uint64_t p_memsz,
                          uint64_t p_align):
-	type  (p_type),
-	flags (p_flags),
-	offset(p_offset),
-	vaddr (p_vaddr),
-	paddr (p_paddr),
-	filesz(p_filesz),
-	memsz (p_memsz),
-	align (p_align) {}
+	type  {p_type},
+	flags {p_flags},
+	offset{p_offset},
+	vaddr {p_vaddr},
+	paddr {p_paddr},
+	filesz{p_filesz},
+	memsz {p_memsz},
+	align {p_align} {}
 
 SegmentInfo::~SegmentInfo() {}
 
@@ -114,7 +106,9 @@ ElfFile::ElfFile(FILE *fd, size_t fileSize, uint8_t *fileContent,
 	fileContent{fileContent},
 	type{type},
 	programType{programType},
-	filename{""} {}
+	filename{""},
+	doLazyBind{false} // < TODO set to true once the "this elf doesn't lazybind" detection works
+{}
 
 ElfFile::~ElfFile(){
 	if(this->fileContent != nullptr){
@@ -153,22 +147,24 @@ ElfFile *ElfFile::loadElfFile(const std::string &filename) {
 			fileSize = ftell(fd);
 
 			// MMAP the file to memory
-			fileContent = (uint8_t *)mmap(
-				0,
-				fileSize,
-				PROT_READ | PROT_WRITE,
-				MAP_PRIVATE,
-				fileno(fd),
-				0
+			fileContent = reinterpret_cast<uint8_t *>(
+				mmap(
+					0,
+					fileSize,
+					PROT_READ | PROT_WRITE,
+					MAP_PRIVATE,
+					fileno(fd),
+					0
+				)
 			);
 			if (fileContent == MAP_FAILED) {
 				std::cout << "mmap failed" << std::endl;
-				throw ElfException("MMAP failed!!!\n");
+				throw ElfException{"MMAP failed!!!\n"};
 			}
 		}
 	} else {
 		std::cout << "cannot load file" << std::endl;
-		throw ElfException("Cannot load file");
+		throw ElfException{"Cannot load file"};
 	}
 
 	if (fileContent[4] == ELFCLASS64) {
@@ -182,6 +178,7 @@ ElfFile *ElfFile::loadElfFile(const std::string &filename) {
 	return elfFile;
 }
 
+/* used for loading VDSO */
 ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) {
 
 	ElfFile* elfFile = 0;
@@ -288,3 +285,5 @@ size_t ElfFile::getFileSize() {
 std::string ElfFile::getFilename() {
 	return this->filename;
 }
+
+} // namespace kernint

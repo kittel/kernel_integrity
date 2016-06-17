@@ -1,21 +1,35 @@
-#ifndef PROCESS_H_
-#define PROCESS_H_
+#ifndef KERNINT_PROCESS_H_
+#define KERNINT_PROCESS_H_
+
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "elffile.h"
 #include "libdwarfparser/symbolmanager.h"
 
+
 class Instance;
+
+namespace kernint {
+
 class Kernel;
 class ElfLoader;
-class ElfProcessLoader;
+class ElfUserspaceLoader;
 class VMAInfo;
 
+/**
+ * Tracks a userland process.
+ * Can reproduce the loading actions done in a VM
+ * on a working copy (the image) to verify correctness.
+ */
 class Process {
 public:
 	Process(const std::string &binaryName, Kernel *kernel, pid_t pid);
 	virtual ~Process() = default;
 
-	ElfProcessLoader *getExecLoader();
+	ElfUserspaceLoader *getExecLoader();
 
 	const std::string &getName() const;
 
@@ -33,7 +47,6 @@ public:
 	Kernel *getKernel() const;
 	pid_t getPID() const;
 
-	ElfLoader *loadLibrary(const std::string &libraryName);
 	SymbolManager symbols;
 
 	std::vector<uint8_t> *getDataSegmentForLib(const std::string &name);
@@ -48,13 +61,27 @@ public:
 	const VMAInfo *findVMAByName(const std::string &name) const;
 	const VMAInfo *findVMAByAddress(const uint64_t address) const;
 
+	ElfUserspaceLoader *findLoaderByAddress(const uint64_t addr) const;
+	ElfUserspaceLoader *findLoaderByFileName(const std::string &name) const;
+
+	const std::unordered_set<ElfUserspaceLoader *> getMappedLibs() const;
+	SectionInfo *getSegmentForAddress(uint64_t addr);
+
+	/**
+	 * Perform all load time relocations,
+	 * for the executable and all libraries.
+	 */
+	void processLoadRel();
+	void registerSyms(ElfUserspaceLoader *elf);
+
 protected:
 	Kernel *kernel;
 
 	Instance *task_struct;
 	pid_t pid;
 
-	ElfProcessLoader *execLoader;
+	ElfUserspaceLoader *execLoader;
+	ElfUserspaceLoader *vdsoLoader;
 	std::string binaryName;
 
 	std::vector<VMAInfo> mappedVMAs;
@@ -62,8 +89,8 @@ protected:
 	std::vector<std::string> getArgv();
 	std::unordered_map<std::string, std::string> getEnv();
 
-	ElfProcessLoader *findLibByName(const std::string &name);
-	typedef std::unordered_map<std::string, ElfLoader*> LibraryMap;
+	ElfUserspaceLoader *findLibByName(const std::string &name);
+	typedef std::unordered_map<std::string, ElfUserspaceLoader*> LibraryMap;
 	LibraryMap libraryMap;
 
 	typedef std::unordered_map<std::string, std::vector<uint8_t>> DataSegmentMap;
@@ -73,5 +100,7 @@ protected:
 	typedef std::unordered_map<std::string, SegmentInfo> DataSegmentInfoMap;
 	DataSegmentInfoMap dataSegmentInfoMap;
 };
+
+} // namespace kernint
 
 #endif

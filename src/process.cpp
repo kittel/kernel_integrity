@@ -3,7 +3,8 @@
 #include <regex>
 
 #include "elffile.h"
-#include "elfprocessloader.h"
+#include "elfuserspaceloader.h"
+#include "error.h"
 #include "kernel.h"
 #include "libdwarfparser/instance.h"
 #include "processvalidator.h"
@@ -13,6 +14,8 @@ namespace fs = boost::filesystem;
 //The following should replace boost filesystem once it is available in gcc
 //#include <filesystem>
 //namespace fs = std::filesystem;
+
+namespace kernint {
 
 Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	:
@@ -25,8 +28,8 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	dataSegmentInfoMap{} {
 
 	std::cout << COLOR_GREEN << "Loading process " << binaryName
-	    << COLOR_NORM << std::endl;
-	this->mappedVMAs = kernel->getTaskManager()->getVMAInfo(pid);
+	          << COLOR_NORM << std::endl;
+	this->mappedVMAs = this->kernel->getTaskManager()->getVMAInfo(pid);
 	this->execLoader = this->kernel->getTaskManager()->loadExec(this);
 }
 
@@ -35,7 +38,7 @@ const std::string &Process::getName() const {
 	return this->binaryName;
 }
 
-ElfProcessLoader *Process::getExecLoader() {
+ElfUserspaceLoader *Process::getExecLoader() {
 	assert(this->execLoader);
 	return this->execLoader;
 }
@@ -48,22 +51,12 @@ pid_t Process::getPID() const {
 	return this->pid;
 }
 
-ElfLoader *Process::loadLibrary(const std::string &libraryName) {
-	// TODO create a local mapping here.
-	// Also relocate the data section according to this process.
-	ElfLoader *library = this->findLibByName(libraryName);
-	if(library) return library;
-
-	library = this->kernel->getTaskManager()->loadLibrary(libraryName);
-	this->libraryMap[libraryName] = library;
-	return library;
-}
-
-ElfProcessLoader *Process::findLibByName(const std::string &name) {
-	if (this->libraryMap.find(name) == this->libraryMap.end()) {
+ElfUserspaceLoader *Process::findLibByName(const std::string &name) {
+	auto it = this->libraryMap.find(name);
+	if (it == this->libraryMap.end()) {
 		return nullptr;
 	}
-	return dynamic_cast<ElfProcessLoader *>(libraryMap[name]);
+	return it->second;
 }
 
 std::vector<uint8_t> *Process::getDataSegmentForLib(const std::string &name) {
@@ -72,7 +65,7 @@ std::vector<uint8_t> *Process::getDataSegmentForLib(const std::string &name) {
 
 SectionInfo *Process::getSectionInfoForLib(const std::string &name) {
 	auto sectionInfoIt = this->dataSectionInfoMap.find(name);
-	if(sectionInfoIt != this->dataSectionInfoMap.end()) {
+	if (sectionInfoIt != this->dataSectionInfoMap.end()) {
 		return &sectionInfoIt->second;
 	}
 
@@ -86,6 +79,7 @@ SegmentInfo *Process::getSegmentInfoForLib(const std::string &name) {
 		return &segmentInfoIt->second;
 	}
 
+	// TODO segment info
 	assert(false);
 	return nullptr;
 	//auto segmentInfo = this->findLibByName(name)->elffile->findDataSegment();
@@ -124,3 +118,153 @@ const VMAInfo *Process::findVMAByAddress(const uint64_t address) const {
 	}
 	return nullptr;
 }
+
+/* Gather all libraries which are mapped into the current Address-Space
+ *
+ * The dynamic linker has already done the ordering work.
+ * The libraries lie in this->mappedVMAs, lowest address first.
+ * => Reverse iterate through the mappedVMAs and find the corresponding loader,
+ *    gives the loaders in the correct processing order.
+ */
+const std::unordered_set<ElfUserspaceLoader *> Process::getMappedLibs() const {
+	std::unordered_set<ElfUserspaceLoader *> ret;
+	ElfUserspaceLoader *loader = nullptr;
+
+	for (auto &vma : this->getMappedVMAs()) {
+		loader = this->findLoaderByFileName(vma.name);
+		if (loader) {
+			ret.insert(loader);
+		} else {
+			std::cout << "ignoring VMA '"
+			          << vma.name << "' because no loader found."
+			          << std::endl;
+		}
+	}
+	return ret;
+}
+
+/*
+ * Find a corresponding ElfUserspaceLoader for the given vaddr
+ */
+ElfUserspaceLoader *Process::findLoaderByAddress(const uint64_t addr) const {
+	const VMAInfo *vma = this->findVMAByAddress(addr);
+	if (!vma) {
+		return nullptr;
+	}
+	return this->findLoaderByFileName(vma->name);
+}
+
+/*
+ * find loader by searching for a library name
+ */
+ElfUserspaceLoader *Process::findLoaderByFileName(const std::string &name) const {
+	std::string libname = fs::path(name).filename().string();
+	return this->getKernel()
+	           ->getTaskManager()
+	           ->findLibByName(libname);
+}
+
+
+/* Find a corresponding SectionInfo for the given vaddr */
+SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
+	// find a corresponding loader for the given vaddr
+	ElfUserspaceLoader *loader = this->findLoaderByAddress(vaddr);
+
+	SectionInfo *ret = loader->getSegmentForAddress(vaddr);
+	return ret;
+}
+
+/* Process load-time relocations of all libraries, which are mapped to the
+ * virtual address space of our main process. The following steps have to be
+ * taken:
+ *
+ *  - check which libraries are mapped to the VAS
+ *  - generate processing order based on cross-dependencies
+ *  - based on the order do for every library:
+ *      - retrieve all exported symbols from the respective library
+ *      - process relocation of the respective library
+ */
+void Process::processLoadRel() {
+	const std::unordered_set<ElfUserspaceLoader *> mappedLibs = this->getMappedLibs();
+
+	// TODO symbol registration by dependency graph
+	// use this->elffile->getDependencies as source for
+	// the relocation processing graph
+
+	for (auto &lib : mappedLibs) {
+		// announce provided symbols
+		std::cout << " - adding syms of " << lib->getName() << std::endl;
+		this->registerSyms(lib);
+	}
+
+	for (auto &lib : mappedLibs) {
+		// TODO: perform relocations on this->image
+		// TODO: the process segments were already inited,
+		//       this will now update the sections and
+		//       won't affect the segment! -> cyclic dependency.
+		lib->elffile->applyRelocations(lib, this->kernel, this);
+	}
+
+	for (auto &lib : mappedLibs) {
+		// TODO: it's already initialized in the taskmanager...
+		//       but probably initializing again will include the
+		//       relocation patches.
+
+		// for each elf component: component->initData()
+		// to get process-local data segments
+		lib->initImage();
+	}
+
+
+	// last, apply the relocations on the executable image.
+	ElfUserspaceLoader *execLoader = this->getExecLoader();
+	execLoader->elffile->applyRelocations(execLoader, this->kernel, this);
+	this->registerSyms(execLoader);
+
+	// TODO: again, reinitialize the image to include relocation patches
+	execLoader->initImage();
+
+	return;
+}
+
+/* Add the symbols, announced by lib, to the nameRelSymMap
+ *
+ *  - sweep through all provided symbols of the lib
+ *  if symbol not in map or (symbol in map(WEAK) and exported symbol(GLOBAL))
+ *      add to relSymMap
+ */
+void Process::registerSyms(ElfUserspaceLoader *elf) {
+	std::vector<RelSym> syms = elf->getSymbols();
+
+	for (auto &it : syms) {
+		const std::string &name = it.name;
+		uint64_t location = it.value;
+
+		if (location == 0) {
+			std::cout << "NULL-symbol: " << name << std::endl;
+			//throw InternalError{"symbol with location 0 registered"};
+		}
+
+		bool replaced = this->symbols.addSymbolAddress(name, location, true);
+		if (replaced) {
+			std::cout << "reregistered symbol: " << name
+			          << " with different address " << location << std::endl
+			          << "previous address was: "
+			          << this->symbols.getSymbolAddress(name) <<  std::endl;
+
+			//throw Error{"symbol overwritten!"};
+		}
+
+		/**
+		TODO if mapped symbol is WEAK and cur symbol is GLOBAL . overwrite
+		if (ELF64_ST_BIND(sym.info) == STB_WEAK &&
+		    ELF64_ST_BIND(it.info) == STB_GLOBAL) {
+			this->relSymMap[it.name] = it;
+		}
+		*/
+
+	}
+	return;
+}
+
+} // namespace kernint

@@ -1,10 +1,12 @@
-#ifndef ELFMODULELOADER_H
-#define ELFMODULELOADER_H
+#ifndef KERNINT_ELFMODULELOADER_H_
+#define KERNINT_ELFMODULELOADER_H_
 
-#include "elfloader.h"
+#include "elfkernelspaceloader.h"
 #include "paravirt_patch.h"
 
-class ElfModuleLoader : public ElfLoader {
+namespace kernint {
+
+class ElfModuleLoader : public ElfKernelspaceLoader {
 public:
 	ElfModuleLoader(ElfFile *elffile,
 	                const std::string &name="",
@@ -14,24 +16,24 @@ public:
 	const std::string &getName() const override;
 	Kernel *getKernel() override;
 
-
 protected:
-	void updateSectionInfoMemAddress(SectionInfo &info);
-	uint8_t *findMemAddressOfSegment(SectionInfo &info);
+	void updateSectionInfoMemAddress(SectionInfo &info) override;
+	uint64_t findMemAddressOfSegment(SectionInfo &info);
 
-	virtual void initText();
-	virtual void initData();
+	void initText() override;
+	void initData() override;
 
 	void loadDependencies();
 
-	bool isDataAddress(uint64_t addr);
+	bool isDataAddress(uint64_t addr) override;
 
 	std::string modName;
 	Kernel *kernel;
-
-	ParavirtPatcher pvpatcher;
 };
 
+} // namespace kernint
+
+// TODO: REMOVE!!!!
 #include "elfmoduleloader64.h"
 
-#endif  /* ELFMODULELOADER_H */
+#endif

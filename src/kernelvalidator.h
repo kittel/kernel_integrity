@@ -1,16 +1,17 @@
-#ifndef KERNELVALIDATOR_H
-#define KERNELVALIDATOR_H
+#ifndef KERNINT_KERNELVALIDATOR_H_
+#define KERNINT_KERNELVALIDATOR_H_
 
-#include <memory>
-#include <unordered_map>
+#include <cstdint>
+#include <map>
 
-#include "elffile.h"
-#include "elfloader.h"
-
-#include "libvmiwrapper/libvmiwrapper.h"
 #include "libdwarfparser/libdwarfparser.h"
+#include "libvmiwrapper/libvmiwrapper.h"
 
-#include "helpers.h"
+
+namespace kernint {
+
+class ElfKernelLoader;
+class ElfKernelspaceLoader;
 
 class KernelValidator {
 public:
@@ -38,13 +39,13 @@ private:
 
 	uint64_t globalCodePtrs;
 
-	void validateCodePage(page_info_t *page, ElfLoader *elf);
+	void validateCodePage(page_info_t *page, ElfKernelspaceLoader *elf);
 	bool isValidJmpLabel(uint8_t *pageInMem,
 	                     uint64_t codeAddress,
 	                     int32_t i,
-	                     ElfLoader *elf);
+	                     ElfKernelspaceLoader *elf);
 
-	void validateDataPage(page_info_t *page, ElfLoader *elf);
+	void validateDataPage(page_info_t *page, ElfKernelspaceLoader *elf);
 	void validateStackPage(uint8_t *memory,
 	                       uint64_t stackBottom,
 	                       uint64_t stackEnd);
@@ -54,5 +55,7 @@ private:
 	uint64_t findCodePtrs(page_info_t *page, uint8_t *pageInMem);
 	uint64_t isReturnAddress(uint8_t *ptr, uint32_t offset, uint64_t index);
 };
+
+} // namespace kernint
 
 #endif /* KERNELVALIDATOR_H */

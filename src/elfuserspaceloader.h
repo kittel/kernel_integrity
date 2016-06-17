@@ -1,5 +1,5 @@
-#ifndef ELFPROCESSLOADER_H
-#define ELFPROCESSLOADER_H
+#ifndef KERNINT_ELFUSERSPACELOADER_H_
+#define KERNINT_ELFUSERSPACELOADER_H_
 
 #include "elffile.h"
 #include "elfloader.h"
@@ -8,22 +8,24 @@
 
 #include <unordered_map>
 
-// The beauty of forward declarations
-class ElfProcessLoader;
+namespace kernint {
+
+class ElfUserspaceLoader;
 class ElfKernelLoader;
 class Process;
 class ProcessValidator;
 
-class ElfProcessLoader : public ElfLoader {
+class ElfUserspaceLoader : public ElfLoader {
 	friend class ProcessValidator;
+	friend class Process;
 
 public:
-	ElfProcessLoader(ElfFile *elffile, Kernel *kernel,
+	ElfUserspaceLoader(ElfFile *elffile, Kernel *kernel,
 	                 const std::string &name);
 
-	virtual ~ElfProcessLoader();
+	virtual ~ElfUserspaceLoader();
 
-	void parse() override;  // Initialize the complete image
+	void initImage() override;  // Initialize the complete image
 
 	const std::string &getName() const override;
 	Kernel *getKernel() override;
@@ -33,18 +35,20 @@ protected:
 
 	std::string name;
 
-	void loadDependencies();
+	std::vector<ElfUserspaceLoader *> getDependencies();
 
 	SegmentInfo textSegmentInfo;
 	SegmentInfo dataSegmentInfo;
 
 	SectionInfo heapSection;  // handler for optional heap segment
 
-	// symbols provided by this loader
-	std::vector<RelSym> providedSyms;
-	virtual std::vector<RelSym> getProvidedSyms();
+	// symbols provided by this elf
+	std::vector<RelSym> getSymbols() const;
 
+	/** copy .text etc to text segment */
 	void initText() override;
+
+	/** create data segment vector as origin for copies */
 	void initData() override;
 
 	SectionInfo *getSegmentForAddress(uint64_t addr);
@@ -60,9 +64,12 @@ protected:
 	virtual int evalLazy(uint64_t addr,
 	                     std::unordered_map<std::string, RelSym> *map) = 0;
 
-	virtual void updateSectionInfoMemAddress(SectionInfo& info);
+	void updateSectionInfoMemAddress(SectionInfo& info) override;
 };
 
-#include "elfprocessloader64.h"
+} // namespace kernint
+
+// TODO: REMOVE!!!!!!
+#include "elfuserspaceloader64.h"
 
 #endif

@@ -1,27 +1,27 @@
-#ifndef ELFKERNELOADER_H
-#define ELFKERNELOADER_H
+#ifndef KERNINT_ELFKERNELOADER_H_
+#define KERNINT_ELFKERNELOADER_H_
 
-#include "elfloader.h"
-#include "kernel.h"
+#include "elfkernelspaceloader.h"
 #include "paravirt_patch.h"
 
 
-class ElfKernelLoader : public ElfLoader, public Kernel {
+namespace kernint {
+
+class ElfKernelLoader : public ElfKernelspaceLoader, public Kernel {
 	friend class KernelValidator;
 
 public:
 	ElfKernelLoader(ElfFile *elffile);
 	virtual ~ElfKernelLoader();
 
-	ElfLoader *getModuleForAddress(uint64_t address);
-	ElfLoader *getModuleForCodeAddress(uint64_t address);
+	ElfKernelspaceLoader *getModuleForAddress(uint64_t address);
+	ElfKernelspaceLoader *getModuleForCodeAddress(uint64_t address);
 
 	const std::string &getName() const override;
 	Kernel *getKernel() override;
 
 protected:
 	std::string name;
-	ParavirtPatcher pvpatcher;
 
 	SectionInfo vvarSegment;
 	SectionInfo dataNosaveSegment;
@@ -36,14 +36,17 @@ protected:
 
 	int apply_relocate();
 
-	void updateSectionInfoMemAddress(SectionInfo &info);
+	void updateSectionInfoMemAddress(SectionInfo &info) override;
 
-	virtual void initText();
-	virtual void initData();
+	void initText() override;
+	void initData() override;
 
-	bool isDataAddress(uint64_t addr);
+	bool isDataAddress(uint64_t addr) override;
 };
 
+} // namespace kernint
+
+// TODO: REMOVE!!!
 #include "elfkernelloader64.h"
 
-#endif  /* ELFKERNELOADER_H */
+#endif

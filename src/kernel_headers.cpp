@@ -3,6 +3,7 @@
 #include "kernel_headers.h"
 #include "libdwarfparser/libdwarfparser.h"
 
+namespace kernint {
 
 const unsigned char p6nops[] = {
 	P6_NOP1,
@@ -56,3 +57,5 @@ const unsigned char *const k8_nops[ASM_NOP_MAX + 2] = {
 
 /* Undefined instruction for dealing with missing ops pointers. */
 const char ud2a[] = {0x0f, 0x0b};
+
+} // namespace kernint

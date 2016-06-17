@@ -1,5 +1,5 @@
-#ifndef KERNELMANAGER_H
-#define KERNELMANAGER_H
+#ifndef KERNINT_KERNEL_H_
+#define KERNINT_KERNEL_H_
 
 #include <iostream>
 #include <list>
@@ -15,7 +15,9 @@
 #include "paravirt_state.h"
 #include "taskmanager.h"
 
-class ElfLoader;
+namespace kernint {
+
+class ElfKernelspaceLoader;
 
 class Kernel {
 public:
@@ -33,7 +35,7 @@ public:
 	void loadAllModules();
 	void loadModuleThread(std::list<std::string> &modList,
 	                      std::mutex &modMutex);
-	ElfLoader *loadModule(const std::string &moduleName);
+	ElfModuleLoader *loadModule(const std::string &moduleName);
 	void parseSystemMap();
 
 	ParavirtState *getParavirtState();
@@ -53,7 +55,7 @@ protected:
 	TaskManager tm;
 
 	std::mutex moduleMapMutex;
-	typedef std::unordered_map<std::string, ElfLoader*> ModuleMap;
+	typedef std::unordered_map<std::string, ElfModuleLoader*> ModuleMap;
 	ModuleMap moduleMap;
 
 private:
@@ -67,4 +69,6 @@ private:
 };
 
 
-#endif  /* KERNELMANAGER_H */
+} // namespace kernint
+
+#endif

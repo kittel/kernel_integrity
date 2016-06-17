@@ -1,5 +1,5 @@
-#ifndef ELFFILE64_H
-#define ELFFILE64_H
+#ifndef KERNINT_ELFFILE64_H_
+#define KERNINT_ELFFILE64_H_
 
 #include <elffile.h>
 
@@ -15,6 +15,8 @@
 
 #include <map>
 
+namespace kernint {
+
 class ElfFile64 : public ElfFile {
 public:
 	ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent);
@@ -27,7 +29,7 @@ public:
 	bool isCodeAddress(uint64_t address) override;
 	bool isDataAddress(uint64_t address) override;
 
-	std::string sectionName(int sectionID) override;
+	std::string sectionName(int sectionID) const override;
 	uint8_t *sectionAddress(int sectionID) override;
 	uint64_t sectionAlign(int sectionID) override;
 
@@ -43,9 +45,8 @@ public:
 	ElfKernelLoader *parseKernel() override;
 	ElfModuleLoader *parseKernelModule(const std::string &name,
 	                                   Kernel *kernel) override;
-	ElfProcessLoader *parseProcess(const std::string &name,
-	                               Kernel *kernel) override;
-
+	ElfUserspaceLoader *parseUserspace(const std::string &name,
+	                                   Kernel *kernel) override;
 
 	bool isRelocatable() const override;
 	void applyRelocations(ElfLoader *loader,
@@ -55,7 +56,7 @@ public:
 	bool isDynamicLibrary() const override;
 	bool isExecutable() const override;
 
-	std::vector<RelSym> getSymbols() override;
+	std::vector<RelSym> getSymbols() const override;
 
 	std::vector<std::string> getDependencies() override;
 
@@ -76,4 +77,6 @@ private:
 	                        Process *process);
 };
 
-#endif /* ELFFILE64_H */
+} // namespace kernint
+
+#endif

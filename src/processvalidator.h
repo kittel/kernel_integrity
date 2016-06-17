@@ -1,5 +1,5 @@
-#ifndef PROCESSVALIDATOR_H
-#define PROCESSVALIDATOR_H
+#ifndef KERNINT_PROCESSVALIDATOR_H_
+#define KERNINT_PROCESSVALIDATOR_H_
 
 #include <memory>
 
@@ -10,10 +10,12 @@
 #include "libvmiwrapper/libvmiwrapper.h"
 #include "process.h"
 
+namespace kernint {
+
 /**
  * This is an instance of our Process Manager.
  * It conducts the loading and validation process by instances of
- * TaskManager, ElfProcessLoader and VMIInstance
+ * TaskManager, ElfUserspaceLoader and VMIInstance
  *
  * validatePage:    Check the given page for mutations.
  * checkEnv:        Validate the envVars, using the given default values
@@ -31,47 +33,26 @@ public:
 
 	int checkEnvironment(const std::map<std::string, std::string> &inputMap);
 	int validateProcess();
-	int validatePage(page_info_t *page);
 
 protected:
-private:
 	VMIInstance *vmi;
 	ElfKernelLoader *kl;
 	int32_t pid;
 
 	Process *process;
 
-	ElfProcessLoader *vdsoLoader;
-
-	std::unordered_map<uint64_t, ElfProcessLoader *> addrToLoaderMap;
-	std::unordered_map<std::string, RelSym> relSymMap;
-
-	ElfProcessLoader *lastLoader;
-
+	// TODO: remove the hardcoding of those
 	constexpr static uint64_t stdStackTop  = 0x7ffffffdd000;
 	constexpr static uint64_t stdStackBot  = 0x7ffffffff000;
 	constexpr static uint64_t dynVDSOAddr  = 0x7ffff7ffa000;
 	constexpr static uint64_t statVDSOAddr = 0x7ffff7ffd000;
 	constexpr static uint16_t stdPageSize  = 0x1000;
 
-	int evalLazy(uint64_t start, uint64_t addr);
-	int _validatePage(page_info_t *page);
-
-	void processLoadRel();
-	void announceSyms(ElfProcessLoader *lib);
-
-	ElfProcessLoader *findLoaderByAddress(const uint64_t addr) const;
-	ElfProcessLoader *findLoaderByName(const std::string &name) const;
-	RelSym *findSymbolByName(const std::string &name);
-
-	const std::set<ElfProcessLoader *> getMappedLibs() const;
-	SectionInfo *getSegmentForAddress(uint64_t addr);
-
 	void validateCodePage(const VMAInfo *vma) const;
 	void validateDataPage(const VMAInfo *vma) const;
-
-	std::unordered_map<std::basic_string<char>, RelSym>* getSymMap();
-
+	int validatePage(page_info_t *page);
 };
+
+} // namespace kernint
 
 #endif /* PROCESSVALIDATOR_H */

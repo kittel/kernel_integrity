@@ -1,7 +1,9 @@
-#ifndef PARAVIRT_STATE_H_
-#define PARAVIRT_STATE_H_
+#ifndef KERNINT_PARAVIRT_STATE_H_
+#define KERNINT_PARAVIRT_STATE_H_
 
 #include "libdwarfparser/instance.h"
+
+namespace kernint {
 
 class Kernel;
 
@@ -32,5 +34,7 @@ public:
 
 	Kernel *kernel;
 };
+
+} // namespace kernint
 
 #endif

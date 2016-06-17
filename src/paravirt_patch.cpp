@@ -5,6 +5,8 @@
 #include "kernel_headers.h"
 #include "paravirt_state.h"
 
+namespace kernint {
+
 ParavirtPatcher::ParavirtPatcher(ParavirtState *pvstate)
 	:
 	pvstate{pvstate} {}
@@ -54,7 +56,7 @@ uint8_t ParavirtPatcher::patch_jmp(void *insnbuf,
 
 	uint32_t delta = target - (addr + 5);
 
-	*((char *)insnbuf) = 0xe9;
+	*((uint8_t *)insnbuf) = 0xe9;
 	*((uint32_t *)((char *)insnbuf + 1)) = delta;
 
 	std::cout << "Patching jump @ " << std::hex << addr << std::dec
@@ -78,7 +80,7 @@ uint8_t ParavirtPatcher::patch_call(void *insnbuf,
 
 	uint32_t delta = target - (addr + 5);
 
-	*((char *)insnbuf) = 0xe8;
+	*((uint8_t *)insnbuf) = 0xe8;
 	*((uint32_t *)((char *)insnbuf + 1)) = delta;
 
 	return 5;
@@ -264,3 +266,5 @@ void ParavirtPatcher::applyParainstr(ElfLoader *target) {
 		memcpy(instrInElf, insnbuf, p->len);      // memcpy
 	}
 }
+
+} // namespace kernint

@@ -2,7 +2,7 @@ AM_CXXFLAGS = -ggdb -Wall -Wextra -pedantic -Wcast-align -fpic -I $(top_builddir
 
 kernint_CXXFLAGS=$(AM_CXXFLAGS) $(GLIB_CFLAGS) $(LIBS)
 kernint_LDFLAGS=$(GLIB_LIBS) \
-                -ldwarfparser -ldwarf -lelf \
+                -ldwarfparser -ldwarf -lelf -ldl\
                 -lvmi -lvmiwrapper \
                 -lboost_system -lboost_filesystem -lpthread
 
@@ -17,13 +17,15 @@ kernint_HEADERS=kernint.h \
                 elffile.h \
                 elffile64.h \
                 elfloader.h \
+                error.h \
                 kernel.h \
+                elfkernelspaceloader.h \
                 elfkernelloader.h \
                 elfmoduleloader.h \
-                elfprocessloader.h \
+                elfuserspaceloader.h \
                 elfkernelloader64.h \
                 elfmoduleloader64.h \
-                elfprocessloader64.h \
+                elfuserspaceloader64.h \
                 taskmanager.h \
                 exceptions.h \
                 paravirt_state.h \
@@ -38,13 +40,15 @@ kernint_SOURCES=kernint.cpp \
                 elffile.cpp \
                 elffile64.cpp \
                 elfloader.cpp \
+                error.cpp \
                 kernel.cpp \
+                elfkernelspaceloader.cpp \
                 elfkernelloader.cpp \
                 elfmoduleloader.cpp \
-                elfprocessloader.cpp \
+                elfuserspaceloader.cpp \
                 elfkernelloader64.cpp \
                 elfmoduleloader64.cpp \
-                elfprocessloader64.cpp \
+                elfuserspaceloader64.cpp \
                 taskmanager.cpp \
                 exceptions.cpp \
                 paravirt_state.cpp \
