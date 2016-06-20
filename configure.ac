@@ -9,9 +9,9 @@ AM_INIT_AUTOMAKE([-Wall])
 #Include CPPUnit
 #AM_PATH_CPPUNIT(1.12.1)
 
+AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/Makefile.am])
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
 
 # Checks for programs.
@@ -60,7 +60,7 @@ fi
 # DOXYGEN SUPPORT
 ######################################################################
 
-DX_INIT_DOXYGEN([$PACKAGE_NAME],[doxygen.cfg], [doc])
+DX_INIT_DOXYGEN([$PACKAGE_NAME],[Doxyfile], [doc])
 DX_HTML_FEATURE(ON)
 DX_CHM_FEATURE(OFF)
 DX_CHI_FEATURE(OFF)
