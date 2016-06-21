@@ -80,6 +80,12 @@ public:
 	std::vector<VMAInfo> getVMAInfo(pid_t pid);
 
 	/**
+	 * Read the name of the executable for a given PID
+	 */
+
+	std::string getTaskExeName(pid_t pid) const;
+
+	/**
 	 * Fetches the arguments for the task (aka argv)
 	 */
 	std::vector<std::string> getArgForTask(pid_t pid) const;

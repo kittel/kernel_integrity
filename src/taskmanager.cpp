@@ -209,6 +209,15 @@ Instance TaskManager::nextTask(Instance &task) const {
 	return next;
 }
 
+std::string TaskManager::getTaskExeName(pid_t pid) const {
+	//return this->getTaskForPID(pid).memberByName("comm").getRawValue<std::string>();
+	Instance a = this->getTaskForPID(pid).memberByName("mm", true);
+	a = a.memberByName("exe_file", true);
+	a = a.memberByName("f_path");
+	a = a.memberByName("dentry", true);
+	return getPathFromDentry(a);
+}
+
 std::vector<std::string> TaskManager::getArgForTask(pid_t pid) const {
 	Instance mm = this->getTaskForPID(pid).memberByName("active_mm", true);
 	uint64_t start = mm.memberByName("arg_start").getValue<uint64_t>();
@@ -331,6 +340,8 @@ ElfUserspaceLoader *TaskManager::loadExec(Process *process) {
 
 	ElfUserspaceLoader *execLoader = execFile->parseUserspace(name, this->kernel);
 	execLoader->initImage();
+	std::string exe = getNameFromPath(this->getTaskExeName(process->getPID()));
+	this->libraryMap[exe] = execLoader;
 	return execLoader;
 }
 
