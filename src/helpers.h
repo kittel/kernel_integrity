@@ -16,6 +16,8 @@
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
 
+#include "libvmiwrapper/vmiinstance.h"
+
 #define COLOR_RESET         "\033[0m"
 #define COLOR_NORM          "\033[39m"
 #define COLOR_GRAY          "\033[30m"
@@ -83,6 +85,54 @@ void displayChange(const uint8_t *memory,
                    const uint8_t *reference,
                    int32_t offset,
                    int32_t size);
+
+inline
+uint64_t isReturnAddress(uint8_t *ptr, uint32_t offset, uint64_t index,
+                         VMIInstance *vmi=nullptr, uint32_t pid=0){
+	int32_t *callOffset = (int32_t*) (ptr + offset - 4);
+	if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe8) {
+		// call qword 0x5
+		return index + offset + *callOffset;
+	}
+	if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe9) {
+		// jmp qword
+		// This is a jmp instruction!
+		return 0;
+	}
+	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
+	    ptr[offset - 5] == (uint8_t)0x90) {
+		// call qword [rax+0x0]
+		// return 1 as we do not know rax
+		return 1;
+	}
+	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
+	    ptr[offset - 5] == (uint8_t)0x15) {
+		// call qword [rel 0x6]
+		uint64_t callAddr = index + offset + *callOffset;
+		return vmi->read64FromVA(callAddr, pid);
+	}
+	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
+	    ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0x25) {
+		// call qword [0x0]
+		std::cout << "INVESTIGATE!" << std::endl;
+		return 1;
+	}
+	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
+	    ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0xc5) {
+		// call   QWORD PTR [rax*8-0x0]
+		return 1;
+	}
+	if (offset > 2 && ptr[offset - 2] == (uint8_t)0xff) {
+		return 1;
+	}
+	if (offset > 3 && ptr[offset - 3] == (uint8_t)0xff) {
+		// call qword [rbx+0x0]
+		return 1;
+	}
+
+	return 0;
+}
+
 
 /* Convert a C-String into a std::string for gdb use (don't use elsewhere) */
 [[deprecated("don't use this gdb helper")]]

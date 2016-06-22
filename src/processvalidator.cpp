@@ -38,6 +38,8 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 	// process load-time relocations
 	std::cout << "Processing load-time relocations..." << std::endl;
 	this->process->processLoadRel();
+
+	this->process->symbols.updateRevMaps();
 }
 
 ProcessValidator::~ProcessValidator() {}
@@ -113,6 +115,7 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 
 	while (bytesChecked < textsize) {
 		// read vma from memory
+
 		codevma = vmi->readVectorFromVA(vma->start + bytesChecked,
 		                                vma->end - vma->start - bytesChecked,
 		                                pid);
@@ -145,15 +148,85 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	}
 }
 
+class PagePtrInfo {
+	uint32_t count;
+	std::map<uint64_t, std::map<uint64_t, uint32_t>> ptrs;
+	Process* process;
+	ElfLoader* loader;
+	uint8_t* data;
+	VMAInfo section;
+
+	public:
+	PagePtrInfo(Process* process, uint8_t* data, VMAInfo section):
+		count(0),
+		ptrs(),
+		process(process),
+		data(data),
+		section(section){
+
+		loader = this->process->findLoaderByFileName(section.name);
+	};
+	~PagePtrInfo(){};
+
+	void addPtr(uint64_t where, uint64_t addr){
+		count++;
+		this->ptrs[addr][where] += 1;
+	}
+	void showPtrs(VMIInstance *vmi, uint32_t pid){
+		std::cout << "Found " << count << " pointers:" << std::endl;
+		for(auto &ptr : ptrs){
+			for(auto &where : ptr.second){
+				std::cout << "From: 0x" << std::setfill ('0') << std::setw (8)
+				          << std::hex << where.first
+				          << "\tto 0x" << std::setfill ('0') << std::setw (8)
+				          << ptr.first - section.start << std::dec
+				          << "\t" << where.second;
+				break;
+			}
+			auto symname = process->symbols.getElfSymbolName(ptr.first - section.start);
+			if (symname != ""){
+				std::cout << "\t" << symname;
+			}else if(data && isReturnAddress(data, ptr.first - section.start, 0, vmi, pid)){
+				std::cout << "\t" << "Return Address";
+			}else if(loader){
+				for (uint32_t i = 0 ; i < loader->elffile->getNrOfSections(); i++) {
+					auto sI = loader->elffile->findSectionByID(i);
+					if (CONTAINS((uint64_t) sI.memindex, sI.size, ptr.first - section.start)) {
+						std::cout << "\tSection: " << sI.name;
+						if(sI.name.compare(".dynstr") == 0){
+							std::string str = std::string((char*) sI.index + (ptr.first - section.start) - sI.memindex);
+							std::cout << "\tString: " << str;
+						}
+						break;
+					}
+				}
+			}else {
+				std::cout << "\tNo Loader?";
+			}
+			std::cout << std::endl;
+		}
+		std::cout << std::endl;
+	}
+	uint32_t getCount() { return count; };
+};
+
+
 void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	// TODO: see if the start address of the mapping
 	// is the address of GOT, then validate if symbols and
 	// references are correct. elffile64 does the patching.
 
-	std::vector<VMAInfo> range;
+	std::vector<std::pair<VMAInfo,PagePtrInfo>> range;
 	for (auto &section : this->process->getMappedVMAs()) {
 		if (CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)) {
-			range.push_back(section);
+			uint8_t *data = nullptr;
+			auto&& loader = this->process->findLoaderByFileName(section.name);
+			if(loader) {
+				data = loader->textSegmentContent.data();
+			}
+			range.push_back(
+			    std::make_pair(section, PagePtrInfo(process, data, section)));
+
 		}
 	}
 
@@ -177,10 +250,15 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 		}
 
 		for (auto &section : range) {
-			if ((CHECKFLAGS(section.flags, VMAInfo::VM_EXEC))) {
-				if (IN_RANGE(*value, section.start, section.end)) {
+			if ((CHECKFLAGS(section.first.flags, VMAInfo::VM_EXEC))) {
+				if (vma->name == section.first.name) continue;
+				if (IN_RANGE(*value, section.first.start + 1, section.first.end)) {
+					if (*value == section.first.start + 0x40) {
+						//Pointer to PHDR
+						continue;
+					}
 					counter++;
-					std::cout << "Found ptr to: " << section.name << std::endl;
+					section.second.addPtr((uint64_t)i, *value);
 				}
 			}
 		}
@@ -193,6 +271,11 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	std::cout << "Found " << COLOR_RED << COLOR_BOLD
 	          << counter << COLOR_RESET
 	          << " pointers in section:" << std::endl;
+	for (auto &section : range) {
+		if (section.second.getCount() == 0) continue;
+		std::cout << "Pointers from " << vma->name << " to " << section.first.name << std::endl;
+		section.second.showPtrs(this->vmi, this->pid);
+	}
 	vma->print();
 }
 

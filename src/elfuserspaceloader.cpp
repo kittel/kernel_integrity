@@ -31,8 +31,8 @@ void ElfUserspaceLoader::initText() {
 }
 
 void ElfUserspaceLoader::initData() {
-	std::cout << "Initializing data segment for elfuserspaceloader: "
-	          << this->name << std::endl;
+	//std::cout << "Initializing data segment for elfuserspaceloader: "
+	//          << this->name << std::endl;
 
 	// information about the data segment
 	this->dataSegmentInfo = this->elffile->findDataSegment();
@@ -45,20 +45,20 @@ void ElfUserspaceLoader::initData() {
 	// create a vector filled with zeroes for the size of the data segment
 	auto begin = std::begin(this->dataSegmentContent);
 
-	std::cout << " reserving segment of size 0x" << std::hex
-	          << this->dataSegmentInfo.memsz
-	          << " with offset 0x" << this->dataSegmentInfo.offset
-	          << std::dec << std::endl;
+	//std::cout << " reserving segment of size 0x" << std::hex
+	//          << this->dataSegmentInfo.memsz
+	//          << " with offset 0x" << this->dataSegmentInfo.offset
+	//          << std::dec << std::endl;
 	this->dataSegmentContent.insert(begin, this->dataSegmentInfo.memsz, 0);
 
 	// copy all sections in the data segment at their correct position
 	for (unsigned int i = 0; i < this->elffile->getNrOfSections(); i++) {
 		SectionInfo section = this->elffile->findSectionByID(i);
 
-		std::cout << " trying " << section.name
-		          << " at 0x" << std::hex
-		          << section.offset
-		          << std::dec << std::endl;
+		//std::cout << " trying " << section.name
+		//          << " at 0x" << std::hex
+		//          << section.offset
+		//          << std::dec << std::endl;
 
 		// if this section is within the data segment
 		// the section size is subtracted so the start offset check
@@ -67,7 +67,7 @@ void ElfUserspaceLoader::initData() {
 		             this->dataSegmentInfo.filesz - section.size,
 		             section.offset)) {
 
-			std::cout << " adding section: " << section.name << std::endl;
+			//std::cout << " adding section: " << section.name << std::endl;
 
 			uint8_t *data = (this->elffile->getFileContent() +
 			                 section.offset);
@@ -115,7 +115,10 @@ std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies() {
  */
 // TODO: return vector of image
 void ElfUserspaceLoader::initImage() {
+
+	std::cout << "loading userspace: " << this->name << std::endl;
 	if (this->elffile->isExecutable()) {
+		assert(false);
 		std::cout << "ElfUserspaceLoader::parse(): loading vdso" << std::endl;
 		this->kernel->getTaskManager()->loadVDSO();
 
@@ -130,8 +133,8 @@ void ElfUserspaceLoader::initImage() {
 	// craft text segment
 	this->initText();
 
-	// craft data segment
-	this->initData();
+//	// craft data segment
+//	this->initData();
 }
 
 /* Return the SectionInfo, in which the given addr is contained. */

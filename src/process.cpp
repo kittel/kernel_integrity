@@ -206,13 +206,9 @@ void Process::processLoadRel() {
 	}
 
 	for (auto &lib : mappedLibs) {
-		// TODO: it's already initialized in the taskmanager...
-		//       but probably initializing again will include the
-		//       relocation patches.
-
 		// for each elf component: component->initData()
 		// to get process-local data segments
-		lib->initImage();
+		lib->initData();
 	}
 
 
@@ -221,8 +217,7 @@ void Process::processLoadRel() {
 	execLoader->elffile->applyRelocations(execLoader, this->kernel, this);
 	this->registerSyms(execLoader);
 
-	// TODO: again, reinitialize the image to include relocation patches
-	execLoader->initImage();
+	execLoader->initData();
 
 	return;
 }
@@ -262,7 +257,7 @@ void Process::registerSyms(ElfUserspaceLoader *elf) {
 			this->relSymMap[it.name] = it;
 		}
 		*/
-
+	this->symbols.updateRevMaps();
 	}
 	return;
 }

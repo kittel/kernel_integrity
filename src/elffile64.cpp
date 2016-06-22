@@ -364,8 +364,8 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		size_t locOfRelSectionInElf = 0;  // on host
 		size_t locOfRelSectionInMem = 0;  // on guest
 
-		std::cout << "# processing relocation " << i << "in "
-		          << relSectionInfo.name << std::endl;
+		//std::cout << "# processing relocation " << i << "in "
+		//          << relSectionInfo.name << std::endl;
 
 		// r_offset is the offset from section start
 		locInElf = targetSection.index + rel[i].r_offset;
@@ -404,7 +404,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 
 
 			targetSection = this->findSectionByID(sectionCandidate);
-			std::cout << "relocation will patch section " << targetSection.name << std::endl;
+			//std::cout << "relocation will patch section " << targetSection.name << std::endl;
 
 			// remove the base address of the section
 			// so we can operate on the mapped file address later:
@@ -421,10 +421,10 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 
 		Elf64_Sym *sym = symBase + ELF64_R_SYM(rel[i].r_info);
 
-		std::cout << "relocate: r_offset: 0x" << std::hex << rel[i].r_offset
-		          << std::dec << " -- name: "
-		          << this->symbolName(sym->st_name, strindex)
-		          << std::endl;
+		//std::cout << "relocate: r_offset: 0x" << std::hex << rel[i].r_offset
+		//          << std::dec << " -- name: "
+		//          << this->symbolName(sym->st_name, strindex)
+		//          << std::endl;
 
 		if (symRelSectionInfo.secID != sym->st_shndx) {
 			symRelSectionInfo = this->findSectionByID(sym->st_shndx);
@@ -445,9 +445,9 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		locOfRelSectionInElf = reinterpret_cast<size_t>(symRelSectionInfo.index);
 		locOfRelSectionInMem = reinterpret_cast<size_t>(symRelSectionInfo.memindex);
 
-		std::cout << "Relocating: "
-		          << this->symbolName(sym->st_name, strindex) << " -> 0x"
-		          << std::hex << sym->st_value << std::dec << std::endl;
+		//std::cout << "Relocating: "
+		//          << this->symbolName(sym->st_name, strindex) << " -> 0x"
+		//          << std::hex << sym->st_value << std::dec << std::endl;
 
 		switch (sym->st_shndx) {
 		case SHN_COMMON:
@@ -467,20 +467,20 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 				switch (ELF64_R_TYPE(rel[i].r_info)) {
 				case R_X86_64_JUMP_SLOT:
 				case R_X86_64_GLOB_DAT: {
-					std::cout << "Need to find address of process symbol: "
-					          << this->symbolName(sym->st_name, strindex)
-					          << std::endl;
+					//std::cout << "Need to find address of process symbol: "
+					//          << this->symbolName(sym->st_name, strindex)
+					//          << std::endl;
 
 					std::string target_symbol = this->symbolName(sym->st_name, strindex);
 
 					addr = process->symbols.getSymbolAddress(target_symbol);
 
-					std::cout << "addr = " << addr << std::endl;
+					//std::cout << "addr = " << addr << std::endl;
 
-					if (addr == 0 and not (target_symbol == "__gmon_start__")) {
+					if (addr == 0 and not (target_symbol == "__gmon_start__")
+					              and not (target_symbol == "wgetch")) {
 						throw Error{"undefined symbol (=0) encountered"};
 					}
-
 
 					sym->st_value = addr;
 
@@ -548,10 +548,10 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		case R_X86_64_GLOB_DAT:   /* Create GOT entry */
 		case R_X86_64_JUMP_SLOT:  /* Create PLT entry */
 
-			std::cout << "got/plt relocation at 0x"
-			          << std::hex << reinterpret_cast<uint64_t>(locInElf)
-			          << " to 0x" << val << " off=0x" << sym->st_value
-			          << std::dec << std::endl;
+			//std::cout << "got/plt relocation at 0x"
+			//          << std::hex << reinterpret_cast<uint64_t>(locInElf)
+			//          << " to 0x" << val << " off=0x" << sym->st_value
+			//          << std::dec << std::endl;
 
 			// TODO: does this get the correct memindex?
 			//       the process has to return it

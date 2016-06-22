@@ -217,7 +217,10 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 		std::vector<uint8_t> pageInMem = this->kernelLoader->vmi->readVectorFromVA(
 			elfloader->textSegment.memindex, offset + 0x40);
 
-		uint64_t callAddr = isReturnAddress(elfloader->textSegmentContent.data(), offset, elfloader->textSegment.memindex);
+		uint64_t callAddr = isReturnAddress(elfloader->textSegmentContent.data(),
+		                         offset,
+		                         elfloader->textSegment.memindex,
+		                         this->kernelLoader->vmi);
 
 		if (!callAddr) {
 			stackInteresting = true;
@@ -629,57 +632,6 @@ void KernelValidator::validateDataPage(page_info_t* page, ElfKernelspaceLoader* 
 	          << COLOR_NORM << std::endl;
 }
 
-uint64_t KernelValidator::isReturnAddress(uint8_t* ptr,
-                                          uint32_t offset,
-                                          uint64_t index) {
-	int32_t callOffset = 0;
-	if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe8) {
-		// call qword 0x5
-		memcpy(&callOffset, ptr + offset - 4, 4);
-		return index + offset + callOffset;
-	}
-	if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe9) {
-		// jmp qword
-		// This is a jmp instruction!
-		return 0;
-	}
-	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
-	    ptr[offset - 5] == (uint8_t)0x90) {
-		// call qword [rax+0x0]
-		// return 1 as we do not know rax
-		return 1;
-	}
-	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
-	    ptr[offset - 5] == (uint8_t)0x15) {
-		// call qword [rel 0x6]
-		memcpy(&callOffset, ptr + offset - 4, 4);
-		uint64_t callAddr = index + offset + callOffset;
-		return this->kernelLoader->vmi->read64FromVA(callAddr);
-	}
-	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
-	    ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0x25) {
-		// call qword [0x0]
-		memcpy(&callOffset, ptr + offset - 4, 4);
-		std::cout << "INVESTIGATE!" << std::endl;
-		return 1;
-	}
-	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
-	    ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0xc5) {
-		// call   QWORD PTR [rax*8-0x0]
-		memcpy(&callOffset, ptr + offset - 4, 4);
-		return 1;
-	}
-	if (offset > 2 && ptr[offset - 2] == (uint8_t)0xff) {
-		return 1;
-	}
-	if (offset > 3 && ptr[offset - 3] == (uint8_t)0xff) {
-		// call qword [rbx+0x0]
-		return 1;
-	}
-
-	return 0;
-}
-
 uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 	uint64_t codePtrs = 0;
 
@@ -760,7 +712,8 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 			// Return Address (Stack)
 			uint64_t callAddr =
 			isReturnAddress(elfloader->textSegmentContent.data(),
-			                offset, elfloader->textSegment.memindex);
+			                offset, elfloader->textSegment.memindex,
+			                this->kernelLoader->vmi);
 			if (callAddr) {
 				std::cout << std::hex << COLOR_BLUE << COLOR_BOLD
 				          << "return address: 0x" << *longPtr << " ( @ 0x"

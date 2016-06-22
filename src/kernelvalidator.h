@@ -53,7 +53,6 @@ private:
 	void updateStackAddresses();
 
 	uint64_t findCodePtrs(page_info_t *page, uint8_t *pageInMem);
-	uint64_t isReturnAddress(uint8_t *ptr, uint32_t offset, uint64_t index);
 };
 
 } // namespace kernint
