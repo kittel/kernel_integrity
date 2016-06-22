@@ -122,8 +122,7 @@ void ElfUserspaceLoader::initImage() {
 	// craft text segment
 	this->initText();
 
-	// craft data segment
-	this->initData();
+	// data segment is crafted after the relocations were done
 }
 
 /* Return the SectionInfo, in which the given addr is contained. */

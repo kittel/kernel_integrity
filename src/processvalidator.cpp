@@ -34,12 +34,6 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 	this->pid = process->getPID();
 	std::cout << "[PID] " << this->pid << std::endl;
-
-	// process load-time relocations
-	std::cout << "Processing load-time relocations..." << std::endl;
-	this->process->processLoadRel();
-
-	this->process->symbols.updateRevMaps();
 }
 
 ProcessValidator::~ProcessValidator() {}
@@ -149,40 +143,39 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 }
 
 class PagePtrInfo {
-	uint32_t count;
-	std::map<uint64_t, std::map<uint64_t, uint32_t>> ptrs;
-	Process* process;
-	ElfLoader* loader;
-	uint8_t* data;
-	VMAInfo section;
-
-	public:
-	PagePtrInfo(Process* process, uint8_t* data, VMAInfo section):
-		count(0),
-		ptrs(),
-		process(process),
-		data(data),
-		section(section){
+public:
+	PagePtrInfo(Process* process, uint8_t* data, VMAInfo section)
+		:
+		count{0},
+		ptrs{},
+		process{process},
+		data{data},
+		section{section} {
 
 		loader = this->process->findLoaderByFileName(section.name);
 	};
+
 	~PagePtrInfo(){};
 
-	void addPtr(uint64_t where, uint64_t addr){
+	uint32_t getCount() { return count; };
+
+	void addPtr(uint64_t where, uint64_t addr) {
 		count++;
 		this->ptrs[addr][where] += 1;
 	}
-	void showPtrs(VMIInstance *vmi, uint32_t pid){
+
+	void showPtrs(VMIInstance *vmi, uint32_t pid) {
 		std::cout << "Found " << count << " pointers:" << std::endl;
 		for (auto &ptr : ptrs) {
 			for (auto &where : ptr.second) {
-				std::cout << "From: 0x" << std::setfill ('0') << std::setw (8)
+				std::cout << "From: 0x" << std::setfill('0') << std::setw(8)
 				          << std::hex << where.first
-				          << "\tto 0x" << std::setfill ('0') << std::setw (8)
+				          << "\tto 0x" << std::setfill('0') << std::setw(8)
 				          << ptr.first - section.start << std::dec
 				          << "\t" << where.second;
 				break;
 			}
+
 			auto symname = process->symbols.getElfSymbolName(ptr.first - section.start);
 			if (symname != "") {
 				std::cout << "\t" << symname;
@@ -191,7 +184,10 @@ class PagePtrInfo {
 				std::cout << "\t" << "Return Address";
 			}
 			else if (loader) {
-				for (uint32_t i = 0 ; i < loader->elffile->getNrOfSections(); i++) {
+				for (uint32_t i = 0;
+				     i < loader->elffile->getNrOfSections();
+				     i++) {
+
 					auto sI = loader->elffile->findSectionByID(i);
 					if (CONTAINS((uint64_t) sI.memindex, sI.size, ptr.first - section.start)) {
 						std::cout << "\tSection: " << sI.name;
@@ -202,14 +198,23 @@ class PagePtrInfo {
 						break;
 					}
 				}
-			} else {
+			}
+			else {
 				std::cout << "\tNo Loader?";
 			}
 			std::cout << std::endl;
 		}
 		std::cout << std::endl;
 	}
-	uint32_t getCount() { return count; };
+
+
+protected:
+	uint32_t count;
+	std::unordered_map<uint64_t, std::unordered_map<uint64_t, uint32_t>> ptrs;
+	Process *process;
+	ElfLoader *loader;
+	uint8_t *data;
+	VMAInfo section;
 };
 
 
@@ -218,22 +223,27 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	// is the address of GOT, then validate if symbols and
 	// references are correct. elffile64 does the patching.
 
-	std::vector<std::pair<VMAInfo,PagePtrInfo>> range;
+	std::vector<std::pair<VMAInfo, PagePtrInfo>> range;
 	for (auto &section : this->process->getMappedVMAs()) {
 		if (CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)) {
 			uint8_t *data = nullptr;
-			auto&& loader = this->process->findLoaderByFileName(section.name);
-			if(loader) {
+			auto loader = this->process->findLoaderByFileName(section.name);
+			if (loader) {
 				data = loader->textSegmentContent.data();
 			}
 			range.push_back(
-			    std::make_pair(section, PagePtrInfo(process, data, section)));
-
+				std::make_pair(
+					section,
+					PagePtrInfo(process, data, section)
+				)
+			);
 		}
 	}
 
 	uint64_t counter = 0;
-	auto content = vmi->readVectorFromVA(vma->start, vma->end - vma->start, this->pid, true);
+	auto content = vmi->readVectorFromVA(vma->start,
+	                                     vma->end - vma->start,
+	                                     this->pid, true);
 	if (content.size() <= sizeof(uint64_t)) {
 		// This page is currently not mapped
 		return;

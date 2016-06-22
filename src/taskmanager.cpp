@@ -381,7 +381,7 @@ ElfLoader *TaskManager::loadVDSO() {
 
 	// Load VDSO page
 	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(
-		"[kernel vdso]",
+		vdsoString,
 		this->vdsoData.data(), this->vdsoData.size()
 	);
 

@@ -44,8 +44,6 @@ protected:
 	// TODO: remove the hardcoding of those
 	constexpr static uint64_t stdStackTop  = 0x7ffffffdd000;
 	constexpr static uint64_t stdStackBot  = 0x7ffffffff000;
-	constexpr static uint64_t dynVDSOAddr  = 0x7ffff7ffa000;
-	constexpr static uint64_t statVDSOAddr = 0x7ffff7ffd000;
 	constexpr static uint16_t stdPageSize  = 0x1000;
 
 	void validateCodePage(const VMAInfo *vma) const;

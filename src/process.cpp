@@ -31,6 +31,12 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	          << COLOR_NORM << std::endl;
 	this->mappedVMAs = this->kernel->getTaskManager()->getVMAInfo(pid);
 	this->execLoader = this->kernel->getTaskManager()->loadExec(this);
+
+	// process load-time relocations
+	std::cout << "Processing load-time relocations..." << std::endl;
+	this->processLoadRel();
+
+	this->symbols.updateRevMaps();
 }
 
 
@@ -262,8 +268,8 @@ void Process::registerSyms(ElfUserspaceLoader *elf) {
 			this->relSymMap[it.name] = it;
 		}
 		*/
-	this->symbols.updateRevMaps();
 	}
+
 	return;
 }
 
