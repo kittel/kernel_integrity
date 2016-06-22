@@ -2,6 +2,7 @@
 
 #include "elfuserspaceloader.h"
 #include "kernel.h"
+#include "error.h"
 
 
 namespace kernint {
@@ -349,6 +350,8 @@ ElfLoader *TaskManager::loadVDSO() {
 	// Symbols in Kernel that point to the vdso page
 	// ... the size is currently unknown
 	// TODO Find out the correct archirecture of the binary.
+	// pass the arch as argument to this function.
+	// store it as [vdso-64], [vdso-32_int80], etc.
 	//
 	// vdso_image_64
 	// vdso_image_x32
@@ -360,17 +363,27 @@ ElfLoader *TaskManager::loadVDSO() {
 	auto *vdsoLoader = this->findLibByName(vdsoString);
 	if (vdsoLoader) return vdsoLoader;
 
+	if (this->vdsoData.size() > 0) {
+		throw Error{"vdso vector has data but [vdso] not found as library"};
+	}
+
+	// if the vdso loader was not known, fetch the data from
+	// the VM memory.
+
 	auto vdsoVar = this->kernel->symbols.findVariableByName("vdso_image_64");
 	assert(vdsoVar);
 
 	auto vdsoImage = vdsoVar->getInstance();
 
-	auto vdso = this->kernel->vmi->readVectorFromVA(
+	this->vdsoData = this->kernel->vmi->readVectorFromVA(
 		vdsoImage.memberByName("data").getRawValue<uint64_t>(false),
 		vdsoImage.memberByName("size").getValue<uint64_t>());
 
 	// Load VDSO page
-	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(vdso.data(), vdso.size());
+	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(
+		"[kernel vdso]",
+		this->vdsoData.data(), this->vdsoData.size()
+	);
 
 	vdsoLoader = vdsoFile->parseUserspace(vdsoString, this->kernel);
 	vdsoLoader->initImage();

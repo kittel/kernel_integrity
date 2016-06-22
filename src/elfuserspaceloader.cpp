@@ -118,7 +118,6 @@ void ElfUserspaceLoader::initImage() {
 
 	std::cout << "loading userspace: " << this->name << std::endl;
 	if (this->elffile->isExecutable()) {
-		assert(false);
 		std::cout << "ElfUserspaceLoader::parse(): loading vdso" << std::endl;
 		this->kernel->getTaskManager()->loadVDSO();
 
@@ -133,8 +132,8 @@ void ElfUserspaceLoader::initImage() {
 	// craft text segment
 	this->initText();
 
-//	// craft data segment
-//	this->initData();
+	// craft data segment
+	this->initData();
 }
 
 /* Return the SectionInfo, in which the given addr is contained. */

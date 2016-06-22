@@ -174,8 +174,8 @@ class PagePtrInfo {
 	}
 	void showPtrs(VMIInstance *vmi, uint32_t pid){
 		std::cout << "Found " << count << " pointers:" << std::endl;
-		for(auto &ptr : ptrs){
-			for(auto &where : ptr.second){
+		for (auto &ptr : ptrs) {
+			for (auto &where : ptr.second) {
 				std::cout << "From: 0x" << std::setfill ('0') << std::setw (8)
 				          << std::hex << where.first
 				          << "\tto 0x" << std::setfill ('0') << std::setw (8)
@@ -184,23 +184,25 @@ class PagePtrInfo {
 				break;
 			}
 			auto symname = process->symbols.getElfSymbolName(ptr.first - section.start);
-			if (symname != ""){
+			if (symname != "") {
 				std::cout << "\t" << symname;
-			}else if(data && isReturnAddress(data, ptr.first - section.start, 0, vmi, pid)){
+			}
+			else if (data && isReturnAddress(data, ptr.first - section.start, 0, vmi, pid)) {
 				std::cout << "\t" << "Return Address";
-			}else if(loader){
+			}
+			else if (loader) {
 				for (uint32_t i = 0 ; i < loader->elffile->getNrOfSections(); i++) {
 					auto sI = loader->elffile->findSectionByID(i);
 					if (CONTAINS((uint64_t) sI.memindex, sI.size, ptr.first - section.start)) {
 						std::cout << "\tSection: " << sI.name;
-						if(sI.name.compare(".dynstr") == 0){
+						if (sI.name.compare(".dynstr") == 0) {
 							std::string str = std::string((char*) sI.index + (ptr.first - section.start) - sI.memindex);
 							std::cout << "\tString: " << str;
 						}
 						break;
 					}
 				}
-			}else {
+			} else {
 				std::cout << "\tNo Loader?";
 			}
 			std::cout << std::endl;

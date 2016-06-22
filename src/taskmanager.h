@@ -134,6 +134,8 @@ protected:
 
 	std::vector<std::string> libDirName;
 
+	std::vector<uint8_t> vdsoData;
+
 	Kernel *kernel;
 
 private:

@@ -179,7 +179,8 @@ ElfFile *ElfFile::loadElfFile(const std::string &filename) {
 }
 
 /* used for loading VDSO */
-ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) {
+ElfFile* ElfFile::loadElfFileFromBuffer(const std::string &filename,
+                                        uint8_t* buf, size_t size) {
 
 	ElfFile* elfFile = 0;
 
@@ -194,6 +195,7 @@ ElfFile* ElfFile::loadElfFileFromBuffer(uint8_t* buf, size_t size) {
 
 	elfFile->fileSize = fileSize;
 	elfFile->fileContent = fileContent;
+	elfFile->filename    = filename;
 
 	return elfFile;
 }

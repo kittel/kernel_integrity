@@ -208,6 +208,8 @@ void Process::processLoadRel() {
 	for (auto &lib : mappedLibs) {
 		// for each elf component: component->initData()
 		// to get process-local data segments
+		// we have to re-calculate the data segment to apply
+		// the relocation stuff.
 		lib->initData();
 	}
 

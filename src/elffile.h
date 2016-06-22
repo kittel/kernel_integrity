@@ -136,7 +136,8 @@ public:
 	/**
 	 * Elffile-from-buffer factory method.
 	 */
-	static ElfFile *loadElfFileFromBuffer(uint8_t *buf, size_t size);
+	static ElfFile *loadElfFileFromBuffer(const std::string &filename,
+	                                      uint8_t *buf, size_t size);
 
 	/**
 	 * Main elffile factory method.
