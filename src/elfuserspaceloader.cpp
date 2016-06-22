@@ -115,16 +115,6 @@ std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies() {
  */
 // TODO: return vector of image
 void ElfUserspaceLoader::initImage() {
-
-	std::cout << "loading userspace: " << this->name << std::endl;
-	if (this->elffile->isExecutable()) {
-		std::cout << "ElfUserspaceLoader::parse(): loading vdso" << std::endl;
-		this->kernel->getTaskManager()->loadVDSO();
-
-		// TODO: create_process
-		// TODO: store process to kernel
-	}
-
 	// load linked libraries for this executable
 	// this parses the library files
 	this->getDependencies();

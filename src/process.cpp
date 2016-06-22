@@ -185,6 +185,9 @@ SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
  *      - process relocation of the respective library
  */
 void Process::processLoadRel() {
+	std::cout << "Loading vdso" << std::endl;
+	this->kernel->getTaskManager()->loadVDSO();
+
 	const std::unordered_set<ElfUserspaceLoader *> mappedLibs = this->getMappedLibs();
 
 	// TODO symbol registration by dependency graph
