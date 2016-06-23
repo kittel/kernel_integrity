@@ -89,10 +89,6 @@ protected:
 	std::vector<std::string> getArgv();
 	std::unordered_map<std::string, std::string> getEnv();
 
-	ElfUserspaceLoader *findLibByName(const std::string &name);
-	typedef std::unordered_map<std::string, ElfUserspaceLoader*> LibraryMap;
-	LibraryMap libraryMap;
-
 	typedef std::unordered_map<std::string, std::vector<uint8_t>> DataSegmentMap;
 	DataSegmentMap dataSegmentMap;
 	typedef std::unordered_map<std::string, SectionInfo> DataSectionInfoMap;

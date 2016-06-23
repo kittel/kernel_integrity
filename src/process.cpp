@@ -22,10 +22,7 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	kernel{kernel},
 	pid{pid},
 	execLoader{0},
-	binaryName{binaryName},
-	libraryMap{},
-	dataSegmentMap{},
-	dataSegmentInfoMap{} {
+	binaryName{binaryName} {
 
 	std::cout << COLOR_GREEN << "Loading process " << binaryName
 	          << COLOR_NORM << std::endl;
@@ -55,14 +52,6 @@ Kernel *Process::getKernel() const {
 
 pid_t Process::getPID() const {
 	return this->pid;
-}
-
-ElfUserspaceLoader *Process::findLibByName(const std::string &name) {
-	auto it = this->libraryMap.find(name);
-	if (it == this->libraryMap.end()) {
-		return nullptr;
-	}
-	return it->second;
 }
 
 std::vector<uint8_t> *Process::getDataSegmentForLib(const std::string &name) {
