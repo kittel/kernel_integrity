@@ -1,7 +1,7 @@
 #ifndef KERNINT_ELFFILE64_H_
 #define KERNINT_ELFFILE64_H_
 
-#include <elffile.h>
+#include "elffile.h"
 
 #include <iostream>
 #include <stdio.h>
