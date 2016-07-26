@@ -14,16 +14,14 @@ AC_CONFIG_SRCDIR([src/Makefile.am])
 AC_CONFIG_HEADERS([config.h])
 LT_INIT
 
-# Checks for programs.
-# store current user given compiler flags to avoid default setup via AC_PROG_CXX
-OLD_CXXFLAGS=$CXXFLAGS
+# Checks for compilers
 # check for C++ preprocessor and compiler and the library compiler
-# (might change the compiler flags)
 AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_CXXCPP
 # reset compiler flags to initial flags
-CXXFLAGS=$OLD_CXXFLAGS
+# add std=c++14 flags
+AX_CXX_COMPILE_STDCXX_14
 
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
@@ -31,7 +29,6 @@ AC_LIBTOOL_DLOPEN
 
 # use the C++ compiler for the following checks
 AC_LANG([C++])
-AM_CXXFLAGS="$AM_CXXFLAGS -std=c++14"
 
 
 # Checks for libraries.
@@ -40,6 +37,7 @@ AM_CXXFLAGS="$AM_CXXFLAGS -std=c++14"
 AC_HEADER_STDC
 AC_CHECK_HEADERS([string])
 AC_CHECK_HEADERS([iostream])
+AX_BOOST_BASE
 AX_BOOST_FILESYSTEM
 
 # Checks for typedefs, structures, and compiler characteristics.

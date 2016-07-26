@@ -1,6 +1,5 @@
-AM_CXXFLAGS = -ggdb -Wall -Wextra -pedantic -Wcast-align -fpic -I $(top_builddir)/src -std=c++14 -I /usr/include -O3 -pg
+AM_CXXFLAGS += -Wall -Wextra -pedantic -Wcast-align -fpic $(GLIB_CFLAGS) $(LIBS)
 
-kernint_CXXFLAGS=$(AM_CXXFLAGS) $(GLIB_CFLAGS) $(LIBS)
 kernint_LDFLAGS=$(GLIB_LIBS) \
                 -ldwarfparser -ldwarf -lelf -ldl\
                 -lvmi -lvmiwrapper \
