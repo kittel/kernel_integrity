@@ -87,8 +87,8 @@ AC_MSG_RESULT([$debugit])
 
 if test x"$debugit" = x"yes"; then
     AC_DEFINE([DEBUG],[],[Debug Mode])
-    AM_CXXFLAGS="$AM_CXXFLAGS -ggdb -O0 -pg"
-    AM_LDFLAGS="$AM_LDFLAGS -pg"
+    AM_CXXFLAGS="$AM_CXXFLAGS -ggdb -O0"
+    AM_LDFLAGS="$AM_LDFLAGS"
 else
     AC_DEFINE([NDEBUG],[],[No-debug Mode])
     AM_CXXFLAGS="$AM_CXXFLAGS -O3"
@@ -123,9 +123,10 @@ AC_CHECK_HEADERS([libdwarf/libdwarf.h], [],
 LIBS=$OLDLIBS
 
 # Checks for libraries.
-# TODO: purge CXXFLAGS, might overwrite the user flags
 OLD_CXXFLAGS=$CXXFLAGS
-CXXFLAGS="$CXXFLAGS  $GLIB_CFLAGS"
+OLD_CPPFLAGS=$CPPFLAGS
+CXXFLAGS="$CXXFLAGS $GLIB_CFLAGS"
+CPPFLAGS="$CPPFLAGS $GLIB_CFLAGS"
 AC_CHECK_HEADERS([libdwarfparser/libdwarfparser.h], [],
                  [AC_MSG_ERROR(["Error! You need to have libdwarfparser headers around."])]
 )
@@ -134,6 +135,7 @@ AC_CHECK_HEADERS([libvmiwrapper/libvmiwrapper.h], [],
                  [AC_MSG_ERROR(["Error! You need to have libvmiwrapper headers around."])]
 )
 CXXFLAGS=$OLD_CXXFLAGS
+CPPFLAGS=$OLD_CPPFLAGS
 
 
 ##########################################################################
