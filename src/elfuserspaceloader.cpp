@@ -226,7 +226,7 @@ Kernel *ElfUserspaceLoader::getKernel() {
 	return this->kernel;
 }
 
-std::vector<RelSym> ElfUserspaceLoader::getSymbols() const {
+std::vector<ElfSymbol> ElfUserspaceLoader::getSymbols() const {
 	return this->elffile->getSymbols();
 }
 

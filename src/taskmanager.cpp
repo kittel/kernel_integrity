@@ -165,13 +165,26 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 			} else if (i == map_count - 1) {
 				name = "[vvar]";
 			} else {
-				(prevName.find(".heap") != std::string::npos)
-				? name = prevName
-				: name = prevName + ".heap";
+				if (prevName.find(".heap") != std::string::npos) {
+					name = prevName;
+				}
+				else {
+					name = prevName + ".heap";
+				}
 			}
 		}
+
 		prevName = name;
-		vec.push_back(VMAInfo(curStart, curEnd, ino, fileOff, flags, name));
+		vec.push_back(
+			VMAInfo{
+				curStart,
+				curEnd,
+				ino,
+				fileOff,
+				flags,
+				name
+			}
+		);
 		cur = cur.memberByName("vm_next", true, true);
 	}
 	// // Add vsyscall mapping.V

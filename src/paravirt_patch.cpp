@@ -79,6 +79,8 @@ uint8_t ParavirtPatcher::patch_jmp(void *insnbuf,
 	uint32_t delta = target - (addr + 5);
 
 	*((uint8_t *)insnbuf) = 0xe9;
+
+	// TODO: warning: cast from 'char *' to 'uint32_t *' (aka 'unsigned int *') increases required alignment from 1 to 4
 	*((uint32_t *)((char *)insnbuf + 1)) = delta;
 
 	std::cout << "Patching jump @ " << std::hex << addr << std::dec
@@ -103,6 +105,7 @@ uint8_t ParavirtPatcher::patch_call(void *insnbuf,
 	uint32_t delta = target - (addr + 5);
 
 	*((uint8_t *)insnbuf) = 0xe8;
+	// TODO: warning: cast from 'char *' to 'uint32_t *' (aka 'unsigned int *') increases required alignment from 1 to 4
 	*((uint32_t *)((char *)insnbuf + 1)) = delta;
 
 	return 5;
@@ -243,6 +246,7 @@ void ParavirtPatcher::applyParainstr(ElfLoader *target) {
 	// bool addParavirtEntries = false;
 	// if(context.paravirtEntries.size() == 0) addParavirtEntries = true;
 
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'kernint::paravirt_patch_site *' increases required alignment from 1 to 8
 	paravirt_patch_site *start = (paravirt_patch_site *)info.index;
 	paravirt_patch_site *end = (paravirt_patch_site *)(info.index + info.size);
 

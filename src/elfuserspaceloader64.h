@@ -46,7 +46,7 @@ public:
 	virtual ~ElfUserspaceLoader64();
 
 protected:
-	int evalLazy(uint64_t addr, std::unordered_map<std::string, RelSym> *map) override;
+	int evalLazy(uint64_t addr, std::unordered_map<std::string, ElfSymbol> *map) override;
 
 	void writeRelValue(uint64_t locAddr, uint64_t symAddr);
 };

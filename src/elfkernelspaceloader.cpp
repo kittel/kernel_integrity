@@ -54,6 +54,7 @@ void ElfKernelspaceLoader::applyAltinstr(ParavirtPatcher *patcher) {
 	SectionInfo altinstreplace;
 	altinstreplace = this->elffile->findSectionWithName(".altinstr_replacement");
 
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'struct alt_instr *' increases required alignment from 1 to 4
 	struct alt_instr *start = (struct alt_instr *)altinst.index;
 	struct alt_instr *end   = (struct alt_instr *)(altinst.index + altinst.size);
 
@@ -96,6 +97,7 @@ void ElfKernelspaceLoader::applyAltinstr(ParavirtPatcher *patcher) {
 			// If replacement is in the altinstr_replace section fix the offset.
 			if (replacement >= (uint8_t *)altinstreplace.index &&
 			    replacement < (uint8_t *)altinstreplace.index + altinstreplace.size) {
+				// TODO: warning: cast from 'unsigned char *' to 'int32_t *' (aka 'int *') increases required alignment from 1 to 4
 				*(int32_t *)(insnbuf + 1) -= (altinstreplace.index - this->textSegment.index) - (altinstreplace.memindex - this->textSegment.memindex);
 			}
 			*(int32_t *)(insnbuf + 1) += replacement - instr;
@@ -120,6 +122,7 @@ void ElfKernelspaceLoader::applySmpLocks() {
 	unsigned char lock = 0;
 	uint64_t count     = 0;
 
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'int32_t *' (aka 'int *') increases required alignment from 1 to 4
 	int32_t *smpLocksStart = (int32_t *)info.index;
 	int32_t *smpLocksStop  = (int32_t *)(info.index + info.size);
 
@@ -176,6 +179,7 @@ void ElfKernelspaceLoader::applyJumpEntries(uint64_t jumpStart,
 	if (this->jumpEntries.size() == 0)
 		addJumpEntries = true;
 
+	// TODO: warning: cast from 'unsigned char *' to 'struct jump_entry *' increases required alignment from 1 to 8
 	struct jump_entry *startEntry = (struct jump_entry *)this->jumpTable.data();
 	struct jump_entry *endEntry = (struct jump_entry *)(this->jumpTable.data() + this->jumpTable.size());
 
@@ -227,6 +231,7 @@ void ElfKernelspaceLoader::applyJumpEntries(uint64_t jumpStart,
 
 				if (enabled) {
 					*patchAddress = (char)0xe9;
+					// TODO: warning: cast from 'char *' to 'int32_t *' (aka 'int *') increases required alignment from 1 to 4
 					*((int32_t *)(patchAddress + 1)) = destination;
 				} else {
 					patcher->add_nops(patchAddress, 5);

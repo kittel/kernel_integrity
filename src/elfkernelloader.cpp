@@ -18,9 +18,13 @@ ElfKernelLoader::ElfKernelLoader(ElfFile *elffile)
 ElfKernelLoader::~ElfKernelLoader() {}
 
 void ElfKernelLoader::initText() {
+	using namespace std::string_literals;
+
 	ElfFile64 *elffile = dynamic_cast<ElfFile64*>(this->elffile);
 
-	this->textSegment = elffile->findSectionWithName(".text");
+	// we assume, the .text section is the beginning of the code segment
+	// yes, the name must be changed to this->textSection.
+	this->textSegment = elffile->findSectionWithName(".text"s);
 	this->updateSectionInfoMemAddress(this->textSegment);
 
 	this->fentryAddress = this->elffile->findAddressOfVariable("__fentry__");

@@ -166,12 +166,15 @@ void KernelValidator::validateStackPage(uint8_t* memory,
 
 	// Go through every byte and check if it contains a kernel pointer
 	for (int32_t i = stackEnd % 0x2000; i < 0x2000 - 4; i++) {
+
+		// TODO!! warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'uint32_t *' (aka 'unsigned int *') increases required alignment from 1 to 4
 		uint32_t* intPtr = (uint32_t*)(memory + i);
 
 		// Check if this could be a valid kernel address.
 		if (*intPtr != (uint32_t)0xffffffff)
 			continue;
 
+		// TODO!! warning: cast from 'uint32_t *' (aka 'unsigned int *') to 'uint64_t *' (aka 'unsigned long *') increases required alignment from 4 to 8
 		// The first 4 byte could belong to a kernel address.
 		uint64_t* longPtr = (uint64_t*)(intPtr - 1);
 		if (*longPtr == (uint64_t)0xffffffffffffffffL) {
@@ -530,11 +533,14 @@ void KernelValidator::validateDataPage(page_info_t* page, ElfKernelspaceLoader* 
 		for (uint32_t i = 0; i < page->size; i += 0x10) {
 			uint8_t* pagePtr = pageInMem.data() + i;
 
+			// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'uint64_t *' (aka 'unsigned long *') increases required alignment from 1 to 8
 			idtPtr       = *((uint64_t*)(pagePtr + 4));
 			idtPtrPtr[0] = pagePtr[0];
 			idtPtrPtr[1] = pagePtr[1];
 
 			// TODO also verify flags
+			// TODO:  warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'uint32_t *' (aka 'unsigned int *') increases required alignment from 1 to 4
+			//        in: ...(pagePtr + 12)...
 			if ((kernelLoader->symbols.isFunction(idtPtr) ||
 			     kernelLoader->symbols.isSymbol(idtPtr) || idtPtr == 0) &&
 			    *((uint32_t*)(pagePtr + 12)) == 0) {
@@ -554,6 +560,8 @@ void KernelValidator::validateDataPage(page_info_t* page, ElfKernelspaceLoader* 
 				continue;
 			}
 
+			// TODO:  warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'uint32_t *' (aka 'unsigned int *') increases required alignment from 1 to 4
+			//        in ..(pagePtr + 12)..
 			std::cout << COLOR_RED << COLOR_BOLD << "Could not verify idt ptr "
 			          << std::hex << idtPtr << " @ " << page->vaddr + i
 			          << " Padding is: " << *((uint32_t*)(pagePtr + 12))
@@ -580,8 +588,10 @@ void KernelValidator::validateDataPage(page_info_t* page, ElfKernelspaceLoader* 
 			          << std::endl;
 			for (int32_t count = 0; count <= page->size; count++) {
 				if (loadedPage[count] != pageInMem[count]) {
-					uint64_t currentPtr =
-					(uint64_t)((uint64_t*)(pageInMem.data() + count))[0];
+
+					// TODO:  warning: cast from 'unsigned char *' to 'uint64_t *' (aka 'unsigned long *') increases required alignment from 1 to 8
+					uint64_t currentPtr = (uint64_t)((uint64_t*)(pageInMem.data() + count))[0];
+
 					// TODO this is not clean!
 					// kvm_guest_apic_eoi_write vs native_apic_mem_write
 					// KVM init code overwrites apci->eoi_write with
@@ -645,11 +655,14 @@ uint64_t KernelValidator::findCodePtrs(page_info_t* page, uint8_t* pageInMem) {
 
 	// Go through every byte and check if it contains a kernel pointer
 	for (int32_t i = 4; i < page->size - 4; i++) {
+		// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'uint32_t *' (aka 'unsigned int *') increases required alignment from 1 to 4
 		uint32_t *intPtr = (uint32_t*)(pageInMem + i);
 
 		// Check if this could be a valid kernel address.
 		if (*intPtr == (uint32_t)0xffffffff) {
 			// The first 4 byte could belong to a kernel address.
+
+			// TODO: warning: cast from 'uint32_t *' (aka 'unsigned int *') to 'uint64_t *' (aka 'unsigned long *') increases required alignment from 4 to 8
 			uint64_t* longPtr = (uint64_t*)(intPtr - 1);
 			if (*longPtr == (uint64_t)0xffffffffffffffffL) {
 				i += 8;

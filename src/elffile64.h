@@ -24,8 +24,8 @@ public:
 
 	unsigned int getNrOfSections() const override;
 
-	SectionInfo findSectionWithName(const std::string &sectionName) const override;
-	SectionInfo findSectionByID(uint32_t sectionID) const override;
+	const SectionInfo &findSectionWithName(const std::string &sectionName) const override;
+	const SectionInfo &findSectionByID(uint32_t sectionID) const override;
 	bool isCodeAddress(uint64_t address) override;
 	bool isDataAddress(uint64_t address) override;
 
@@ -33,8 +33,9 @@ public:
 	uint8_t *sectionAddress(int sectionID) override;
 	uint64_t sectionAlign(int sectionID) override;
 
-	SegmentInfo findCodeSegment() override;
-	SegmentInfo findDataSegment() override;
+	const SegmentInfo &findCodeSegment() const override;
+	const SegmentInfo &findDataSegment() const override;
+	const SegmentInfo &findSegmentByVaddr(const Elf64_Addr addr) const;
 
 	std::string symbolName(uint32_t index, uint32_t strindex) const override;
 
@@ -56,7 +57,7 @@ public:
 	bool isDynamicLibrary() const override;
 	bool isExecutable() const override;
 
-	std::vector<RelSym> getSymbols() const override;
+	std::vector<ElfSymbol> getSymbols() const override;
 
 	std::vector<std::string> getDependencies() override;
 

@@ -224,17 +224,19 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	// references are correct. elffile64 does the patching.
 
 	std::vector<std::pair<VMAInfo, PagePtrInfo>> range;
-	for (auto &section : this->process->getMappedVMAs()) {
-		if (CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)) {
+	for (auto &mapping : this->process->getMappedVMAs()) {
+		if (CHECKFLAGS(mapping.flags, VMAInfo::VM_EXEC)) {
 			uint8_t *data = nullptr;
-			auto loader = this->process->findLoaderByFileName(section.name);
+			ElfUserspaceLoader *loader = this->process->findLoaderByFileName(mapping.name);
+
 			if (loader) {
 				data = loader->textSegmentContent.data();
 			}
+
 			range.push_back(
 				std::make_pair(
-					section,
-					PagePtrInfo(process, data, section)
+					mapping,
+					PagePtrInfo(process, data, mapping)
 				)
 			);
 		}

@@ -88,7 +88,9 @@ void displayChange(const uint8_t *memory,
 
 inline
 uint64_t isReturnAddress(uint8_t *ptr, uint32_t offset, uint64_t index,
-                         VMIInstance *vmi=nullptr, uint32_t pid=0){
+                         VMIInstance *vmi=nullptr, uint32_t pid=0) {
+
+	// TODO:  warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'int32_t *' (aka 'int *') increases required alignment from 1 to 4
 	int32_t *callOffset = (int32_t*) (ptr + offset - 4);
 	if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe8) {
 		// call qword 0x5

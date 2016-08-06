@@ -25,22 +25,6 @@ class Kernel;
 class Process;
 class Process;
 
-/* This class represents a symbol a loader may export for relocation */
-class RelSym {
-public:
-	RelSym();
-	RelSym(const std::string &name,
-	       uint64_t value,
-	       uint8_t info,
-	       uint32_t shndx);
-	~RelSym();
-
-	std::string name;     ///< name of the symbol
-	uint64_t value;       ///< final vaddr after loading
-	uint8_t info;         ///< corresponding type and sym in parent
-	uint32_t shndx;       ///< linked section index in parent
-};
-
 
 class SectionInfo {
 public:
@@ -50,7 +34,7 @@ public:
 	            uint64_t offset,
 	            uint8_t *index,
 	            uint64_t memindex,
-	            uint32_t size);
+	            uint64_t size);
 	virtual ~SectionInfo();
 
 	std::string name;     ///< name of the section, init with first sec name
@@ -59,7 +43,7 @@ public:
 	uint8_t *index;       ///< section offset actual data pointer,
 	                      ///< equals &elffilecontent[offset]
 	uint64_t memindex;    ///< target virtual address within the VM
-	uint32_t size;        ///< size of the section content
+	uint64_t size;        ///< size of the section content
 
 	bool containsElfAddress(uint64_t address);
 	bool containsMemAddress(uint64_t address);
@@ -90,6 +74,29 @@ public:
 	uint64_t align;      ///< segment alignment
 };
 
+
+/* This class represents a symbol a loader may export for relocation */
+class ElfSymbol {
+public:
+	ElfSymbol();
+	ElfSymbol(const std::string &name,
+	          uint64_t value,
+	          uint8_t info,
+	          uint32_t shndx,
+	          const SectionInfo *section,
+	          const SegmentInfo *segment);
+	~ElfSymbol();
+
+	std::string name;     ///< name of the symbol
+	uint64_t value;       ///< final vaddr after loading
+	uint8_t info;         ///< corresponding type and sym in parent
+	uint32_t shndx;       ///< linked section index in parent
+
+	const SectionInfo *section;
+	const SegmentInfo *segment;
+};
+
+
 class ElfFile {
 public:
 	enum class ElfType { ELFTYPENONE, ELFTYPE32, ELFTYPE64 };
@@ -105,14 +112,14 @@ public:
 
 	virtual unsigned int getNrOfSections() const = 0;
 
-	virtual SectionInfo findSectionWithName(const std::string &sectionName) const = 0;
-	virtual SectionInfo findSectionByID(uint32_t sectionID) const = 0;
+	virtual const SectionInfo &findSectionWithName(const std::string &sectionName) const = 0;
+	virtual const SectionInfo &findSectionByID(uint32_t sectionID) const = 0;
 	virtual bool isCodeAddress(uint64_t address) = 0;
 	virtual bool isDataAddress(uint64_t address) = 0;
 	virtual std::string sectionName(int sectionID) const = 0;
 
-	virtual SegmentInfo findCodeSegment() = 0;
-	virtual SegmentInfo findDataSegment() = 0;
+	virtual const SegmentInfo &findCodeSegment() const = 0;
+	virtual const SegmentInfo &findDataSegment() const = 0;
 
 	virtual uint64_t findAddressOfVariable(const std::string &symbolName) = 0;
 
@@ -171,7 +178,7 @@ public:
 	virtual bool isExecutable() const = 0;
 
 	virtual std::vector<std::string> getDependencies() = 0;
-	virtual std::vector<RelSym> getSymbols() const = 0;
+	virtual std::vector<ElfSymbol> getSymbols() const = 0;
 
 	virtual std::vector<Elf64_Rel> getRelEntries() const = 0;
 	virtual std::vector<Elf64_Rela> getRelaEntries() const = 0;
@@ -202,6 +209,12 @@ protected:
 
 	typedef std::map<std::string, uint64_t> SymbolNameMap;
 	SymbolNameMap symbolNameMap;
+
+	std::vector<SectionInfo> sections;
+	std::vector<SegmentInfo> segments;
+
+	std::unordered_map<uint32_t, SectionInfo *> section_ids;
+	std::unordered_map<std::string, SectionInfo *> section_names;
 
 	bool doLazyBind;
 };
