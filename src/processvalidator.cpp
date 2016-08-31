@@ -59,7 +59,9 @@ int ProcessValidator::validateProcess() {
 
 	// Check if all mapped VMAs are valid
 	for (auto &section : this->process->getMappedVMAs()) {
-		if (section.name[0] == '[') {
+		if(section.name == "[stack]" || section.name == "[heap]") {
+			this->validateDataPage(&section);
+		} else if (section.name[0] == '[') {
 			continue;
 		} else if ((section.flags & VMAInfo::VM_EXEC)) {
 			this->validateCodePage(&section);
@@ -166,6 +168,7 @@ public:
 
 	void showPtrs(VMIInstance *vmi, uint32_t pid) {
 		std::cout << "Found " << count << " pointers:" << std::endl;
+		uint64_t callAddr = 0;
 		for (auto &ptr : ptrs) {
 			for (auto &where : ptr.second) {
 				std::cout << "From: 0x" << std::setfill('0') << std::setw(8)
@@ -176,12 +179,15 @@ public:
 				break;
 			}
 
-			auto symname = process->symbols.getElfSymbolName(ptr.first - section.start);
+			auto symname = this->process->symbols.getElfSymbolName(ptr.first - section.start);
 			if (symname != "") {
 				std::cout << "\t" << symname;
 			}
-			else if (data && isReturnAddress(data, ptr.first - section.start, 0, vmi, pid)) {
+			else if (data && (callAddr = isReturnAddress(data, ptr.first - section.start, 0, vmi, pid))) {
 				std::cout << "\t" << "Return Address";
+				uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
+				std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
+				std::cout << "\t" << retFuncName;
 			}
 			else if (loader) {
 				for (uint32_t i = 0;
@@ -301,8 +307,6 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 std::vector<uint8_t> ProcessValidator::getStackContent(
     size_t readAmount) const {
 	const VMAInfo *stack = process->findVMAByName("[stack]");
-	// get stack content from VM
-	// return vmi->readVectorFromVA(stack->start, readAmount, this->pid);
 
 	return vmi->readVectorFromVA(stack->end - readAmount, readAmount, this->pid, true);
 }
