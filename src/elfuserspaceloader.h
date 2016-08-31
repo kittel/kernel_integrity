@@ -21,7 +21,7 @@ class ElfUserspaceLoader : public ElfLoader {
 
 public:
 	ElfUserspaceLoader(ElfFile *elffile, Kernel *kernel,
-	                 const std::string &name);
+	                   const std::string &name);
 
 	virtual ~ElfUserspaceLoader();
 
@@ -43,7 +43,7 @@ protected:
 	SectionInfo heapSection;  // handler for optional heap segment
 
 	// symbols provided by this elf
-	std::vector<RelSym> getSymbols() const;
+	std::vector<ElfSymbol> getSymbols() const;
 
 	/** copy .text etc to text segment */
 	void initText() override;
@@ -62,7 +62,7 @@ protected:
 	bool isDataOffset(uint64_t off, Process *process);
 
 	virtual int evalLazy(uint64_t addr,
-	                     std::unordered_map<std::string, RelSym> *map) = 0;
+	                     std::unordered_map<std::string, ElfSymbol> *map) = 0;
 
 	void updateSectionInfoMemAddress(SectionInfo& info) override;
 };

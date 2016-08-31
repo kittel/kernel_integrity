@@ -25,6 +25,7 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 	        ElfProgramType::ELFPROGRAMTYPEEXEC) {  // TODO make this general
 
 	uint8_t *elfEhdr = this->fileContent;
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Ehdr *' increases required alignment from 1 to 8
 	this->elf64Ehdr  = (Elf64_Ehdr *)elfEhdr;
 	this->elf64Shdr  = (Elf64_Shdr *)(elfEhdr + elf64Ehdr->e_shoff);
 	this->elf64Phdr  = (Elf64_Phdr *)(elfEhdr + elf64Ehdr->e_phoff);
@@ -34,19 +35,69 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 	uint32_t symindex = 0;
 	uint32_t strindex = 0;
 
-	/* find sections SHT_SYMTAB, SHT_STRTAB  */
+	this->sections.clear();
+
+	// allocate the memory for the section vector
+	// so that the data is guaranteed to stay at the same point
+	// and pointers and iterators are not invalidated.
+	this->sections.reserve(this->getNrOfSections());
+
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		if ((elf64Shdr[i].sh_type == SHT_SYMTAB )) {
+		// find sections SHT_SYMTAB, SHT_STRTAB
+		if (elf64Shdr[i].sh_type == SHT_SYMTAB) {
 			symindex = i;
 			strindex = elf64Shdr[i].sh_link;
 		}
+
+		std::string section_name = this->sectionName(i);
+
+		// save section infos
+		this->sections.push_back(
+			SectionInfo{
+				section_name,
+				i,
+				this->elf64Shdr[i].sh_offset,
+				this->fileContent + this->elf64Shdr[i].sh_offset,
+				this->elf64Shdr[i].sh_addr,
+				this->elf64Shdr[i].sh_size
+			}
+		);
+
+		SectionInfo *vec_ptr = &(this->sections[i]);
+		this->section_ids.insert({i, vec_ptr});
+		this->section_names.insert({section_name, vec_ptr});
 	}
 
-	if (!symindex) return;
+	// save all segments
+	for (int i = 0; i < this->elf64Ehdr->e_phnum; i++) {
+
+		// only store LOAD segments for now.
+		if (this->elf64Phdr[i].p_type == PT_LOAD) {
+			auto hdr = this->elf64Phdr[i];
+			this->segments.push_back(
+				SegmentInfo{
+					hdr.p_type,
+					hdr.p_flags,
+					hdr.p_offset,
+					hdr.p_vaddr,
+					hdr.p_paddr,
+					hdr.p_filesz,
+					hdr.p_memsz,
+					hdr.p_align
+				}
+			);
+		}
+	}
+
+	if (!symindex) {
+		return;
+	}
 
 	uint32_t symSize = elf64Shdr[symindex].sh_size;
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
 	Elf64_Sym *symBase = (Elf64_Sym *)(this->fileContent + elf64Shdr[symindex].sh_offset);
 
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
 	for (Elf64_Sym *sym = symBase;
 	     sym < (Elf64_Sym *)(((uint8_t *)symBase) + symSize);
 	     sym++) {
@@ -71,7 +122,7 @@ void ElfFile64::addSymbolsToStore(SymbolManager *store, uint64_t memindex) const
 
 	/* find sections SHT_SYMTAB, SHT_STRTAB  */
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		if ((elf64Shdr[i].sh_type == SHT_SYMTAB )) {
+		if (elf64Shdr[i].sh_type == SHT_SYMTAB) {
 			symindex = i;
 			strindex = elf64Shdr[i].sh_link;
 		}
@@ -82,6 +133,7 @@ void ElfFile64::addSymbolsToStore(SymbolManager *store, uint64_t memindex) const
 	uint32_t symSize = elf64Shdr[symindex].sh_size;
 	Elf64_Sym *symBase = (Elf64_Sym *)(this->fileContent + elf64Shdr[symindex].sh_offset);
 
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
 	for (Elf64_Sym *sym = symBase;
 	     sym < (Elf64_Sym *)(((uint8_t *)symBase) + symSize);
 	     sym++) {
@@ -113,21 +165,22 @@ void ElfFile64::addSymbolsToStore(SymbolManager *store, uint64_t memindex) const
 
 ElfKernelLoader *ElfFile64::parseKernel() {
 	auto kernel = new ElfKernelLoader64(this);
-	this->symbols = &kernel->symbols;
+	this->symbols = &(kernel->symbols);
 	this->parseDwarf();
 	kernel->getParavirtState()->updateState();
 	return kernel;
 }
 
+
 ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
                                               Kernel *kernel) {
 	auto mod = new ElfModuleLoader64(this, name, kernel);
-	assert(kernel);
-	this->symbols = &kernel->symbols;
+	this->symbols = &(kernel->symbols);
 	mod->initImage();
 	this->parseDwarf();
 	return mod;
 }
+
 
 ElfUserspaceLoader *ElfFile64::parseUserspace(const std::string &name,
                                               Kernel *kernel) {
@@ -138,61 +191,40 @@ ElfUserspaceLoader *ElfFile64::parseUserspace(const std::string &name,
 	return proc;
 }
 
+
 unsigned int ElfFile64::getNrOfSections() const {
 	return this->elf64Ehdr->e_shnum;
 }
 
+
 /* This function actually searches for a _section_ in the ELF file */
-SectionInfo ElfFile64::findSectionWithName(const std::string &sectionName) const {
-	char *tempBuf = nullptr;
-	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		tempBuf = (char *)this->fileContent +
-		          this->elf64Shdr[this->elf64Ehdr->e_shstrndx].sh_offset +
-		          this->elf64Shdr[i].sh_name;
+const SectionInfo &ElfFile64::findSectionWithName(const std::string &sectionName) const {
 
-		if (sectionName.compare(tempBuf) == 0) {
-			return SectionInfo(
-				sectionName,
-				i,
-				this->elf64Shdr[i].sh_offset,
-				this->fileContent + this->elf64Shdr[i].sh_offset,
-				this->elf64Shdr[i].sh_addr,
-				this->elf64Shdr[i].sh_size
-			);
-		}
-	}
-	assert(0);
-}
+	auto it = this->section_names.find(sectionName);
 
-SectionInfo ElfFile64::findSectionByID(uint32_t sectionID) const {
-	if (sectionID < this->getNrOfSections()) {
-		auto dataptr = this->fileContent + this->elf64Shdr[sectionID].sh_offset;
-
-		// TODO: really `infosec`? not just sectionID?
-		unsigned int infosec = this->elf64Shdr[sectionID].sh_info;
-		if (infosec < this->getNrOfSections()) {
-			if (this->elf64Shdr[infosec].sh_type == SHT_NOBITS) {
-				if (this->elf64Shdr[infosec].sh_flags & SHF_ALLOC) {
-					// TODO: create vector
-					std::cout << "TODO: alloc NOBITS section: "
-					          << this->sectionName(sectionID)
-					          << std::endl;
-					throw InternalError("NOBITS implementation");
-				}
-			}
+	if (it != std::end(this->section_names)) {
+		if (it->second->name != sectionName) {
+			throw Error{"wrong result in section name map"};
 		}
 
-		return SectionInfo(
-			this->sectionName(sectionID),
-			sectionID,
-			this->elf64Shdr[sectionID].sh_offset,
-			dataptr,
-			this->elf64Shdr[sectionID].sh_addr,
-			this->elf64Shdr[sectionID].sh_size
-		);
+		return *(it->second);
 	}
-	assert(0);
+
+	throw Error{"could not find section by name"};
 }
+
+
+const SectionInfo &ElfFile64::findSectionByID(uint32_t sectionID) const {
+
+	auto it = this->section_ids.find(sectionID);
+
+	if (it != std::end(this->section_ids)) {
+		return *(it->second);
+	}
+
+	throw Error{"could not find section by id"};
+}
+
 
 bool ElfFile64::isCodeAddress(uint64_t address) {
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
@@ -265,6 +297,7 @@ bool ElfFile64::isDynamicLibrary() const {
 
 	// get .dynamic section
 	SectionInfo dynamic       = this->findSectionWithName(".dynamic");
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Dyn *' increases required alignment from 1 to 8
 	Elf64_Dyn *dynamicEntries = (Elf64_Dyn *)(dynamic.index);
 
 	for (int i = 0; (dynamicEntries[i].d_tag != DT_NULL); i++) {
@@ -367,11 +400,13 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 		//std::cout << "# processing relocation " << i << "in "
 		//          << relSectionInfo.name << std::endl;
 
+		uint64_t relOffset = rel[i].r_offset;
+
 		// r_offset is the offset from section start
-		locInElf = targetSection.index + rel[i].r_offset;
+		locInElf = targetSection.index + relOffset;
 
 		// in the guest
-		locInMem = targetSection.memindex + rel[i].r_offset;
+		locInMem = targetSection.memindex + relOffset;
 
 		switch (this->elf64Ehdr->e_type) {
 		case ET_EXEC:
@@ -386,15 +421,16 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 			int sectionCandidate = -1;
 			Elf64_Addr closest = 0;
 			for (unsigned int j = 0; j < this->getNrOfSections(); j++) {
-				if (this->elf64Shdr[j].sh_addr < rel[i].r_offset) {
+				uint64_t sectionStart = this->elf64Shdr[j].sh_addr;
+				if (sectionStart < relOffset) {
 					// if the virtual base address of the section is
 					// smaller than the relocation target,
 					// it might be the section start
 					// try to find the section start that is closest
 					// to the relocation target
-					if (closest < this->elf64Shdr[j].sh_addr) {
+					if (closest < sectionStart) {
 						sectionCandidate = j;
-						closest = this->elf64Shdr[j].sh_addr;
+						closest = sectionStart;
 					}
 				}
 			}
@@ -402,6 +438,10 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 				throw InternalError{"no section can be the target for the relocation"};
 			}
 
+
+			//if (sectionCandidate != symtab[i].st_shndx) {
+			//	std::cout << "TODO doesn't match" << std::endl;
+			//}
 
 			targetSection = this->findSectionByID(sectionCandidate);
 			//std::cout << "relocation will patch section " << targetSection.name << std::endl;
@@ -421,7 +461,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 
 		Elf64_Sym *sym = symBase + ELF64_R_SYM(rel[i].r_info);
 
-		//std::cout << "relocate: r_offset: 0x" << std::hex << rel[i].r_offset
+		//std::cout << "relocate: r_offset: 0x" << std::hex << relOffset
 		//          << std::dec << " -- name: "
 		//          << this->symbolName(sym->st_name, strindex)
 		//          << std::endl;
@@ -650,42 +690,41 @@ std::vector<std::string> ElfFile64::getDependencies() {
 	return dependencies;
 }
 
-SegmentInfo ElfFile64::findCodeSegment() {
-	for (int i = 0; i < this->elf64Ehdr->e_phnum; i++) {
-		if (this->elf64Phdr[i].p_type == PT_LOAD) {
-			if (this->elf64Phdr[i].p_flags == (PF_X | PF_R)) {
-				auto hdr = this->elf64Phdr[i];
-				return SegmentInfo(hdr.p_type,
-				                   hdr.p_flags,
-				                   hdr.p_offset,
-				                   hdr.p_vaddr,
-				                   hdr.p_paddr,
-				                   hdr.p_filesz,
-				                   hdr.p_memsz,
-				                   hdr.p_align);
+const SegmentInfo &ElfFile64::findCodeSegment() const {
+	for (auto &seg : this->segments) {
+		if (seg.type == PT_LOAD) {
+			if (seg.flags == (PF_X | PF_R)) {
+				return seg;
 			}
 		}
 	}
-	return SegmentInfo();
+
+	throw Error{"could not find code segment"};
 }
 
-SegmentInfo ElfFile64::findDataSegment() {
-	for (int i = 0; i < this->elf64Ehdr->e_phnum; i++) {
-		if (this->elf64Phdr[i].p_type == PT_LOAD) {
-			if (!CHECKFLAGS(this->elf64Phdr[i].p_flags, PF_X)) {
-				auto hdr = this->elf64Phdr[i];
-				return SegmentInfo(hdr.p_type,
-				                   hdr.p_flags,
-				                   hdr.p_offset,
-				                   hdr.p_vaddr,
-				                   hdr.p_paddr,
-				                   hdr.p_filesz,
-				                   hdr.p_memsz,
-				                   hdr.p_align);
+const SegmentInfo &ElfFile64::findDataSegment() const {
+	for (auto &seg : this->segments) {
+		if (seg.type == PT_LOAD) {
+			if (!CHECKFLAGS(seg.flags, PF_X)) {
+				return seg;
 			}
 		}
 	}
-	return SegmentInfo();
+
+	throw Error{"could not find data segment"};
+}
+
+const SegmentInfo &ElfFile64::findSegmentByVaddr(const Elf64_Addr addr) const {
+
+	for (auto &seg : this->segments) {
+		uint64_t segmentStart = seg.vaddr;
+		uint64_t segmentEnd = segmentStart + seg.filesz;
+		if (segmentStart <= addr and addr <= segmentEnd) {
+			return seg;
+		}
+	}
+
+	throw Error{"could not find segment by vaddr"};
 }
 
 template <typename T>
@@ -720,8 +759,8 @@ std::vector<Elf64_Rela> ElfFile64::getRelaEntries() const {
 }
 
 
-std::vector<RelSym> ElfFile64::getSymbols() const {
-	std::vector<RelSym> ret;
+std::vector<ElfSymbol> ElfFile64::getSymbols() const {
+	std::vector<ElfSymbol> ret;
 
 	if (not (this->isDynamic() or this->isExecutable())) {
 		return ret;
@@ -730,11 +769,10 @@ std::vector<RelSym> ElfFile64::getSymbols() const {
 	SectionInfo symtabSection = this->findSectionWithName(".dynsym");
 	SectionInfo strtabSection = this->findSectionWithName(".dynstr");
 
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
 	Elf64_Sym *symtab = (Elf64_Sym *)symtabSection.index;
 
 	char *strtab = (char *)strtabSection.index;
-
-	uint64_t targetAddr = 0;  // this is final memory address after loading
 
 	uint32_t elements = symtabSection.size / sizeof(Elf64_Sym);
 
@@ -748,13 +786,20 @@ std::vector<RelSym> ElfFile64::getSymbols() const {
 		    symtab[i].st_shndx != SHN_ABS &&
 		    symtab[i].st_shndx != SHN_COMMON) {
 
-			targetAddr = symtab[i].st_value;
+			// this is final memory address after loading
+			uint64_t targetAddr = symtab[i].st_value;
 
-			RelSym sym = RelSym{
+			const SectionInfo *section = &(this->findSectionByID(symtab[i].st_shndx));
+
+			const SegmentInfo *segment = &(this->findSegmentByVaddr(targetAddr));
+
+			ElfSymbol sym{
 				std::string{&strtab[symtab[i].st_name]},
 				targetAddr,
 				symtab[i].st_info,
-				symtab[i].st_shndx
+				symtab[i].st_shndx,
+				section,
+				segment
 			};
 
 			ret.push_back(sym);

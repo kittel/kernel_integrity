@@ -5,6 +5,28 @@
 #include "kernel_headers.h"
 #include "paravirt_state.h"
 
+
+DEF_NATIVE(pv_irq_ops, irq_disable, "cli");
+DEF_NATIVE(pv_irq_ops, irq_enable, "sti");
+DEF_NATIVE(pv_irq_ops, restore_fl, "pushq %rdi; popfq");
+DEF_NATIVE(pv_irq_ops, save_fl, "pushfq; popq %rax");
+DEF_NATIVE(pv_cpu_ops, iret, "iretq");
+DEF_NATIVE(pv_mmu_ops, read_cr2, "movq %cr2, %rax");
+DEF_NATIVE(pv_mmu_ops, read_cr3, "movq %cr3, %rax");
+DEF_NATIVE(pv_mmu_ops, write_cr3, "movq %rdi, %cr3");
+DEF_NATIVE(pv_mmu_ops, flush_tlb_single, "invlpg (%rdi)");
+DEF_NATIVE(pv_cpu_ops, clts, "clts");
+DEF_NATIVE(pv_cpu_ops, wbinvd, "wbinvd");
+
+DEF_NATIVE(pv_cpu_ops, irq_enable_sysexit, "swapgs; sti; sysexit");
+DEF_NATIVE(pv_cpu_ops, usergs_sysret64, "swapgs; sysretq");
+DEF_NATIVE(pv_cpu_ops, usergs_sysret32, "swapgs; sysretl");
+DEF_NATIVE(pv_cpu_ops, swapgs, "swapgs");
+
+DEF_NATIVE(, mov32, "mov %edi, %eax");
+DEF_NATIVE(, mov64, "mov %rdi, %rax");
+
+
 namespace kernint {
 
 ParavirtPatcher::ParavirtPatcher(ParavirtState *pvstate)
@@ -57,6 +79,8 @@ uint8_t ParavirtPatcher::patch_jmp(void *insnbuf,
 	uint32_t delta = target - (addr + 5);
 
 	*((uint8_t *)insnbuf) = 0xe9;
+
+	// TODO: warning: cast from 'char *' to 'uint32_t *' (aka 'unsigned int *') increases required alignment from 1 to 4
 	*((uint32_t *)((char *)insnbuf + 1)) = delta;
 
 	std::cout << "Patching jump @ " << std::hex << addr << std::dec
@@ -81,6 +105,7 @@ uint8_t ParavirtPatcher::patch_call(void *insnbuf,
 	uint32_t delta = target - (addr + 5);
 
 	*((uint8_t *)insnbuf) = 0xe8;
+	// TODO: warning: cast from 'char *' to 'uint32_t *' (aka 'unsigned int *') increases required alignment from 1 to 4
 	*((uint32_t *)((char *)insnbuf + 1)) = delta;
 
 	return 5;
@@ -221,6 +246,7 @@ void ParavirtPatcher::applyParainstr(ElfLoader *target) {
 	// bool addParavirtEntries = false;
 	// if(context.paravirtEntries.size() == 0) addParavirtEntries = true;
 
+	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'kernint::paravirt_patch_site *' increases required alignment from 1 to 8
 	paravirt_patch_site *start = (paravirt_patch_site *)info.index;
 	paravirt_patch_site *end = (paravirt_patch_site *)(info.index + info.size);
 

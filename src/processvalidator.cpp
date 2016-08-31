@@ -224,17 +224,19 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	// references are correct. elffile64 does the patching.
 
 	std::vector<std::pair<VMAInfo, PagePtrInfo>> range;
-	for (auto &section : this->process->getMappedVMAs()) {
-		if (CHECKFLAGS(section.flags, VMAInfo::VM_EXEC)) {
+	for (auto &mapping : this->process->getMappedVMAs()) {
+		if (CHECKFLAGS(mapping.flags, VMAInfo::VM_EXEC)) {
 			uint8_t *data = nullptr;
-			auto loader = this->process->findLoaderByFileName(section.name);
+			ElfUserspaceLoader *loader = this->process->findLoaderByFileName(mapping.name);
+
 			if (loader) {
 				data = loader->textSegmentContent.data();
 			}
+
 			range.push_back(
 				std::make_pair(
-					section,
-					PagePtrInfo(process, data, section)
+					mapping,
+					PagePtrInfo(process, data, mapping)
 				)
 			);
 		}
@@ -251,7 +253,7 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 
 	uint8_t *data = content.data();
 
-	for (uint32_t i = 0; i < content.size() - sizeof(uint64_t); i++) {
+	for (uint64_t i = 0; i < content.size() - sizeof(uint64_t); i++) {
 		// create pointer to current sec
 		uint64_t *value = reinterpret_cast<uint64_t *>(data + i);
 
@@ -263,14 +265,17 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 
 		for (auto &section : range) {
 			if ((CHECKFLAGS(section.first.flags, VMAInfo::VM_EXEC))) {
-				if (vma->name == section.first.name) continue;
+				if (vma->name == section.first.name) {
+					// points to the same section
+					continue;
+				}
 				if (IN_RANGE(*value, section.first.start + 1, section.first.end)) {
 					if (*value == section.first.start + 0x40) {
 						//Pointer to PHDR
 						continue;
 					}
 					counter++;
-					section.second.addPtr((uint64_t)i, *value);
+					section.second.addPtr(i, *value);
 				}
 			}
 		}
@@ -280,15 +285,16 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	// sysdeps/x86_64/dl-trampoline.S:64
 	// LD_BIND_NOW forces load-time relocations.
 
+	std::cout << std::endl << "== Analyzed mapping:" << std::endl;
+	vma->print();
 	std::cout << "Found " << COLOR_RED << COLOR_BOLD
 	          << counter << COLOR_RESET
-	          << " pointers in section:" << std::endl;
+	          << " pointers:" << std::endl;
 	for (auto &section : range) {
 		if (section.second.getCount() == 0) continue;
 		std::cout << "Pointers from " << vma->name << " to " << section.first.name << std::endl;
 		section.second.showPtrs(this->vmi, this->pid);
 	}
-	vma->print();
 }
 
 

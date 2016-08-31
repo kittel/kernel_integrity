@@ -19,22 +19,16 @@ namespace kernint {
 
 /**
  * This class contains the extracted information of an address space's VMAs
- *
- * @start : start address of the VMA in the virtual address space of the task
- * @end   : end     "
- * @ino   : inode nr of the backing file. 0, if backed by no file
- * @name  : filename, empty if backed by no file
- * @off   : offset of the VMA from file beginning, if existant
- *          IMPORTANT: the offset is given in PAGE_SIZE units (0x1000)
  */
 class VMAInfo {
 public:
-	uint64_t start;
-	uint64_t end;
-	uint64_t ino;
-	uint64_t off;
+	uint64_t start;   // !< start address of the VMA in the virtual address space of the task
+	uint64_t end;     // !< end address, like above
+	uint64_t ino;     // !< inode nr of the backing file. 0, if backed by no file
+	uint64_t off;     // !< offset of the VMA from file beginning, if existant
+	                  // IMPORTANT: the offset is given in PAGE_SIZE units (0x1000)
 	uint64_t flags;
-	std::string name;
+	std::string name; // !< filename, empty if backed by no file
 
 	VMAInfo(uint64_t start,
 	        uint64_t end,
@@ -76,13 +70,19 @@ public:
 
 	void init();
 
+	/**
+	 * Get the task struct for some pid.
+	 */
 	Instance getTaskForPID(pid_t pid) const;
+
+	/**
+	 * Get all the mappings for a pid.
+	 */
 	std::vector<VMAInfo> getVMAInfo(pid_t pid);
 
 	/**
 	 * Read the name of the executable for a given PID
 	 */
-
 	std::string getTaskExeName(pid_t pid) const;
 
 	/**

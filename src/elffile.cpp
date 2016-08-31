@@ -13,24 +13,30 @@
 
 namespace kernint {
 
-RelSym::RelSym()
+ElfSymbol::ElfSymbol()
 	:
 	name{},
 	value{0},
 	info{0},
-	shndx{0} {}
+	shndx{0},
+	section{nullptr},
+	segment{nullptr} {}
 
-RelSym::RelSym(const std::string &name,
-               uint64_t value,
-               uint8_t info,
-               uint32_t shndx)
+ElfSymbol::ElfSymbol(const std::string &name,
+                     uint64_t value,
+                     uint8_t info,
+                     uint32_t shndx,
+                     const SectionInfo *section,
+                     const SegmentInfo *segment)
 	:
 	name{name},
 	value{value},
 	info{info},
-	shndx{shndx} {}
+	shndx{shndx},
+	section{section},
+	segment{segment} {}
 
-RelSym::~RelSym() {}
+ElfSymbol::~ElfSymbol() {}
 
 SectionInfo::SectionInfo()
 	:
@@ -45,7 +51,7 @@ SectionInfo::SectionInfo(const std::string &name,
                          uint64_t offset,
                          uint8_t *index,
                          uint64_t memindex,
-                         uint32_t size)
+                         uint64_t size)
 	:
 	name{name},
 	secID{secID},
@@ -217,16 +223,20 @@ void ElfFile::printSymbols(uint32_t symindex){
 		Elf64_Ehdr * elf64Ehdr;
 		Elf64_Shdr * elf64Shdr;
 
+		// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Ehdr *' increases required alignment from 1 to 8
 		elf64Ehdr = (Elf64_Ehdr *) elfEhdr;
+		// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Shdr *' increases required alignment from 1 to 8
 		elf64Shdr = (Elf64_Shdr *) (elfEhdr + elf64Ehdr->e_shoff);
 
 		uint32_t symSize = elf64Shdr[symindex].sh_size;
+		// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
 		Elf64_Sym *symBase = (Elf64_Sym *) (elfEhdr + elf64Shdr[symindex].sh_offset);
 
 		std::string symbolName;
 		std::string sectionName;
 		uint32_t strindex = elf64Shdr[symindex].sh_link;
 
+		// TODO: warning: cast from 'char *' to 'Elf64_Sym *' increases required alignment from 1 to 8
 		for(Elf64_Sym * sym = symBase;
 		    sym < (Elf64_Sym *) (((char*) symBase) + symSize) ;
 		    sym++) {

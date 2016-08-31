@@ -95,6 +95,8 @@ void ElfModuleLoader::initText(void) {
 	                                + this->textSegment.size);
 
 	uint8_t *fileContent  = this->elffile->getFileContent();
+
+	// TODO: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Ehdr *' increases required alignment from 1 to 8
 	Elf64_Ehdr *elf64Ehdr = (Elf64_Ehdr *)fileContent;
 	Elf64_Shdr *elf64Shdr = (Elf64_Shdr *)(fileContent + elf64Ehdr->e_shoff);
 	for (unsigned int i = 0; i < elf64Ehdr->e_shnum; i++) {
