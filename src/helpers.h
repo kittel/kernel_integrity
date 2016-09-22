@@ -217,6 +217,11 @@ size_t offset(const char* buf, size_t len, const char* str) {
 namespace util {
 
 /**
+ * Check if a given string ends with another string.
+ */
+bool hasEnding (std::string const &fullString, std::string const &ending);
+
+/**
  * Demangles a symbol name.
  *
  * On failure, the mangled symbol name is returned.
