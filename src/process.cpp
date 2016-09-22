@@ -294,9 +294,9 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 			//throw InternalError{"symbol with location 0 registered"};
 		}
 
-		std::cout << " * symbol: " << name
-		          << std::hex << ", location: 0x" << location
-		          << std::dec << std::endl;
+		// std::cout << " * symbol: " << name
+		//          << std::hex << ", location: 0x" << location
+		//          << std::dec << std::endl;
 
 
 		// TODO: check the last mapping?
@@ -346,7 +346,7 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 			//throw Error{"symbol overwritten!"};
 		}
 
-		std::cout << " * registered symbol: " << name << std::endl;
+		// std::cout << " * registered symbol: " << name << std::endl;
 
 		/**
 		TODO if mapped symbol is WEAK and cur symbol is GLOBAL . overwrite
