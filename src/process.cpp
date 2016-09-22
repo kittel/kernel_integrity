@@ -132,19 +132,29 @@ const std::vector<UserspaceMapping> Process::getMappings() const {
 		vma.print();
 
 		ElfUserspaceLoader *loader = this->findLoaderByFileName(vma.name);
-		UserspaceMapping mapping{
-			loader,
-			vma.start,
-			vma.end,
-			vma.flags
-		};
 
-		if (loader) {
-			ret.push_back(mapping);
-		} else {
+		// not stack, heap, vdso, vvar and so on
+		if(!loader &&
+		   vma.name[0] != '[' &&
+		   !util::hasEnding(vma.name, ".heap")){
+			std::cout << "Trying to load library: " << vma.name << std::endl;
+			std::string libname = fs::path(vma.name).filename().string();
+			this->getKernel()->getTaskManager()->loadLibrary(libname);
+			loader = this->findLoaderByFileName(vma.name);
+		}
+
+		if (!loader) {
 			std::cout << "ignoring VMA '"
 			          << vma.name << "' because no loader found."
 			          << std::endl;
+		}else{
+			UserspaceMapping mapping{
+				loader,
+				vma.start,
+				vma.end,
+				vma.flags
+			};
+			ret.push_back(mapping);
 		}
 	}
 	return ret;
