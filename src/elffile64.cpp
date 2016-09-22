@@ -718,7 +718,7 @@ const SegmentInfo &ElfFile64::findSegmentByVaddr(const Elf64_Addr addr) const {
 
 	for (auto &seg : this->segments) {
 		uint64_t segmentStart = seg.vaddr;
-		uint64_t segmentEnd = segmentStart + seg.filesz;
+		uint64_t segmentEnd = segmentStart + seg.memsz;
 		if (segmentStart <= addr and addr <= segmentEnd) {
 			return seg;
 		}
