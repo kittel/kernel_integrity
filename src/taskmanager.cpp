@@ -332,7 +332,10 @@ ElfUserspaceLoader *TaskManager::findLibByName(const std::string &name) {
 }
 
 std::string TaskManager::findLibraryFile(const std::string &libName) {
-	std::regex regex = std::regex(libName);
+	//escape special characters in filenames
+	std::string replaced_libName = std::regex_replace(libName,
+	std::regex("[\\[\\().*+^?|{}$[]"),"\\$&");
+	std::regex regex = std::regex(replaced_libName);
 	for (auto &directory : this->libDirName) {
 		for (fs::recursive_directory_iterator end, dir(directory); dir != end; dir++) {
 			if (std::regex_match((*dir).path().filename().string(), regex)) {
