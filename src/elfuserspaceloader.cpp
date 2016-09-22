@@ -34,6 +34,8 @@ void ElfUserspaceLoader::initData() {
 	//std::cout << "Initializing data segment for elfuserspaceloader: "
 	//          << this->name << std::endl;
 
+	if(this->getName() == "[vdso]") return;
+
 	// information about the data segment
 	this->dataSegmentInfo = this->elffile->findDataSegment();
 
