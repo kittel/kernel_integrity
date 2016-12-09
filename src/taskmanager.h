@@ -76,6 +76,11 @@ public:
 	Instance getTaskForPID(pid_t pid) const;
 
 	/**
+	 * Get the list of tasks.
+	 */
+	std::vector<Instance> getTasks() const;
+
+	/**
 	 * Get all the mappings for a pid.
 	 */
 	std::vector<VMAInfo> getVMAInfo(pid_t pid);
@@ -139,7 +144,6 @@ protected:
 	Kernel *kernel;
 
 private:
-	Instance getMMStruct(Instance *task) const;
 	Instance nextTask(Instance &task) const;
 	std::string getPathFromDentry(Instance& dentry) const;
 };

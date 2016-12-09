@@ -20,6 +20,7 @@ public:
 	const std::string &getName() const override;
 	Kernel *getKernel() override;
 
+	bool isDataAddress(uint64_t addr) override;
 protected:
 	std::string name;
 
@@ -41,7 +42,6 @@ protected:
 	void initText() override;
 	void initData() override;
 
-	bool isDataAddress(uint64_t addr) override;
 };
 
 } // namespace kernint

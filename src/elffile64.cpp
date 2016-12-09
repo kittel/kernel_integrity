@@ -313,7 +313,7 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
 
-	std::cout << std::endl << COLOR_GREEN << " == Relocating: "
+	std::cout << COLOR_GREEN << " == Relocating: "
 	          << this->filename << COLOR_NORM
 	          << std::endl;
 

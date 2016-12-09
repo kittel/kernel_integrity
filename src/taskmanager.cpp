@@ -56,17 +56,15 @@ void TaskManager::init() {
 
 TaskManager::~TaskManager() {}
 
-/* Return an instance of the mm_struct member */
-Instance TaskManager::getMMStruct(Instance *task) const {
-	Instance mm = task->memberByName("mm", true);
-	return mm;
-}
-
 std::string TaskManager::getPathFromDentry(Instance& dentry) const {
 	std::string path;
 	std::string name = dentry.memberByName("d_name", false)
 	                         .memberByName("name", true)
 	                         .getRawValue<std::string>(false);
+
+	if(name.compare("dev/zero") == 0) {
+		return "/dev/zero";
+	}
 
 	while (name.compare("/") != 0) {
 		path.insert(0, name);
@@ -80,17 +78,24 @@ std::string TaskManager::getPathFromDentry(Instance& dentry) const {
 	return path;
 }
 
-/* Return a vector of VMAInfo*, containing all VMA mapping information
+/*
+ * Return a vector of VMAInfo, containing all VMA mapping information
  * for the given pid.
- *
- * IMPORTANT: The elements of the vector should be freed, if not needed anymore
- *            to save space!
  */
 std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 	Instance target = this->getTaskForPID(pid);
+	std::vector<VMAInfo> vec;
 
-	// get vector for target task_struct
-	Instance mm = this->getMMStruct(&target);
+	/**
+	 * Return an instance of the mm_struct member
+	 * Take care, that this might not exist for kernel threads.
+	 */
+	Instance mm = target.memberByName("mm", true, true);
+
+	// Kernel Threads do not own a memory map.
+	if(!mm.getAddress()) {
+		return vec;
+	}
 
 	int32_t map_count = 0;
 	// get amount of VMAs in mm_struct
@@ -109,7 +114,6 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 	std::string name;
 	uint64_t fileOff = 0;
 
-	std::vector<VMAInfo> vec;
 	std::string prevName;
 
 	// Get address of VDSO page
@@ -215,6 +219,22 @@ Instance TaskManager::getTaskForPID(pid_t pid) const {
 
 	return this->initTask;
 }
+
+std::vector<Instance> TaskManager::getTasks() const {
+	std::vector<Instance> tasks;
+
+	// set iterator to the first child of init
+	Instance taskStruct = this->initTask.memberByName("tasks")
+	                                    .changeBaseType("task_struct", "tasks");
+	auto it = taskStruct;
+	do {
+		tasks.push_back(it);
+		it = this->nextTask(it);
+	} while(it != taskStruct);
+
+	return tasks;
+}
+
 
 /* Return the next task from task list */
 Instance TaskManager::nextTask(Instance &task) const {
