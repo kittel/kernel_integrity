@@ -1,6 +1,7 @@
 #include "process.h"
 
 #include <regex>
+#include <sstream>
 
 #include "elffile.h"
 #include "elfuserspaceloader.h"
@@ -115,52 +116,6 @@ const VMAInfo *Process::findVMAByAddress(const uint64_t address) const {
 }
 
 /*
- * Gather all libraries which are mapped into the current Address-Space
- *
- * The dynamic linker has already done the ordering work.
- * The libraries lie in this->mappedVMAs, lowest address first.
- * => Reverse iterate through the mappedVMAs and find the corresponding loader,
- *    gives the loaders in the correct processing order.
- */
-const std::vector<UserspaceMapping> Process::getMappings() const {
-	std::vector<UserspaceMapping> ret;
-
-	std::cout << "Process VMAs: " << std::endl;
-
-	// return a list of mappings
-	for (auto &vma : this->getMappedVMAs()) {
-		vma.print();
-
-		ElfUserspaceLoader *loader = this->findLoaderByFileName(vma.name);
-
-		// not stack, heap, vdso, vvar and so on
-		if(!loader &&
-		   vma.name[0] != '[' &&
-		   !util::hasEnding(vma.name, ".heap")){
-			std::cout << "Trying to load library: " << vma.name << std::endl;
-			std::string libname = fs::path(vma.name).filename().string();
-			this->getKernel()->getTaskManager()->loadLibrary(libname);
-			loader = this->findLoaderByFileName(vma.name);
-		}
-
-		if (!loader) {
-			std::cout << "ignoring VMA '"
-			          << vma.name << "' because no loader found."
-			          << std::endl;
-		}else{
-			UserspaceMapping mapping{
-				loader,
-				vma.start,
-				vma.end,
-				vma.flags
-			};
-			ret.push_back(mapping);
-		}
-	}
-	return ret;
-}
-
-/*
  * Find a corresponding ElfUserspaceLoader for the given vaddr
  */
 ElfUserspaceLoader *Process::findLoaderByAddress(const uint64_t addr) const {
@@ -175,10 +130,13 @@ ElfUserspaceLoader *Process::findLoaderByAddress(const uint64_t addr) const {
  * find loader by searching for a library name
  */
 ElfUserspaceLoader *Process::findLoaderByFileName(const std::string &name) const {
-	std::string libname = fs::path(name).filename().string();
+
+	// XXX: filename now stored with full path
+	// std::string libname = fs::path(name).filename().string();
+
 	return this->getKernel()
 	           ->getTaskManager()
-	           ->findLibByName(libname);
+	           ->findLibByName(name);
 }
 
 
@@ -203,19 +161,63 @@ SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
  */
 void Process::processLoadRel() {
 	std::cout << "Loading vdso" << std::endl;
-	this->kernel->getTaskManager()->loadVDSO();
+	this->kernel->getTaskManager()->loadVDSO(this);
 
-	const std::vector<UserspaceMapping> mappings = this->getMappings();
+	/*
+	 * Gather all libraries which are mapped into the current Address-Space
+	 *
+	 * The dynamic linker has already done the ordering work.
+	 * The libraries lie in this->mappedVMAs, lowest address first.
+	 * => Reverse iterate through the mappedVMAs and find the corresponding loader,
+	 *    gives the loaders in the correct processing order.
+	 */
+	std::vector<const VMAInfo *> loader_mappings;
+	std::unordered_set<ElfUserspaceLoader *> loaders;
+
+	std::cout << "Process VMAs: " << std::endl;
+
+	// return a list of mappings
+	for (auto &vma : this->getMappedVMAs()) {
+		vma.print();
+
+		ElfUserspaceLoader *loader = this->findLoaderByFileName(vma.name);
+
+		// not stack, heap, vdso, vvar and so on
+		if (not loader &&
+		    vma.name[0] != '[' &&
+		    not util::hasEnding(vma.name, ".heap")) {
+
+			std::cout << "vma '" << vma.name
+			          << "' not found as loaded library, loading..."
+			          << std::endl;
+
+			// load the library by its filename only,
+			// use the searchpaths for that
+			std::string libname = fs::path(vma.name).filename().string();
+
+			this->getKernel()->getTaskManager()->loadLibrary(libname, this);
+
+			// this should now succeed with the vma name (= fullpath)
+			loader = this->findLoaderByFileName(vma.name);
+		}
+
+		if (not loader) {
+			std::cout << "Skipped analyzing VMA '"
+			          << vma.name
+			          << "' because no loader found."
+			          << std::endl;
+			// TODO: create raw file mapping here!
+		}
+		else {
+			loaders.insert(loader);
+			loader_mappings.push_back(&vma);
+		}
+	}
 
 	// TODO symbol registration by dependency graph
 	// use this->elffile->getDependencies as source for
 	// the relocation processing graph
 
-	std::unordered_set<ElfUserspaceLoader *> loaders;
-
-	for (auto &mapping : mappings) {
-		loaders.insert(mapping.loader);
-	}
 
 	// for each loader
 	// goal: add symbols by symbol manager with their virtual address
@@ -225,8 +227,9 @@ void Process::processLoadRel() {
 	//         figure out what segment the symbol is in
 	//         figure out what mapping that segment is (by flags (ugh))
 	//         get virtual base address from the mapping
+
 	for (auto &loader : loaders) {
-		this->registerSyms(loader, mappings);
+		this->registerSyms(loader, loader_mappings);
 	}
 
 	for (auto &loader : loaders) {
@@ -242,7 +245,6 @@ void Process::processLoadRel() {
 		// the relocation stuff.
 		loader->initData();
 	}
-
 
 	// last, apply the relocations on the executable image.
 	//ElfUserspaceLoader *execLoader = this->getExecLoader();
@@ -264,11 +266,11 @@ void Process::processLoadRel() {
  * a mapping is some elfloader and has an address range.
  */
 void Process::registerSyms(ElfUserspaceLoader *loader,
-                           const std::vector<UserspaceMapping> &mappings) {
-
+                           const std::vector<const VMAInfo *> &mappings) {
 
 	// loader: some loader where we get symbols from.
-	// mappings: all the mappings of this process
+	// mappings: mappings of this process that could be associated with
+	//           a loader
 
 	// in here:
 	// for each symbol:
@@ -300,17 +302,33 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 
 
 		// TODO: check the last mapping?
-		const UserspaceMapping *sym_proc_mapping = nullptr;
+		const VMAInfo *sym_proc_mapping = nullptr;
 
+		// find the right mapping by
+		// * try only mappings handled by the correct loader again
+		// * each loader has multiple mappings.
+		// * we try to find the one where the symbol is on
+		//   by comparing the flags of the in-vm-mapping
+		//
+		// TODO: optimize out by only walking over mappings with
+		// the loader name. this mapping then has submappings where
+		// we have to find the right one.
 		for (auto &mapping : mappings) {
-			// test if the flags of the mapping match the flags of the
-			// found segment and if the loader is the same
-			if (mapping.loader == loader) {
+
+			// loader == findloaderbyfilename(mapping.name)
+			// is the same as
+			// loader.name = mapping.name
+			// because findloaderbyfilename just looks at that name.
+			if (mapping->name == loader->getName()) {
+
+				// test if the flags of the mapping match the flags of the
+				// found segment
+
 				// in-vm mapping flags from the VMAinfo
 				bool mflag_r, mflag_w, mflag_x;
-				mflag_r = mapping.flags & VMAInfo::VM_READ;
-				mflag_w = mapping.flags & VMAInfo::VM_WRITE;
-				mflag_x = mapping.flags & VMAInfo::VM_EXEC;
+				mflag_r = mapping->flags & VMAInfo::VM_READ;
+				mflag_w = mapping->flags & VMAInfo::VM_WRITE;
+				mflag_x = mapping->flags & VMAInfo::VM_EXEC;
 
 				// segment flags from program header table
 				bool sflag_r, sflag_w, sflag_x;
@@ -323,7 +341,7 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 				    mflag_x == sflag_x) {
 
 					if (sym_proc_mapping == nullptr) {
-						sym_proc_mapping = &mapping;
+						sym_proc_mapping = mapping;
 					}
 					else {
 						throw Error{"found another mapping for the symbol!"};
@@ -333,11 +351,14 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 		}
 
 		if (sym_proc_mapping == nullptr) {
-			throw Error{"could not find any mapping for the symbol!"};
+			std::stringstream ss;
+			ss << "could not find any mapping for the symbol '"
+			   << name << "'";
+			throw Error{ss.str()};
 		}
 
 		// add the virtual base address to the location!
-		location += sym_proc_mapping->virtual_base;
+		location += sym_proc_mapping->start;
 
 		// actually register it!
 		bool replaced = this->symbols.addSymbolAddress(name, location, true);

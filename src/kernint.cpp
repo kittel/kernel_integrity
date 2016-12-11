@@ -121,6 +121,7 @@ int main(int argc, char **argv) {
 	std::string targetsFile;
 
 	std::string libraryDir;
+	std::string rootDir;
 	std::string binaryName;
 	int32_t pid = 0;
 
@@ -147,11 +148,12 @@ int main(int argc, char **argv) {
 		{"list-procs", no_argument, 0, 'x'},
 		{"check-userspace", required_argument, 0, 'u'},
 		{"pid", required_argument, 0, 'p'},
+		{"root-path", required_argument, 0, 'r'},
 		{"library-path", required_argument, 0, 'b'},
 		{0, 0, 0, 0}
 	};
 
-	while ((c = getopt_long(argc, argv, ":hg:lk:acet:xu:p:b:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, ":hg:lk:acet:xu:p:b:r:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 0: break;
 
@@ -204,6 +206,10 @@ int main(int argc, char **argv) {
 
 		case 'u':
 			binaryName.assign(optarg);
+			break;
+
+		case 'r':
+			rootDir.assign(optarg);
 			break;
 
 		case 'b':
@@ -294,6 +300,8 @@ int main(int argc, char **argv) {
 
 	if (!binaryName.empty() && pid != 0) {
 		kl->getTaskManager()->setLibraryDir(libraryDir);
+		kl->getTaskManager()->setRootDir(rootDir);
+
 		std::cout << "Creating process image to verify..." << std::endl;
 		Process proc{binaryName, kl, pid};
 		std::cout << "Starting process validation..." << std::endl;

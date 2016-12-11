@@ -306,39 +306,63 @@ void TaskManager::setLibraryDir(const std::string &dirName) {
 	std::string::size_type pos     = dirName.find_first_of(delimiters, lastPos);
 
 	while (std::string::npos != pos || std::string::npos != lastPos) {
-		libDirName.push_back(dirName.substr(lastPos, pos - lastPos));
+		ldLibraryPaths.push_back(dirName.substr(lastPos, pos - lastPos));
 		lastPos = dirName.find_first_not_of(delimiters, pos);
 		pos     = dirName.find_first_of(delimiters, lastPos);
 	}
 }
 
-ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig) {
+
+void TaskManager::setRootDir(const std::string &dirName) {
+	this->rootPath = dirName;
+}
+
+
+ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig,
+                                    Process *process) {
+
+	// locate the requested library name on the filesystem.
+	// the elf doesn't request a full name, so we have to
+	// walk through the searchpaths ourselves.
 	std::string filename = this->findLibraryFile(libraryNameOrig);
+
 	if (filename.empty()) {
 		std::cout << libraryNameOrig
-		          << ": Library File not found" << std::endl;
+		          << ": library file not found on disk" << std::endl;
 		return nullptr;
 	}
 
+	// this is the path on the hypervisor
 	fs::path file = fs::canonical(filename);
-	filename = file.string();
-	std::string libraryName = file.filename().string();
+	std::string file_on_disk = file.string();
 
-	auto library = this->findLibByName(libraryName);
+	// make the path vm-absolute
+	filename = "/" + file.lexically_relative(this->rootPath).string();
+
+	auto library = this->findLibByName(filename);
 	if (library) {
 		return library;
 	}
 
-	// create ELF Object
-	ElfFile *libraryFile = ElfFile::loadElfFile(filename);
+	std::cout << "to satisfy: " << libraryNameOrig
+	          << " loading new library: " << filename << std::endl;
 
-	library = libraryFile->parseUserspace(libraryName, this->kernel);
+	// create ELF Object
+	ElfFile *libraryFile = ElfFile::loadElfFile(file_on_disk);
+
+	library = libraryFile->parseUserspace(filename, this->kernel, process);
+
+	// create the text segment copy
+	library->initImage();
 
 	// TODO: move somewhere where we can also do relocations in the
 	//       process context. (to loaddependencies)
-	library->initImage(); // TODO: this has to be done once per process.
+	//       this has to be done once per process.
+	//       the design is fundamentally flawed so this task manager
+	//       can only support one process to watch.
+	library->getDependencies(process);
 
-	this->libraryMap[libraryName] = library;
+	this->libraryMap[filename] = library;
 
 	return library;
 }
@@ -356,7 +380,9 @@ std::string TaskManager::findLibraryFile(const std::string &libName) {
 	std::string replaced_libName = std::regex_replace(libName,
 	std::regex("[\\[\\().*+^?|{}$[]"),"\\$&");
 	std::regex regex = std::regex(replaced_libName);
-	for (auto &directory : this->libDirName) {
+
+	// try each search path
+	for (auto &directory : this->ldLibraryPaths) {
 		for (fs::recursive_directory_iterator end, dir(directory); dir != end; dir++) {
 			if (std::regex_match((*dir).path().filename().string(), regex)) {
 				return (*dir).path().native();
@@ -371,18 +397,30 @@ ElfUserspaceLoader *TaskManager::loadExec(Process *process) {
 
 	// TODO XXX implement caching for binaries
 	std::string binaryName = process->getName();
-	ElfFile *execFile = ElfFile::loadElfFile(binaryName);
+	std::string exe = this->getTaskExeName(process->getPID());
 
-	std::string name = binaryName.substr(binaryName.rfind("/", std::string::npos) + 1, std::string::npos);
+	std::cout << "loading exec: binary = " << binaryName
+	          << ", exe name = " << exe << std::endl;
 
-	ElfUserspaceLoader *execLoader = execFile->parseUserspace(name, this->kernel);
+	fs::path file = fs::canonical(binaryName);
+	std::string file_on_disk = file.string();
+
+	std::string loader_name = "/" + file.lexically_relative(this->rootPath).string();
+
+
+	ElfFile *execFile = ElfFile::loadElfFile(file_on_disk);
+
+	ElfUserspaceLoader *execLoader = execFile->parseUserspace(
+		loader_name, this->kernel, process);
+
 	execLoader->initImage();
-	std::string exe = getNameFromPath(this->getTaskExeName(process->getPID()));
+
+	// XXX: should we only store getNameFromPath(exe) (the basename)?
 	this->libraryMap[exe] = execLoader;
 	return execLoader;
 }
 
-ElfLoader *TaskManager::loadVDSO() {
+ElfLoader *TaskManager::loadVDSO(Process *process) {
 	// Symbols in Kernel that point to the vdso page
 	// ... the size is currently unknown
 	// TODO Find out the correct archirecture of the binary.
@@ -421,7 +459,8 @@ ElfLoader *TaskManager::loadVDSO() {
 		this->vdsoData.data(), this->vdsoData.size()
 	);
 
-	vdsoLoader = vdsoFile->parseUserspace(vdsoString, this->kernel);
+	vdsoLoader = vdsoFile->parseUserspace(vdsoString,
+	                                      this->kernel, process);
 	vdsoLoader->initImage();
 
 	this->libraryMap[vdsoString] = vdsoLoader;

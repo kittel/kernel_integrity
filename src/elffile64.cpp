@@ -12,6 +12,7 @@
 #include "kernel.h"
 #include "libdwarfparser/libdwarfparser.h"
 #include "libvmiwrapper/libvmiwrapper.h"
+#include "process.h"
 
 
 namespace kernint {
@@ -183,11 +184,12 @@ ElfModuleLoader *ElfFile64::parseKernelModule(const std::string &name,
 
 
 ElfUserspaceLoader *ElfFile64::parseUserspace(const std::string &name,
-                                              Kernel *kernel) {
+                                              Kernel *kernel,
+                                              Process *process) {
 	auto proc = new ElfUserspaceLoader64(this, kernel, name);
 
+	this->symbols = &(process->symbols);
 	this->parseDwarf();
-	// TODO: transfer symbols from loader this->symbols
 	return proc;
 }
 

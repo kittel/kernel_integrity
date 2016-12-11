@@ -103,11 +103,15 @@ public:
 	/** Set the path where libraries are loaded from. */
 	void setLibraryDir(const std::string &dirName);
 
+	/** Set the path where the root of the vm begins */
+	void setRootDir(const std::string &dirName);
+
 	/** get the vdso (currently hardcoded to vdso_image_64) */
-	ElfLoader *loadVDSO();
+	ElfLoader *loadVDSO(Process *process);
 
 	/** load a shared library by name */
-	ElfLoader *loadLibrary(const std::string &libraryName);
+	ElfLoader *loadLibrary(const std::string &libraryName,
+	                       Process *process);
 
 	/** determine the absolute path of a library */
 	std::string findLibraryFile(const std::string &libName);
@@ -137,7 +141,17 @@ protected:
 	 */
 	LibraryMap libraryMap;
 
-	std::vector<std::string> libDirName;
+
+	/**
+	 * search paths for userspace libraries to load
+	 * this is the LD_LIBRARY_PATH
+	 */
+	std::vector<std::string> ldLibraryPaths;
+
+	/**
+	 * root folder of the vm on the kernint-running machine.
+	 */
+	std::string rootPath;
 
 	std::vector<uint8_t> vdsoData;
 
