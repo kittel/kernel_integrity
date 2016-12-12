@@ -330,10 +330,11 @@ int main(int argc, char **argv) {
 			auto VMAInfos = kl->getTaskManager()->getVMAInfo(pid);
 
 			if (VMAInfos.size() > 0) {
-				// TODO: the taskmanager must be cleaned up after each process!
-				//       this is because the loaded libraries depend on the
-				//       process environment, and they have to be loaded again!
-				//       otherwise, the wrong offsets will be reused!
+				// the taskmanager must be cleaned up after each process!
+				// this is because the loaded libraries depend on the
+				// process environment, and they have to be loaded again!
+				// otherwise, the wrong offsets will be reused!
+				kl->getTaskManager()->cleanupLibraries();
 				Process proc{exe, kl, pid};
 				ProcessValidator val{kl, &proc, &vmi};
 				validateUserspace(&val);

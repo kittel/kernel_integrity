@@ -107,7 +107,7 @@ public:
 	void setRootDir(const std::string &dirName);
 
 	/** get the vdso (currently hardcoded to vdso_image_64) */
-	ElfLoader *loadVDSO(Process *process);
+	ElfUserspaceLoader *loadVDSO(Process *process);
 
 	/** load a shared library by name */
 	ElfLoader *loadLibrary(const std::string &libraryName,
@@ -121,6 +121,13 @@ public:
 
 	/** create an executable from a process */
 	ElfUserspaceLoader *loadExec(Process *process);
+
+	/**
+	 * Remove all the libraries from the list,
+	 * this is used to analyze another process after one was
+	 * analyzed already.
+	 */
+	void cleanupLibraries();
 
 protected:
 	Instance initTask;

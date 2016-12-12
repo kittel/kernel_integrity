@@ -28,7 +28,13 @@ class VMAInfo;
 class Process {
 public:
 	Process(const std::string &binaryName, Kernel *kernel, pid_t pid);
-	virtual ~Process() = default;
+
+	Process(Process &&) = delete;
+	Process(const Process &) = delete;
+	Process &operator =(Process &&) = delete;
+	Process &operator =(const Process &) = delete;
+
+	virtual ~Process();
 
 	ElfUserspaceLoader *getExecLoader();
 

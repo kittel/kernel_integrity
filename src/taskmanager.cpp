@@ -420,7 +420,7 @@ ElfUserspaceLoader *TaskManager::loadExec(Process *process) {
 	return execLoader;
 }
 
-ElfLoader *TaskManager::loadVDSO(Process *process) {
+ElfUserspaceLoader *TaskManager::loadVDSO(Process *process) {
 	// Symbols in Kernel that point to the vdso page
 	// ... the size is currently unknown
 	// TODO Find out the correct archirecture of the binary.
@@ -465,6 +465,23 @@ ElfLoader *TaskManager::loadVDSO(Process *process) {
 
 	this->libraryMap[vdsoString] = vdsoLoader;
 	return vdsoLoader;
+}
+
+
+void TaskManager::cleanupLibraries() {
+	// of course we don't use unique_ptrs, because.
+
+	for (auto &lib : this->libraryMap) {
+		// delete the elffile
+		if (lib.second->elffile) {
+			delete lib.second->elffile;
+		}
+
+		// delete the userspaceloader
+		delete lib.second;
+	}
+
+	this->libraryMap.clear();
 }
 
 } // namespace kernint
