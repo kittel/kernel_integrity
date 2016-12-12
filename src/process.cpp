@@ -130,10 +130,6 @@ ElfUserspaceLoader *Process::findLoaderByAddress(const uint64_t addr) const {
  * find loader by searching for a library name
  */
 ElfUserspaceLoader *Process::findLoaderByFileName(const std::string &name) const {
-
-	// XXX: filename now stored with full path
-	// std::string libname = fs::path(name).filename().string();
-
 	return this->getKernel()
 	           ->getTaskManager()
 	           ->findLibByName(name);

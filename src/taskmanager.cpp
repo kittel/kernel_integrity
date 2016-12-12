@@ -360,7 +360,7 @@ ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig,
 	//       this has to be done once per process.
 	//       the design is fundamentally flawed so this task manager
 	//       can only support one process to watch.
-	library->getDependencies(process);
+	library->loadDependencies(process);
 
 	this->libraryMap[filename] = library;
 
@@ -395,7 +395,7 @@ std::string TaskManager::findLibraryFile(const std::string &libName) {
 ElfUserspaceLoader *TaskManager::loadExec(Process *process) {
 	// Create ELF Object
 
-	// TODO XXX implement caching for binaries
+	// TODO: implement caching for binaries
 	std::string binaryName = process->getName();
 	std::string exe = this->getTaskExeName(process->getPID());
 
@@ -414,8 +414,8 @@ ElfUserspaceLoader *TaskManager::loadExec(Process *process) {
 		loader_name, this->kernel, process);
 
 	execLoader->initImage();
+	execLoader->loadDependencies(process);
 
-	// XXX: should we only store getNameFromPath(exe) (the basename)?
 	this->libraryMap[exe] = execLoader;
 	return execLoader;
 }
