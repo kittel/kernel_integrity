@@ -309,73 +309,94 @@ int main(int argc, char **argv) {
 		validateUserspace(&val);
 	}
 
-	if(listprocs) {
+	if (listprocs) {
 		const auto time1_start = std::chrono::system_clock::now();
 
-		std::cout << COLOR_GREEN <<
-			"Starting to find kernel pointers in userspace applications" <<
-			COLOR_NORM << std::endl;
+		std::cout << COLOR_GREEN
+		          << "Starting to find kernel pointers in userspace applications"
+		          << COLOR_NORM << std::endl;
 		auto tasks = kl->getTaskManager()->getTasks();
 
-		std::map<uint64_t, std::vector<std::pair<std::pair<pid_t, std::string>, VMAInfo> > > physMap;
+		std::unordered_map<uint64_t, std::vector<std::pair<std::pair<pid_t, std::string>, VMAInfo>>> physMap;
 
 		uint64_t mapcount = 0;
 
-		for (auto && task : tasks) {
+		for (auto &&task : tasks) {
 			pid_t pid = task.memberByName("pid").getValue<int64_t>();
-			std::string comm = task.memberByName("comm").getValue<std::string>();
-			// std::cout << COLOR_GREEN << pid << "\t" << comm << COLOR_NORM << std::endl;
+			std::string comm =
+			task.memberByName("comm").getValue<std::string>();
+			// std::cout << COLOR_GREEN << pid << "\t" << comm << COLOR_NORM <<
+			// std::endl;
 			auto VMAInfos = kl->getTaskManager()->getVMAInfo(pid);
-			// std::cout << "Number of mappings " << VMAInfos.size() << std::endl;
-			for (auto && info : VMAInfos){
-				if(info.name == "[vdso]") continue;
-				if(!(info.flags & VMAInfo::VM_READ)) continue;
-				if(!(info.flags & VMAInfo::VM_WRITE)) continue;
+			// std::cout << "Number of mappings " << VMAInfos.size() <<
+			// std::endl;
+
+			for (auto &&info : VMAInfos) {
+				if (info.name == "[vdso]")
+					continue;
+				if (!(info.flags & VMAInfo::VM_READ))
+					continue;
+				if (!(info.flags & VMAInfo::VM_WRITE))
+					continue;
+
 				size_t mlength = (info.end - info.start) / 0x1000;
 				// std::cout << "Number of pages: " << mlength << std::endl;
-				for(size_t i = 0; i < mlength; i++){
-					uint64_t phys = vmi.translateV2P(info.start+i*0x1000, pid);
-					physMap[phys].push_back(std::pair<std::pair<pid_t, std::string>, VMAInfo>(std::pair<pid_t, std::string>(pid, comm), info));
+
+				for (size_t i = 0; i < mlength; i++) {
+					uint64_t phys =
+					vmi.translateV2P(info.start + i * 0x1000, pid);
+					physMap[phys].push_back(
+						std::pair<std::pair<pid_t, std::string>, VMAInfo>(
+							std::pair<pid_t, std::string>(pid, comm), info
+						)
+					);
 				}
 				mapcount++;
 				// info.print();
 			}
-
 		}
-		std::cout << "Number of mappings in all " << tasks.size() << " processes " << mapcount << std::endl;
-		std::cout << "Number of different physical pages: " << physMap.size() << std::endl;
+		std::cout << "Number of mappings in all " << tasks.size()
+		          << " processes " << mapcount << std::endl;
+		std::cout << "Number of different physical pages: " << physMap.size()
+		          << std::endl;
 
 		std::cout << "Starting to iterate through physical pages" << std::endl;
 		int addressCount = 0;
 		// const uint64_t kernelStart = 0xffffffff80000000;
-		for(auto phys : physMap){
+
+		for (auto phys : physMap) {
 			auto physPage = vmi.readVectorFromPA(phys.first, 0x1000);
-			if (physPage.size() == 0) continue;
-			const unsigned char* physData = physPage.data();
-			for (uint16_t i = 0 ; i < 0x1000 ; i++){
-				uint64_t* physPtr = (uint64_t*) (physData + i);
-				if (*physPtr == 0xffffffffffffffff) continue;
+			if (physPage.size() == 0)
+				continue;
+			const unsigned char *physData = physPage.data();
+			for (uint16_t i = 0; i < 0x1000; i++) {
+				uint64_t *physPtr = (uint64_t *)(physData + i);
+				if (*physPtr == 0xffffffffffffffff)
+					continue;
 				// if ((*physPtr & kernelStart) != kernelStart) continue;
-				//if (*physPtr > kernelStart + 0x10000000) continue;
+				// if (*physPtr > kernelStart + 0x10000000) continue;
 				if (!kl->isCodeAddress(*physPtr) ||
 				    kl->isDataAddress(*physPtr)) {
 					continue;
 				}
 				addressCount++;
-				std::cout << "Found address with the correct start: " <<
-					std::hex << *(uint64_t*) (physData+i) << std::dec << std::endl;
-				for(auto && mapping : phys.second){
-					std::cout << "Mapped into PID: " << mapping.first.first <<
-						" " << mapping.first.second << std::endl;
+
+				std::cout << "Found address with the correct start: "
+				          << std::hex << *(uint64_t *)(physData + i) << std::dec
+				          << std::endl;
+				for (auto &&mapping : phys.second) {
+					std::cout << "Mapped into PID: " << mapping.first.first
+					          << " " << mapping.first.second << std::endl;
 					mapping.second.print();
 				}
 			}
 		}
-		std::cout << std::endl << "Done iterating through physical pages" << std::endl;
-		std::cout << "Found " << addressCount << " address with the correct start" << std::endl;
+		std::cout << std::endl
+		          << "Done iterating through physical pages" << std::endl;
+		std::cout << "Found " << addressCount
+		          << " address with the correct start" << std::endl;
 
 		const auto time1_stop = std::chrono::system_clock::now();
-
 		const auto time1 = std::chrono::duration_cast<std::chrono::milliseconds>(time1_stop - time1_start).count();
 
 		std::cout << "Needed " << time1 << " ms " << std::endl;
