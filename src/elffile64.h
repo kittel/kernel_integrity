@@ -17,6 +17,9 @@
 
 namespace kernint {
 
+class Process;
+
+
 class ElfFile64 : public ElfFile {
 public:
 	ElfFile64(FILE* fd, size_t fileSize, uint8_t* fileContent);
@@ -47,7 +50,8 @@ public:
 	ElfModuleLoader *parseKernelModule(const std::string &name,
 	                                   Kernel *kernel) override;
 	ElfUserspaceLoader *parseUserspace(const std::string &name,
-	                                   Kernel *kernel) override;
+	                                   Kernel *kernel,
+	                                   Process *process) override;
 
 	bool isRelocatable() const override;
 	void applyRelocations(ElfLoader *loader,

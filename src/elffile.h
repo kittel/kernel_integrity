@@ -23,7 +23,6 @@ class ElfKernelLoader;
 class ElfUserspaceLoader;
 class Kernel;
 class Process;
-class Process;
 
 
 class SectionInfo {
@@ -167,7 +166,8 @@ public:
 	 * associated with a given process.
 	 */
 	virtual ElfUserspaceLoader *parseUserspace(const std::string &name,
-	                                           Kernel *kernel) = 0;
+	                                           Kernel *kernel,
+	                                           Process *process) = 0;
 
 	virtual bool isRelocatable() const = 0;
 	virtual void applyRelocations(ElfLoader *loader,
@@ -185,6 +185,10 @@ public:
 
 	uint32_t shstrindex;
 
+	/**
+	 * set by the parseKernel,
+	 * parseKernelModule and parseUserspace functions
+	 */
 	SymbolManager *symbols;
 
 protected:

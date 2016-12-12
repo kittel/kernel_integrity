@@ -80,6 +80,8 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	std::vector<uint8_t> codevma;
 	ElfUserspaceLoader *binary = nullptr;
 
+	// check if the process name equals the vma name
+	// -> use the exec loader and not some library loader
 	if (this->process->getName().length() >= vma->name.length() &&
 	    this->process->getName().compare(this->process->getName().length()
 	                                     - vma->name.length(),
@@ -144,25 +146,32 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 	}
 }
 
+
 class PagePtrInfo {
 public:
-	PagePtrInfo(Process* process, uint8_t* data, VMAInfo section)
+	PagePtrInfo(Process* process, VMAInfo mapping)
 		:
 		count{0},
 		ptrs{},
 		process{process},
-		data{data},
-		section{section} {
+		data{nullptr},
+		mapping{mapping} {
 
-		loader = this->process->findLoaderByFileName(section.name);
-	};
+		this->loader = this->process->findLoaderByFileName(mapping.name);
 
-	~PagePtrInfo(){};
+		if (this->loader != nullptr) {
+			this->data = this->loader->getTextSegment().data();
+		}
+	}
 
-	uint32_t getCount() { return count; };
+	~PagePtrInfo() = default;
+
+	uint32_t getCount() {
+		return count;
+	}
 
 	void addPtr(uint64_t where, uint64_t addr) {
-		count++;
+		this->count += 1;
 		this->ptrs[addr][where] += 1;
 	}
 
@@ -174,31 +183,36 @@ public:
 				std::cout << "From: 0x" << std::setfill('0') << std::setw(8)
 				          << std::hex << where.first
 				          << "\tto 0x" << std::setfill('0') << std::setw(8)
-				          << ptr.first - section.start << std::dec
+				          << ptr.first - mapping.start << std::dec
 				          << "\t" << where.second;
 				break;
 			}
 
-			auto symname = this->process->symbols.getElfSymbolName(ptr.first - section.start);
+			auto symname = this->process->symbols.getElfSymbolName(ptr.first - mapping.start);
+
 			if (symname != "") {
 				std::cout << "\t" << symname;
 			}
-			else if (data && (callAddr = isReturnAddress(data, ptr.first - section.start, 0, vmi, pid))) {
+			else if (this->data &&
+			         (callAddr = isReturnAddress(this->data,
+			                                     ptr.first - mapping.start,
+			                                     0, vmi, pid))) {
+
 				std::cout << "\t" << "Return Address";
 				uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
 				std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
 				std::cout << "\t" << retFuncName;
 			}
-			else if (loader) {
+			else if (this->loader) {
 				for (uint32_t i = 0;
-				     i < loader->elffile->getNrOfSections();
+				     i < this->loader->elffile->getNrOfSections();
 				     i++) {
 
-					auto sI = loader->elffile->findSectionByID(i);
-					if (CONTAINS((uint64_t) sI.memindex, sI.size, ptr.first - section.start)) {
+					auto sI = this->loader->elffile->findSectionByID(i);
+					if (CONTAINS((uint64_t) sI.memindex, sI.size, ptr.first - mapping.start)) {
 						std::cout << "\tSection: " << sI.name;
 						if (sI.name.compare(".dynstr") == 0) {
-							std::string str = std::string((char*) sI.index + (ptr.first - section.start) - sI.memindex);
+							std::string str = std::string((char*) sI.index + (ptr.first - mapping.start) - sI.memindex);
 							std::cout << "\tString: " << str;
 						}
 						break;
@@ -206,7 +220,7 @@ public:
 				}
 			}
 			else {
-				std::cout << "\tNo Loader?";
+				std::cout << "\tplain file";
 			}
 			std::cout << std::endl;
 		}
@@ -219,8 +233,8 @@ protected:
 	std::unordered_map<uint64_t, std::unordered_map<uint64_t, uint32_t>> ptrs;
 	Process *process;
 	ElfLoader *loader;
-	uint8_t *data;
-	VMAInfo section;
+	const uint8_t *data;
+	VMAInfo mapping;
 };
 
 
@@ -230,19 +244,13 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	// references are correct. elffile64 does the patching.
 
 	std::vector<std::pair<VMAInfo, PagePtrInfo>> range;
+
 	for (auto &mapping : this->process->getMappedVMAs()) {
 		if (CHECKFLAGS(mapping.flags, VMAInfo::VM_EXEC)) {
-			uint8_t *data = nullptr;
-			ElfUserspaceLoader *loader = this->process->findLoaderByFileName(mapping.name);
-
-			if (loader) {
-				data = loader->textSegmentContent.data();
-			}
-
 			range.push_back(
 				std::make_pair(
 					mapping,
-					PagePtrInfo(process, data, mapping)
+					PagePtrInfo(process, mapping)
 				)
 			);
 		}
@@ -270,16 +278,18 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 		}
 
 		for (auto &section : range) {
-			if ((CHECKFLAGS(section.first.flags, VMAInfo::VM_EXEC))) {
+			if (CHECKFLAGS(section.first.flags, VMAInfo::VM_EXEC)) {
 				if (vma->name == section.first.name) {
 					// points to the same section
 					continue;
 				}
+
 				if (IN_RANGE(*value, section.first.start + 1, section.first.end)) {
 					if (*value == section.first.start + 0x40) {
-						//Pointer to PHDR
+						// Pointer to PHDR
 						continue;
 					}
+
 					counter++;
 					section.second.addPtr(i, *value);
 				}
@@ -298,7 +308,8 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	          << " pointers:" << std::endl;
 	for (auto &section : range) {
 		if (section.second.getCount() == 0) continue;
-		std::cout << "Pointers from " << vma->name << " to " << section.first.name << std::endl;
+		std::cout << "Pointers from " << vma->name
+		          << " to " << section.first.name << std::endl;
 		section.second.showPtrs(this->vmi, this->pid);
 	}
 }

@@ -21,19 +21,6 @@ class VMAInfo;
 
 
 /**
- * To store a mapping in the userspace.
- * Contains the loader and the virtual start address.
- */
-class UserspaceMapping {
-public:
-	ElfUserspaceLoader *loader;  // !< the elf file mapped at that point
-	uint64_t virtual_base;       // !< virtual base address of the mapping
-	uint64_t virtual_end;        // !< virtual end address of the mapping (exclusive)
-	uint64_t flags;              // !< mapping flags, as in VMAInfo
-};
-
-
-/**
  * Tracks a userland process.
  * Can reproduce the loading actions done in a VM
  * on a working copy (the image) to verify correctness.
@@ -78,7 +65,6 @@ public:
 	ElfUserspaceLoader *findLoaderByAddress(const uint64_t addr) const;
 	ElfUserspaceLoader *findLoaderByFileName(const std::string &name) const;
 
-	const std::vector<UserspaceMapping> getMappings() const;
 	SectionInfo *getSegmentForAddress(uint64_t addr);
 
 	/**
@@ -94,7 +80,7 @@ public:
 	 * to the symbol addresses.
 	 */
 	void registerSyms(ElfUserspaceLoader *loader,
-	                  const std::vector<UserspaceMapping> &mappings);
+	                  const std::vector<const VMAInfo *> &mappings);
 
 protected:
 	Kernel *kernel;

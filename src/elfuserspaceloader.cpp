@@ -11,7 +11,8 @@ ElfUserspaceLoader::ElfUserspaceLoader(ElfFile *file,
 	:
 	ElfLoader(file),
 	kernel{kernel},
-	name{name} {}
+	name{name},
+	baseName{getNameFromPath(name)} {}
 
 ElfUserspaceLoader::~ElfUserspaceLoader() {}
 
@@ -88,7 +89,7 @@ void ElfUserspaceLoader::initData() {
 }
 
 
-std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies() {
+std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies(Process *process) {
 	auto dependencies = this->elffile->getDependencies();
 
 	std::vector<ElfUserspaceLoader *> ret;
@@ -96,7 +97,10 @@ std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies() {
 	for (auto &dep : dependencies) {
 		// TODO: NO NO NO NO NO this is a getter function, it must not
 		//       magically load libraries!!!
-		ElfLoader *lib = this->kernel->getTaskManager()->loadLibrary(dep);
+		// TODO: the process is needed here because the loading
+		//       of the elf requires the right symbol manager,
+		//       which is in the process. yes, it's broken.
+		ElfLoader *lib = this->kernel->getTaskManager()->loadLibrary(dep, process);
 		std::cout << "Loaded library " << lib->getName() << std::endl;
 
 		ElfUserspaceLoader *usLib = dynamic_cast<ElfUserspaceLoader *>(lib);
@@ -112,20 +116,16 @@ std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies() {
 
 
 /*
- * Initialize a complete memory image for validation. Relocations are not yet
- * processed
+ * Initialize a complete memory image for validation.
+ * Relocations are not yet processed.
  */
-// TODO: return vector of image
 void ElfUserspaceLoader::initImage() {
-	// load linked libraries for this executable
-	// this parses the library files
-	this->getDependencies();
-
 	// craft text segment
 	this->initText();
 
 	// data segment is crafted after the relocations were done
 }
+
 
 /* Return the SectionInfo, in which the given addr is contained. */
 SectionInfo *ElfUserspaceLoader::getSegmentForAddress(uint64_t addr) {
@@ -223,6 +223,11 @@ bool ElfUserspaceLoader::isDataOffset(uint64_t off, Process *process) {
 const std::string &ElfUserspaceLoader::getName() const {
 	return this->name;
 }
+
+const std::string &ElfUserspaceLoader::getBaseName() const {
+	return this->baseName;
+}
+
 
 Kernel *ElfUserspaceLoader::getKernel() {
 	return this->kernel;

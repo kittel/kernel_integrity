@@ -87,7 +87,7 @@ void displayChange(const uint8_t *memory,
                    int32_t size);
 
 inline
-uint64_t isReturnAddress(uint8_t *ptr, uint32_t offset, uint64_t index,
+uint64_t isReturnAddress(const uint8_t *ptr, uint32_t offset, uint64_t index,
                          VMIInstance *vmi=nullptr, uint32_t pid=0) {
 
 	// TODO:  warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'int32_t *' (aka 'int *') increases required alignment from 1 to 4
@@ -144,6 +144,7 @@ inline std::string& toSTDstring(const char *input) {
 
 /* Reduce given path to filename */
 inline std::string getNameFromPath(const std::string &path) {
+	// TODO: use filesystem::path::canonical()::filename()
 	std::string ret = path.substr(path.rfind("/", std::string::npos) + 1,
 	                              std::string::npos);
 	return ret;
@@ -185,28 +186,6 @@ inline bool betweenRange(T value, const std::vector<std::pair<T, T>> &r){
 	return false;
 }
 
-/**
- * Perform a static cast for unique pointers.
- */
-template <typename Target, typename Current, typename Del>
-std::unique_ptr<Target, Del> static_cast_unique_ptr(std::unique_ptr<Current, Del> &&p) {
-	auto d = static_cast<Target *>(p.release());
-	return std::unique_ptr<Target, Del>(d, std::move(p.get_deleter()));
-}
-
-/**
- * Performs a dynamic cast for unique ptrs.
- * When the cast is invalid, return a nullptr.
- */
-template <typename Target, typename Current, typename Del>
-std::unique_ptr<Target, Del> dynamic_cast_unique_ptr(std::unique_ptr<Current, Del> &&p) {
-	if (Target *result = dynamic_cast<Target *>(p.get())) {
-		p.release();
-		auto deleter = p.get_deleter();
-		return std::unique_ptr<Target, Del>(result, std::move(deleter));
-	}
-	return std::unique_ptr<Target, Del>(nullptr, p.get_deleter());
-}
 
 inline
 size_t offset(const char* buf, size_t len, const char* str) {

@@ -25,17 +25,28 @@ public:
 
 	virtual ~ElfUserspaceLoader();
 
-	void initImage() override;  // Initialize the complete image
+	/**
+	 * Initialize the complete image
+	 */
+	void initImage() override;
 
 	const std::string &getName() const override;
+	const std::string &getBaseName() const;
 	Kernel *getKernel() override;
+
+	/**
+	 * List of loaders that the current loader depends on for running.
+	 */
+	std::vector<ElfUserspaceLoader *> getDependencies(Process *process);
 
 protected:
 	Kernel *kernel;
 
+	/** full path of the elffile used in this loader */
 	std::string name;
 
-	std::vector<ElfUserspaceLoader *> getDependencies();
+	/** only the filename of the elffile used in this loader */
+	std::string baseName;
 
 	SegmentInfo textSegmentInfo;
 	SegmentInfo dataSegmentInfo;
