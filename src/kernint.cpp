@@ -317,7 +317,7 @@ int main(int argc, char **argv) {
 		          << COLOR_NORM << std::endl;
 		auto tasks = kl->getTaskManager()->getTasks();
 
-		std::unordered_map<uint64_t, std::vector<std::pair<std::pair<pid_t, std::string>, VMAInfo>>> physMap;
+		std::unordered_map<uint64_t, std::vector<std::tuple<pid_t, std::string, VMAInfo>>> physMap;
 
 		uint64_t mapcount = 0;
 
@@ -345,11 +345,7 @@ int main(int argc, char **argv) {
 				for (size_t i = 0; i < mlength; i++) {
 					uint64_t phys =
 					vmi.translateV2P(info.start + i * 0x1000, pid);
-					physMap[phys].push_back(
-						std::pair<std::pair<pid_t, std::string>, VMAInfo>(
-							std::pair<pid_t, std::string>(pid, comm), info
-						)
-					);
+					physMap[phys].push_back(std::make_tuple(pid, comm, info));
 				}
 				mapcount++;
 				// info.print();
@@ -385,9 +381,9 @@ int main(int argc, char **argv) {
 				          << std::hex << *(uint64_t *)(physData + i) << std::dec
 				          << std::endl;
 				for (auto &&mapping : phys.second) {
-					std::cout << "Mapped into PID: " << mapping.first.first
-					          << " " << mapping.first.second << std::endl;
-					mapping.second.print();
+					std::cout << "Mapped into PID: " << std::get<0>(mapping)
+					          << " " << std::get<1>(mapping) << std::endl;
+					std::get<2>(mapping).print();
 				}
 			}
 		}
