@@ -22,7 +22,8 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	:
 	kernel{kernel},
 	pid{pid},
-	execLoader{0},
+	execLoader{nullptr},
+	vdsoLoader{nullptr},
 	binaryName{binaryName} {
 
 	std::cout << COLOR_GREEN << "Loading process " << binaryName
@@ -35,6 +36,19 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	this->processLoadRel();
 
 	this->symbols.updateRevMaps();
+}
+
+Process::~Process() {
+
+	if (this->vdsoLoader) {
+		if (this->vdsoLoader->elffile) {
+			delete this->vdsoLoader->elffile;
+		}
+
+		delete this->vdsoLoader;
+		this->vdsoLoader = nullptr;
+	}
+
 }
 
 
@@ -130,10 +144,6 @@ ElfUserspaceLoader *Process::findLoaderByAddress(const uint64_t addr) const {
  * find loader by searching for a library name
  */
 ElfUserspaceLoader *Process::findLoaderByFileName(const std::string &name) const {
-
-	// XXX: filename now stored with full path
-	// std::string libname = fs::path(name).filename().string();
-
 	return this->getKernel()
 	           ->getTaskManager()
 	           ->findLibByName(name);
@@ -161,7 +171,8 @@ SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {
  */
 void Process::processLoadRel() {
 	std::cout << "Loading vdso" << std::endl;
-	this->kernel->getTaskManager()->loadVDSO(this);
+
+	this->vdsoLoader = this->kernel->getTaskManager()->loadVDSO(this);
 
 	/*
 	 * Gather all libraries which are mapped into the current Address-Space

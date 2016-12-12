@@ -89,17 +89,17 @@ void ElfUserspaceLoader::initData() {
 }
 
 
-std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::getDependencies(Process *process) {
+std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::loadDependencies(Process *process) {
 	auto dependencies = this->elffile->getDependencies();
 
 	std::vector<ElfUserspaceLoader *> ret;
 
 	for (auto &dep : dependencies) {
-		// TODO: NO NO NO NO NO this is a getter function, it must not
-		//       magically load libraries!!!
 		// TODO: the process is needed here because the loading
 		//       of the elf requires the right symbol manager,
-		//       which is in the process. yes, it's broken.
+		//       which is in the process. when the dependencies are loaded,
+		//       their mappings are evaluated for the symbol manager,
+		//       depending on the process as well.
 		ElfLoader *lib = this->kernel->getTaskManager()->loadLibrary(dep, process);
 		std::cout << "Loaded library " << lib->getName() << std::endl;
 

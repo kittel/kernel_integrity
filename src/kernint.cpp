@@ -323,13 +323,22 @@ int main(int argc, char **argv) {
 
 		for (auto &&task : tasks) {
 			pid_t pid = task.memberByName("pid").getValue<int64_t>();
-			std::string comm =
-			task.memberByName("comm").getValue<std::string>();
-			// std::cout << COLOR_GREEN << pid << "\t" << comm << COLOR_NORM <<
-			// std::endl;
+			std::string comm = task.memberByName("comm").getValue<std::string>();
+			// this is the executable name:
+			std::string exe = kl->getTaskManager()->getTaskExeName(pid);
+
 			auto VMAInfos = kl->getTaskManager()->getVMAInfo(pid);
-			// std::cout << "Number of mappings " << VMAInfos.size() <<
-			// std::endl;
+
+			if (VMAInfos.size() > 0) {
+				// the taskmanager must be cleaned up after each process!
+				// this is because the loaded libraries depend on the
+				// process environment, and they have to be loaded again!
+				// otherwise, the wrong offsets will be reused!
+				kl->getTaskManager()->cleanupLibraries();
+				Process proc{exe, kl, pid};
+				ProcessValidator val{kl, &proc, &vmi};
+				validateUserspace(&val);
+			}
 
 			for (auto &&info : VMAInfos) {
 				if (info.name == "[vdso]")

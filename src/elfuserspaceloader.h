@@ -37,7 +37,7 @@ public:
 	/**
 	 * List of loaders that the current loader depends on for running.
 	 */
-	std::vector<ElfUserspaceLoader *> getDependencies(Process *process);
+	std::vector<ElfUserspaceLoader *> loadDependencies(Process *process);
 
 protected:
 	Kernel *kernel;
