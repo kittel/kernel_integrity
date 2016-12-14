@@ -1,5 +1,7 @@
 #include "taskmanager.h"
 
+#include <elf.h>
+
 #include "elfuserspaceloader.h"
 #include "kernel.h"
 #include "error.h"
@@ -335,6 +337,24 @@ ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig,
 	// this is the path on the hypervisor
 	fs::path file = fs::canonical(filename);
 	std::string file_on_disk = file.string();
+
+	if (std::ifstream is{file_on_disk, std::ios::binary}) {
+		char e_ident[SELFMAG];
+		is.read(e_ident, sizeof(e_ident));
+
+		if (e_ident[EI_MAG0] != ELFMAG0 or
+		    e_ident[EI_MAG1] != ELFMAG1 or
+		    e_ident[EI_MAG2] != ELFMAG2 or
+		    e_ident[EI_MAG3] != ELFMAG3) {
+
+			std::cout << "non-elf file: " << filename << std::endl;
+
+			return nullptr;
+		}
+	} else {
+		std::cout << "could not open " << filename << std::endl;
+		return nullptr;
+	}
 
 	// make the path vm-absolute
 	filename = "/" + file.lexically_relative(this->rootPath).string();
