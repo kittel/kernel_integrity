@@ -243,6 +243,23 @@ Instance TaskManager::nextTask(Instance &task) const {
 	return next;
 }
 
+bool TaskManager::isKernelTask(pid_t pid) const {
+	return this->isKernelTask(this->getTaskForPID(pid));
+}
+
+bool TaskManager::isKernelTask(const Instance &task) const {
+	static auto pid_type_e = this->kernel->symbols.findBaseTypeByName<Enum>("pid_type");
+	assert (pid_type_e);
+	static uint32_t PIDTYPE_PGID = pid_type_e->enumValue("PIDTYPE_PGID");
+
+	auto i = task.memberByName("group_leader", true)
+	             .memberByName("pids")[PIDTYPE_PGID]
+	             .memberByName("pid", true)
+	             .memberByName("numbers")[0]
+	             .memberByName("nr").getRawValue<int32_t>();
+	return (i == 0);
+}
+
 std::string TaskManager::getTaskExeName(pid_t pid) const {
 	//return this->getTaskForPID(pid).memberByName("comm").getRawValue<std::string>();
 	Instance a = this->getTaskForPID(pid).memberByName("mm", true);

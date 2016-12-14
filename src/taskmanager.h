@@ -86,6 +86,22 @@ public:
 	std::vector<VMAInfo> getVMAInfo(pid_t pid);
 
 	/**
+	 * @param pid Task to check
+	 * @returns Returns true, if the task is a kernel task
+	 *
+	 * Check if given task is a kernel task
+	 */
+	bool isKernelTask(pid_t pid) const;
+
+	/**
+	 * @param task Instance of task_struct of task
+	 * @returns Returns true, if the task is a kernel task
+	 *
+	 * Check if given task is a kernel task
+	 */
+	bool isKernelTask(const Instance &task) const;
+
+	/**
 	 * Read the name of the executable for a given PID
 	 */
 	std::string getTaskExeName(pid_t pid) const;
