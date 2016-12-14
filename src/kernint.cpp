@@ -335,12 +335,22 @@ int main(int argc, char **argv) {
 		uint64_t mapcount = 0;
 
 		for (auto &&task : tasks) {
+
+			static auto tm = kl->getTaskManager();
+
 			pid_t pid = task.memberByName("pid").getValue<int64_t>();
 			std::string comm = task.memberByName("comm").getValue<std::string>();
-			// this is the executable name:
-			std::string exe = kl->getTaskManager()->getTaskExeName(pid);
 
-			auto VMAInfos = kl->getTaskManager()->getVMAInfo(pid);
+			if (tm->isKernelTask(task)) {
+				continue;
+			}
+
+			std::string exe = tm->getTaskExeName(pid);
+
+			std::cout << "Loading next process: "
+			          << pid <<": " << comm << " " << exe << std::endl;
+
+			auto VMAInfos = tm->getVMAInfo(pid);
 
 			if (VMAInfos.size() > 0) {
 				// the taskmanager must be cleaned up after each process!

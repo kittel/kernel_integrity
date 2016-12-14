@@ -491,7 +491,6 @@ void TaskManager::cleanupLibraries() {
 		if (lib.second->elffile) {
 			delete lib.second->elffile;
 		}
-
 		// delete the userspaceloader
 		delete lib.second;
 	}
