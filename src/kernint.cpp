@@ -235,6 +235,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	if (rootDir.empty()){
+		std::cout << "Guest root path not set, exiting ..." << std::endl;
+		exit(0);
+	}
+
 	if (hypflag == 0) {
 		hypflag = VMI_AUTO;
 	}
@@ -271,6 +276,16 @@ int main(int argc, char **argv) {
 	ElfKernelLoader *kl = KernelValidator::loadKernel(kerndir);
 	kl->setVMIInstance(&vmi);
 	kl->initTaskManager();
+	if (!rootDir.empty()) {
+		while(rootDir.back() == '/') {
+			rootDir.pop_back();
+		}
+		kl->getTaskManager()->setRootDir(rootDir);
+	}
+
+	if (!libraryDir.empty()) {
+		kl->getTaskManager()->setLibraryDir(libraryDir);
+	}
 
 	if (kernelValidation) {
 		if (!fexists(targetsFile)) {
@@ -299,8 +314,6 @@ int main(int argc, char **argv) {
 	}
 
 	if (!binaryName.empty() && pid != 0) {
-		kl->getTaskManager()->setLibraryDir(libraryDir);
-		kl->getTaskManager()->setRootDir(rootDir);
 
 		std::cout << "Creating process image to verify..." << std::endl;
 		Process proc{binaryName, kl, pid};

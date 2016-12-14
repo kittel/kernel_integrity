@@ -306,7 +306,8 @@ void TaskManager::setLibraryDir(const std::string &dirName) {
 	std::string::size_type pos     = dirName.find_first_of(delimiters, lastPos);
 
 	while (std::string::npos != pos || std::string::npos != lastPos) {
-		ldLibraryPaths.push_back(dirName.substr(lastPos, pos - lastPos));
+		std::string dir = dirName.substr(lastPos, pos - lastPos);
+		ldLibraryPaths.push_back(this->rootPath + dir);
 		lastPos = dirName.find_first_not_of(delimiters, pos);
 		pos     = dirName.find_first_of(delimiters, lastPos);
 	}
@@ -402,16 +403,13 @@ ElfUserspaceLoader *TaskManager::loadExec(Process *process) {
 	std::cout << "loading exec: binary = " << binaryName
 	          << ", exe name = " << exe << std::endl;
 
-	fs::path file = fs::canonical(binaryName);
+	fs::path file = fs::canonical(this->rootPath + exe);
 	std::string file_on_disk = file.string();
-
-	std::string loader_name = "/" + file.lexically_relative(this->rootPath).string();
-
 
 	ElfFile *execFile = ElfFile::loadElfFile(file_on_disk);
 
 	ElfUserspaceLoader *execLoader = execFile->parseUserspace(
-		loader_name, this->kernel, process);
+		exe, this->kernel, process);
 
 	execLoader->initImage();
 	execLoader->loadDependencies(process);
