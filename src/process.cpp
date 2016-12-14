@@ -206,6 +206,13 @@ void Process::processLoadRel() {
 			// use the searchpaths for that
 			std::string libname = fs::path(vma.name).filename().string();
 
+			if (libname == "locale-archive" ||
+			    libname == "gconv-modules.cache" ||
+			    libname == "LC_CTYPE") {
+				std::cout << COLOR_RED << libname << COLOR_NORM << std::endl;
+				continue;
+			};
+
 			this->getKernel()->getTaskManager()->loadLibrary(libname, this);
 
 			// this should now succeed with the vma name (= fullpath)

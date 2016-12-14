@@ -127,7 +127,8 @@ void ElfFile::parseDwarf() {
 	try {
 		DwarfParser::parseDwarfFromFD(this->getFD(), this->symbols);
 	} catch(DwarfException &e) {
-		std::cout << e.what() << std::endl;
+		//std::cout << e.what() << std::endl;
+		e.what();
 	}
 }
 

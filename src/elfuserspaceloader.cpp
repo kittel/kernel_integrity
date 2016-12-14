@@ -72,18 +72,22 @@ void ElfUserspaceLoader::initData() {
 
 			//std::cout << " adding section: " << section.name << std::endl;
 
-			uint8_t *data = (this->elffile->getFileContent() +
-			                 section.offset);
-
 			// TODO: vaddr or paddr?
 			auto position = (std::begin(this->dataSegmentContent) +
 			                 section.memindex - this->dataSegmentInfo.vaddr);
 
-			this->dataSegmentContent.insert(
-				position,
-				data,
-				data + section.size
-			);
+			if(section.name == ".bss"){
+				this->dataSegmentContent.insert(position, section.size, '0');
+			} else {
+				uint8_t *data = (this->elffile->getFileContent() +
+			                     section.offset);
+
+				this->dataSegmentContent.insert(
+					position,
+					data,
+					data + section.size
+				);
+			}
 		}
 	}
 }
