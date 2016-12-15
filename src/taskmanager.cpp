@@ -62,7 +62,10 @@ std::string TaskManager::getPathFromDentry(Instance& dentry) const {
 	                         .memberByName("name", true)
 	                         .getRawValue<std::string>(false);
 
-	if(name.compare("dev/zero") == 0) {
+	if(name[0] == '[') {
+		return name;
+	}
+	if(name == "dev/zero") {
 		return "/dev/zero";
 	}
 
