@@ -1,5 +1,7 @@
 #include "taskmanager.h"
 
+#include <elf.h>
+
 #include "elfuserspaceloader.h"
 #include "kernel.h"
 #include "error.h"
@@ -368,8 +370,12 @@ ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig,
 	// std::cout << "to satisfy: " << libraryNameOrig
 	//           << " loading new library: " << filename << std::endl;
 
-	// create ELF Object
+	// create ELF Object, returns nullptr if it's not an elf file.
 	ElfFile *libraryFile = ElfFile::loadElfFile(file_on_disk);
+
+	if (libraryFile == nullptr) {
+		return nullptr;
+	}
 
 	library = libraryFile->parseUserspace(filename, this->kernel, process);
 

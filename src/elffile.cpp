@@ -136,47 +136,65 @@ ElfFile *ElfFile::loadElfFile(const std::string &filename) {
 	FILE *fd = nullptr;
 	fd       = fopen(filename.c_str(), "rb");
 
-	if (!fd) {
-		std::cout << COLOR_RED << COLOR_BOLD << "File not found: " << filename
+	if (fd == nullptr) {
+		std::cout << COLOR_RED << COLOR_BOLD
+		          << "File not found: " << filename
 		          << COLOR_NORM << std::endl;
-		exit(0);
+		return nullptr;
 	}
 
-	ElfFile *elfFile = nullptr;
+	{
+		char e_ident[SELFMAG];
+		size_t nread = fread(e_ident, 1, sizeof(e_ident), fd);
 
+		if (nread != SELFMAG or
+		    e_ident[EI_MAG0] != ELFMAG0 or
+		    e_ident[EI_MAG1] != ELFMAG1 or
+		    e_ident[EI_MAG2] != ELFMAG2 or
+		    e_ident[EI_MAG3] != ELFMAG3) {
+
+			std::cout << "non-elf file: " << filename << std::endl;
+
+			fclose(fd);
+			return nullptr;
+		}
+	}
+
+
+	ElfFile *elfFile     = nullptr;
 	size_t fileSize      = 0;
 	uint8_t *fileContent = nullptr;
 
-	if (fd != nullptr) {
-		/* Go to the end of the file. */
-		if (fseek(fd, 0L, SEEK_END) == 0) {
-			/* Get the size of the file. */
-			fileSize = ftell(fd);
+	// Go to the end of the file.
+	if (fseek(fd, 0L, SEEK_END) == 0) {
+		// Get the size of the file.
+		fileSize = ftell(fd);
 
-			// MMAP the file to memory
-			fileContent = reinterpret_cast<uint8_t *>(
-				mmap(
-					0,
-					fileSize,
-					PROT_READ | PROT_WRITE,
-					MAP_PRIVATE,
-					fileno(fd),
-					0
-				)
-			);
-			if (fileContent == MAP_FAILED) {
-				std::cout << "mmap failed" << std::endl;
-				throw ElfException{"MMAP failed!!!\n"};
-			}
+		// MMAP the file to memory
+		fileContent = reinterpret_cast<uint8_t *>(
+			mmap(
+				0,
+				fileSize,
+				PROT_READ | PROT_WRITE,
+				MAP_PRIVATE,
+				fileno(fd),
+				0
+			)
+		);
+		if (fileContent == MAP_FAILED) {
+			std::cout << "mmap failed" << std::endl;
+			fclose(fd);
+			throw ElfException{"MMAP failed!!!\n"};
 		}
-	} else {
-		std::cout << "cannot load file" << std::endl;
-		throw ElfException{"Cannot load file"};
 	}
 
 	if (fileContent[4] == ELFCLASS64) {
 		elfFile = new ElfFile64(fd, fileSize, fileContent);
+	} else {
+		fclose(fd);
+		throw ElfException{"unsupported elfclass!\n"};
 	}
+
 	elfFile->fd          = fd;
 	elfFile->fileSize    = fileSize;
 	elfFile->fileContent = fileContent;
