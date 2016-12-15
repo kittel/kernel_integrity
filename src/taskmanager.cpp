@@ -362,8 +362,8 @@ ElfLoader *TaskManager::loadLibrary(const std::string &libraryNameOrig,
 		return library;
 	}
 
-	std::cout << "to satisfy: " << libraryNameOrig
-	          << " loading new library: " << filename << std::endl;
+	// std::cout << "to satisfy: " << libraryNameOrig
+	//           << " loading new library: " << filename << std::endl;
 
 	// create ELF Object
 	ElfFile *libraryFile = ElfFile::loadElfFile(file_on_disk);

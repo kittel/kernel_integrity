@@ -297,7 +297,7 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 	//     symbol address += mapping virtual base address
 	//     add symbol -> symbol address to symbol manager
 
-	std::cout << " - adding syms of " << loader->getName() << std::endl;
+	// std::cout << " - adding syms of " << loader->getName() << std::endl;
 
 	// TODO: only get symbols for that mapping!
 	std::vector<ElfSymbol> syms = loader->getSymbols();
@@ -379,11 +379,12 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 		location += sym_proc_mapping->start;
 
 		// actually register it!
-		bool replaced = this->symbols.addSymbolAddress(name, location, true);
-		if (replaced) {
-			std::cout << " * reregistered symbol: " << name << std::endl;
-			//throw Error{"symbol overwritten!"};
-		}
+		this->symbols.addSymbolAddress(name, location, true);
+		// bool replaced = this->symbols.addSymbolAddress(name, location, true);
+		// if (replaced) {
+		// 	std::cout << " * reregistered symbol: " << name << std::endl;
+		// 	// throw Error{"symbol overwritten!"};
+		// }
 
 		// std::cout << " * registered symbol: " << name << std::endl;
 

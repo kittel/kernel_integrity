@@ -17,8 +17,8 @@ ElfUserspaceLoader::ElfUserspaceLoader(ElfFile *file,
 ElfUserspaceLoader::~ElfUserspaceLoader() {}
 
 void ElfUserspaceLoader::initText() {
-	std::cout << "Initializing text segment for elfuserspaceloader: "
-	          << this->name << std::endl;
+	// std::cout << "Initializing text segment for elfuserspaceloader: "
+	//           << this->name << std::endl;
 	this->textSegmentInfo = this->elffile->findCodeSegment();
 
 	auto index = this->elffile->getFileContent() + this->textSegmentInfo.offset;
@@ -105,7 +105,7 @@ std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::loadDependencies(Process *
 		//       their mappings are evaluated for the symbol manager,
 		//       depending on the process as well.
 		ElfLoader *lib = this->kernel->getTaskManager()->loadLibrary(dep, process);
-		std::cout << "Loaded library " << lib->getName() << std::endl;
+		// std::cout << "Loaded library " << lib->getName() << std::endl;
 
 		ElfUserspaceLoader *usLib = dynamic_cast<ElfUserspaceLoader *>(lib);
 		if (usLib == nullptr) {
