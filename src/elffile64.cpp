@@ -514,18 +514,14 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 					//          << std::endl;
 
 					std::string target_symbol = this->symbolName(sym->st_name, strindex);
-
 					addr = process->symbols.getSymbolAddress(target_symbol);
 
 					//std::cout << "addr = " << addr << std::endl;
 
-					if (addr == 0 and not (target_symbol == "__gmon_start__")
-					              and not (target_symbol == "wgetch")) {
+					if (addr == 0 and not ELF64_ST_BIND(sym->st_info) == STB_WEAK) {
 						throw Error{"undefined symbol (=0) encountered"};
 					}
-
 					sym->st_value = addr;
-
 					break;
 				}
 				case R_X86_64_RELATIVE:   /* Adjust by program base */
