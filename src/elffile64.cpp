@@ -518,7 +518,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 
 					//std::cout << "addr = " << addr << std::endl;
 
-					if (addr == 0 and not ELF64_ST_BIND(sym->st_info) == STB_WEAK) {
+					if (addr == 0 and not (ELF64_ST_BIND(sym->st_info) == STB_WEAK)) {
 						throw Error{"undefined symbol (=0) encountered"};
 					}
 					sym->st_value = addr;
