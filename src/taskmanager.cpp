@@ -221,19 +221,21 @@ Instance TaskManager::getTaskForPID(pid_t pid) const {
 			return it;
 		it = this->nextTask(it);
 	}
-
-	return this->initTask;
+	Instance tmp = this->initTask;
+	tmp.setAddress(0);
+	return tmp;
 }
 
-std::vector<Instance> TaskManager::getTasks() const {
-	std::vector<Instance> tasks;
+std::vector<std::pair<pid_t,Instance>> TaskManager::getTasks() const {
+	std::vector<std::pair<pid_t,Instance>> tasks;
 
 	// set iterator to the first child of init
 	Instance taskStruct = this->initTask.memberByName("tasks")
 	                                    .changeBaseType("task_struct", "tasks");
 	auto it = taskStruct;
 	do {
-		tasks.push_back(it);
+		pid_t pid = it.memberByName("pid").getValue<int64_t>();
+		tasks.push_back(std::pair<pid_t,Instance>(pid,it));
 		it = this->nextTask(it);
 	} while(it != taskStruct);
 
@@ -246,6 +248,10 @@ Instance TaskManager::nextTask(Instance &task) const {
 	Instance next = task.memberByName("tasks").memberByName("next", true);
 	next          = next.changeBaseType("task_struct", "tasks");
 	return next;
+}
+
+bool TaskManager::terminated(pid_t pid) const {
+	return this->getTaskForPID(pid).isNULL();
 }
 
 bool TaskManager::isKernelTask(pid_t pid) const {

@@ -334,11 +334,17 @@ int main(int argc, char **argv) {
 
 		uint64_t mapcount = 0;
 
-		for (auto &&task : tasks) {
+		for (auto &&curTask : tasks) {
+
+			pid_t pid = curTask.first;
+			auto task = curTask.second;
 
 			static auto tm = kl->getTaskManager();
 
-			pid_t pid = task.memberByName("pid").getValue<int64_t>();
+			if (tm->terminated(pid)) {
+				continue;
+			}
+
 			std::string comm = task.memberByName("comm").getValue<std::string>();
 
 			if (tm->isKernelTask(task)) {
@@ -350,18 +356,18 @@ int main(int argc, char **argv) {
 			std::cout << "Loading next process: "
 			          << pid <<": " << comm << " " << exe << std::endl;
 
-			auto VMAInfos = tm->getVMAInfo(pid);
+			// the taskmanager must be cleaned up after each process!
+			// this is because the loaded libraries depend on the
+			// process environment, and they have to be loaded again!
+			// otherwise, the wrong offsets will be reused!
+			
+			kl->getTaskManager()->cleanupLibraries();
+			Process proc{exe, kl, pid};
+			ProcessValidator val{kl, &proc, &vmi};
+			validateUserspace(&val);
+			continue;
 
-			if (VMAInfos.size() > 0) {
-				// the taskmanager must be cleaned up after each process!
-				// this is because the loaded libraries depend on the
-				// process environment, and they have to be loaded again!
-				// otherwise, the wrong offsets will be reused!
-				kl->getTaskManager()->cleanupLibraries();
-				Process proc{exe, kl, pid};
-				ProcessValidator val{kl, &proc, &vmi};
-				validateUserspace(&val);
-			}
+			auto VMAInfos = tm->getVMAInfo(pid);
 
 			for (auto &&info : VMAInfos) {
 				if (info.name == "[vdso]")
@@ -399,12 +405,16 @@ int main(int argc, char **argv) {
 			const unsigned char *physData = physPage.data();
 			for (uint16_t i = 0; i < 0x1000; i++) {
 				uint64_t *physPtr = (uint64_t *)(physData + i);
-				if (*physPtr == 0xffffffffffffffff)
+				if (*physPtr == 0xffffffffffffffff) {
 					continue;
+				}
+				if ((*physPtr & 0xffff000000000000) != 0xffff000000000000) {
+					continue;
+				}
 				// if ((*physPtr & kernelStart) != kernelStart) continue;
 				// if (*physPtr > kernelStart + 0x10000000) continue;
-				if (!kl->isCodeAddress(*physPtr) ||
-				    kl->isDataAddress(*physPtr)) {
+				if (!(kl->isCodeAddress(*physPtr) ||
+				      kl->isDataAddress(*physPtr))) {
 					continue;
 				}
 				addressCount++;

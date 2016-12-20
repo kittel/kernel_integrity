@@ -78,12 +78,20 @@ public:
 	/**
 	 * Get the list of tasks.
 	 */
-	std::vector<Instance> getTasks() const;
+	std::vector<std::pair<pid_t,Instance>> getTasks() const;
 
 	/**
 	 * Get all the mappings for a pid.
 	 */
 	std::vector<VMAInfo> getVMAInfo(pid_t pid);
+
+	/**
+	 * @param pid Task to check
+	 * @returns Returns true, if a corresponding task still exists
+	 *
+	 * Check if a task has terminated
+	 */
+	bool terminated(pid_t pid) const;
 
 	/**
 	 * @param pid Task to check
