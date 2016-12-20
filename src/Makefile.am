@@ -1,4 +1,4 @@
-AM_CXXFLAGS += -Wall -Wextra -pedantic -Wcast-align -fpic $(GLIB_CFLAGS) $(LIBS)
+AM_CXXFLAGS += -Wall -Wextra -pedantic -Wcast-align -fpic $(GLIB_CFLAGS) $(LIBS) # -fsanitize=address
 
 kernint_LDFLAGS=$(GLIB_LIBS) \
                 -ldwarfparser -ldwarf -lelf -ldl\

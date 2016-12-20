@@ -315,9 +315,9 @@ void ElfFile64::applyRelocations(ElfLoader *loader,
                                  Kernel *kernel,
                                  Process *process) {
 
-	std::cout << COLOR_GREEN << " == Relocating: "
-	          << this->filename << COLOR_NORM
-	          << std::endl;
+	//std::cout << COLOR_GREEN << " == Relocating: "
+	//          << this->filename << COLOR_NORM
+	//          << std::endl;
 
 	switch(this->elf64Ehdr->e_type) {
 	case ET_REL:
@@ -527,7 +527,7 @@ void ElfFile64::applyRelaOnSection(uint32_t relSectionID,
 				case R_X86_64_RELATIVE:   /* Adjust by program base */
 				case R_X86_64_IRELATIVE:  /* Adjust indirectly by program base */
 					// TODO:
-					std::cout << "TODO: irelative relocation" << std::endl;
+					// std::cout << "TODO: irelative relocation" << std::endl;
 					break;
 
 				default:

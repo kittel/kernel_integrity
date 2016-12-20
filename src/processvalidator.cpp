@@ -301,6 +301,10 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	// sysdeps/x86_64/dl-trampoline.S:64
 	// LD_BIND_NOW forces load-time relocations.
 
+	if ( counter == 0 ) {
+		return;
+	}
+
 	std::cout << std::endl << "== Analyzed mapping:" << std::endl;
 	vma->print();
 	std::cout << "Found " << COLOR_RED << COLOR_BOLD

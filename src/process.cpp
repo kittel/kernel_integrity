@@ -189,7 +189,7 @@ void Process::processLoadRel() {
 
 	// return a list of mappings
 	for (auto &vma : this->getMappedVMAs()) {
-		vma.print();
+		// vma.print();
 
 		ElfUserspaceLoader *loader = this->findLoaderByFileName(vma.name);
 
@@ -198,20 +198,13 @@ void Process::processLoadRel() {
 		    vma.name[0] != '[' &&
 		    not util::hasEnding(vma.name, ".heap")) {
 
-			std::cout << "vma '" << vma.name
-			          << "' not found as loaded library, loading..."
-			          << std::endl;
+			// std::cout << "vma '" << vma.name
+			//           << "' not found as loaded library, loading..."
+			//           << std::endl;
 
 			// load the library by its filename only,
 			// use the searchpaths for that
 			std::string libname = fs::path(vma.name).filename().string();
-
-			if (libname == "locale-archive" ||
-			    libname == "gconv-modules.cache" ||
-			    libname == "LC_CTYPE") {
-				std::cout << COLOR_RED << libname << COLOR_NORM << std::endl;
-				continue;
-			};
 
 			this->getKernel()->getTaskManager()->loadLibrary(libname, this);
 
@@ -220,10 +213,11 @@ void Process::processLoadRel() {
 		}
 
 		if (not loader) {
-			std::cout << "Skipped analyzing VMA '"
-			          << vma.name
-			          << "' because no loader found."
-			          << std::endl;
+			continue;
+			// std::cout << "Skipped analyzing VMA '"
+			//           << vma.name
+			//           << "' because no loader found."
+			//           << std::endl;
 			// TODO: create raw file mapping here!
 		}
 		else {
