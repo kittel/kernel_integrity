@@ -333,6 +333,8 @@ int main(int argc, char **argv) {
 		std::unordered_map<uint64_t, std::vector<std::tuple<pid_t, std::string, VMAInfo>>> physMap;
 
 		uint64_t mapcount = 0;
+		static long int time2;
+		static long int time3;
 
 		for (auto &&curTask : tasks) {
 
@@ -362,9 +364,15 @@ int main(int argc, char **argv) {
 			// otherwise, the wrong offsets will be reused!
 			
 			kl->getTaskManager()->cleanupLibraries();
+			const auto time2_start = std::chrono::system_clock::now();
 			Process proc{exe, kl, pid};
 			ProcessValidator val{kl, &proc, &vmi};
+			const auto time2_stop = std::chrono::system_clock::now();
+			const auto time3_start = std::chrono::system_clock::now();
 			validateUserspace(&val);
+			const auto time3_stop = std::chrono::system_clock::now();
+			time2 += std::chrono::duration_cast<std::chrono::milliseconds>(time2_stop - time2_start).count();
+			time3 += std::chrono::duration_cast<std::chrono::milliseconds>(time3_stop - time3_start).count();
 			continue;
 
 			auto VMAInfos = tm->getVMAInfo(pid);
@@ -438,5 +446,7 @@ int main(int argc, char **argv) {
 		const auto time1 = std::chrono::duration_cast<std::chrono::milliseconds>(time1_stop - time1_start).count();
 
 		std::cout << "Needed " << time1 << " ms " << std::endl;
+		std::cout << "Process Loading " << time2 << " ms " << std::endl;
+		std::cout << "Process Validation " << time3 << " ms " << std::endl;
 	}
 }

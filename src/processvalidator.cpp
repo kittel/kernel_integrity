@@ -39,6 +39,9 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 ProcessValidator::~ProcessValidator() {}
 
 int ProcessValidator::validateProcess() {
+	static uint64_t size = 0;
+	static uint64_t pageCount = 0;
+	
 	// check if all mapped pages are known
 	std::cout << COLOR_GREEN
 	          << "Starting page validation ..."
@@ -64,6 +67,8 @@ int ProcessValidator::validateProcess() {
 		} else if (section.name[0] == '[') {
 			continue;
 		} else if ((section.flags & VMAInfo::VM_EXEC)) {
+			size += section.end - section.start;
+			pageCount = pageCount + 1;
 			this->validateCodePage(&section);
 		} else if ((section.flags & VMAInfo::VM_WRITE)) {
 			this->validateDataPage(&section);
@@ -73,6 +78,8 @@ int ProcessValidator::validateProcess() {
 	}
 
 	// TODO count errors or change return value
+	std::cout << "Validated: " << size << std::endl;
+	std::cout << "Validated " << pageCount << " executable pages" << std::endl;
 	return 0;
 }
 
