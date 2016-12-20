@@ -40,14 +40,14 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 
 Process::~Process() {
 
-	if (this->vdsoLoader) {
-		if (this->vdsoLoader->elffile) {
-			delete this->vdsoLoader->elffile;
-		}
+	// if (this->vdsoLoader) {
+	// 	if (this->vdsoLoader->elffile) {
+	// 		delete this->vdsoLoader->elffile;
+	// 	}
 
-		delete this->vdsoLoader;
-		this->vdsoLoader = nullptr;
-	}
+	// 	delete this->vdsoLoader;
+	// 	this->vdsoLoader = nullptr;
+	// }
 
 }
 

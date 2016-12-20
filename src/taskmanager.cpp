@@ -468,7 +468,8 @@ ElfUserspaceLoader *TaskManager::loadVDSO(Process *process) {
 	if (vdsoLoader) return vdsoLoader;
 
 	if (this->vdsoData.size() > 0) {
-		throw Error{"vdso vector has data but [vdso] not found as library"};
+		this->vdsoData.clear();
+		// throw Error{"vdso vector has data but [vdso] not found as library"};
 	}
 
 	// if the vdso loader was not known, fetch the data from
