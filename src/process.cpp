@@ -149,6 +149,10 @@ ElfUserspaceLoader *Process::findLoaderByFileName(const std::string &name) const
 	           ->findLibByName(name);
 }
 
+const ElfUserspaceLoader *Process::getExecLoader() const {
+	assert(this->execLoader);
+	return this->execLoader;
+}
 
 /* Find a corresponding SectionInfo for the given vaddr */
 SectionInfo *Process::getSegmentForAddress(uint64_t vaddr) {

@@ -70,6 +70,7 @@ public:
 
 	ElfUserspaceLoader *findLoaderByAddress(const uint64_t addr) const;
 	ElfUserspaceLoader *findLoaderByFileName(const std::string &name) const;
+	const ElfUserspaceLoader *getExecLoader() const;
 
 	SectionInfo *getSegmentForAddress(uint64_t addr);
 
