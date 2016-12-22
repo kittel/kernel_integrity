@@ -48,7 +48,6 @@ protected:
 
 	void validateCodePage(const VMAInfo *vma) const;
 	void validateDataPage(const VMAInfo *vma) const;
-	int validatePage(page_info_t *page);
 };
 
 } // namespace kernint
