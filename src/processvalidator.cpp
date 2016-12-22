@@ -319,8 +319,23 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	          << " pointers:" << std::endl;
 	for (auto &section : range) {
 		if (section.second.getCount() == 0) continue;
-		std::cout << "Pointers from " << vma->name
+		const ElfUserspaceLoader* loader = nullptr;
+		if (vma->name[0] == '[') {
+			loader = this->process->getExecLoader();
+		} else if (vma->name.compare(vma->name.size()-5,5,".heap") == 0) {
+			loader = this->process->findLoaderByFileName(
+			            vma->name.substr(0,vma->name.size()-5));
+		} else {
+			loader = this->process->findLoaderByFileName(vma->name);
+		}
+		if (!loader) {
+			std::cout << "Could not find loader for VMA: " << vma->name << std::endl;
+		} else {
+			std::cout << "Dependency in layer: " << loader->isDependency(section.first.name) << std::endl;
+		}
+		std::cout << "Pointers from " << ((vma->name[0] == '[') ?loader->getName() + " " + vma->name :vma->name)
 		          << " to " << section.first.name << std::endl;
+		std::cout << std::hex << "0x" <<  vma->start << std::dec << std::endl;
 		section.second.showPtrs(this->vmi, this->pid);
 	}
 }
