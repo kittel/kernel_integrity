@@ -191,42 +191,71 @@ public:
 		this->ptrs[addr].insert(where);
 	}
 
-	void showPtrs(VMIInstance *vmi, uint32_t pid) {
-		std::cout << "Found " << count << " pointers:" << std::endl;
+	uint64_t showPtrs(VMIInstance *vmi, uint32_t pid) {
+		uint64_t unknown_count = 0;
+		//std::cout << "Found " << count << " pointers:" << std::endl;
 		uint64_t callAddr = 0;
 		for (auto &ptr : ptrs) {
-			std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-			          << std::hex << ptr.first - toVMA.start << std::dec;
-
 			auto symname = this->process->symbols.getElfSymbolName(ptr.first - toVMA.start);
+			auto toSec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
+
 
 			if (symname != "") {
-				std::cout << "\t" << symname;
+				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+				//          << std::hex << ptr.first - toVMA.start << std::dec;
+				//          << "\t" << symname << std::endl;
+				continue;
 			}
-			else if (this->data &&
-			         (callAddr = isReturnAddress(this->data,
-			                                     ptr.first - toVMA.start,
-			                                     0, vmi, pid))) {
 
-				std::cout << "\t" << "Return Address";
-				uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
-				std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
-				std::cout << "\t" << retFuncName;
+			if (this->data &&
+			   (callAddr = isReturnAddress(this->data,
+			                               ptr.first - toVMA.start,
+			                               0, vmi, pid))) {
+
+				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+				//          << std::hex << ptr.first - toVMA.start << std::dec;
+				//std::cout << "\t" << "Return Address";
+				//uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
+				//std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
+				//std::cout << "\t" << retFuncName << std::endl;
+				continue;
 			}
-			else if (this->toLoader) {
-				auto sec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
-				if(sec) {
-					std::cout << "\tSection: " << sec->name;
-					if (sec->name.compare(".dynstr") == 0) {
-						std::string str = std::string((char*) sec->index + (ptr.first - toVMA.start) - sec->memindex);
-						std::cout << "\tString: " << str;
+
+			if(!this->toLoader){
+				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+				//          << std::hex << ptr.first - toVMA.start << std::dec;
+				//std::cout << "\tplain file" << std::endl;
+				continue;
+			}
+
+			if(toSec) {
+				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+				//          << std::hex << ptr.first - toVMA.start << std::dec;
+				if (toSec->name == ".dynstr") {
+					//std::string str = std::string((char*) sec->index + (ptr.first - toVMA.start) - sec->memindex);
+					//std::cout << "\tString: " << str;
+					continue;
+				}
+				if (toSec->name == ".dynsym") {
+					continue;
+				}
+				if (toSec->name == ".rodata") {
+					continue;
+				}
+
+				bool found = false;
+				for (auto &where : ptr.second) {
+					auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
+					if(fromVMA->off and fromSec and
+					   fromSec->name == ".got.plt") {
+						found = true;
 					}
 				}
+				if (found) { continue; }
 			}
-			else {
-				std::cout << "\tplain file";
-			}
-			std::cout << std::endl;
+
+			std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+			          << std::hex << ptr.first - toVMA.start << std::dec;
 
 			for (auto &where : ptr.second) {
 				std::cout << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
@@ -237,7 +266,9 @@ public:
 				}
 				std::cout << std::endl;
 			}
+			unknown_count++;
 		}
+		return unknown_count;
 	}
 
 
@@ -320,11 +351,8 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 		return;
 	}
 
-	std::cout << std::endl << "== Analyzed mapping:" << std::endl;
-	vma->print();
-	std::cout << "Found " << COLOR_RED << COLOR_BOLD
-	          << counter << COLOR_RESET
-	          << " pointers:" << std::endl;
+	uint64_t unknown = 0;
+
 	for (auto &section : range) {
 		if (section.second.getCount() == 0) continue;
 		const ElfUserspaceLoader* loader = nullptr;
@@ -339,12 +367,22 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 		if (!loader) {
 			std::cout << "Could not find loader for VMA: " << vma->name << std::endl;
 		} else {
-			std::cout << "Dependency in layer: " << loader->isDependency(section.first.name) << std::endl;
+			//std::cout << "Dependency in layer: " << loader->isDependency(section.first.name) << std::endl;
 		}
-		std::cout << "Pointers from " << ((vma->name[0] == '[') ?loader->getName() + " " + vma->name :vma->name)
-		          << " to " << section.first.name << std::endl;
-		std::cout << std::hex << "0x" <<  vma->start << std::dec << std::endl;
-		section.second.showPtrs(this->vmi, this->pid);
+		uint64_t unknown_now = section.second.showPtrs(this->vmi, this->pid);
+		unknown += unknown_now;
+		if(unknown_now) {
+			std::cout << "Pointers from " << ((vma->name[0] == '[') ?loader->getName() + " " + vma->name :vma->name)
+			          << " to " << section.first.name << std::endl;
+		}
+	}
+	if(unknown) {
+		vma->print();
+		std::cout << "Found " << COLOR_RED << COLOR_BOLD
+	          << unknown << COLOR_RESET << " unknown (" 
+	          << COLOR_GREEN << counter << COLOR_RESET << ")"
+	          << " pointers:" << std::endl;
+		std::cout << std::endl << "== Analyzed mapping:" << std::endl;
 	}
 }
 
