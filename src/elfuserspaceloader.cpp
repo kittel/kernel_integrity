@@ -112,10 +112,24 @@ std::vector<ElfUserspaceLoader *> ElfUserspaceLoader::loadDependencies(Process *
 			std::cout << "depended on non-userspace elf" << std::endl;
 			assert(0);
 		}
+		this->dependencies.push_back(usLib);
 		ret.push_back(usLib);
 	}
 
 	return ret;
+}
+
+uint64_t ElfUserspaceLoader::isDependency(std::string &lib) const {
+	if(this->getName() == lib){
+		return 1;
+	}
+	for(auto && dep : this->dependencies) {
+		uint64_t level = dep->isDependency(lib);
+		if (level) {
+			return (level + 1);
+		}
+	}
+	return 0;
 }
 
 

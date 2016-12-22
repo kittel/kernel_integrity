@@ -38,6 +38,7 @@ public:
 	 * List of loaders that the current loader depends on for running.
 	 */
 	std::vector<ElfUserspaceLoader *> loadDependencies(Process *process);
+	uint64_t isDependency(std::string &lib) const;
 
 protected:
 	Kernel *kernel;
@@ -47,6 +48,8 @@ protected:
 
 	/** only the filename of the elffile used in this loader */
 	std::string baseName;
+
+	std::vector<ElfUserspaceLoader*> dependencies;
 
 	SegmentInfo textSegmentInfo;
 	SegmentInfo dataSegmentInfo;
