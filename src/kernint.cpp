@@ -86,10 +86,6 @@ const char *helpString = R"EOF(
     -t, --targetsFile=<targets>
         Use call targets in <targets> for stackvalidation.
 
-    -u, --checkUserspace=<binaryName>
-        Check userspace process for integrity. Load binary <binaryName>
-        as trusted reference.
-
     -p, --pid=<pid>
         Check <pid> for integrity
 
@@ -122,7 +118,6 @@ int main(int argc, char **argv) {
 
 	std::string libraryDir;
 	std::string rootDir;
-	std::string binaryName;
 	int32_t pid = 0;
 
 	int c;
@@ -146,14 +141,13 @@ int main(int argc, char **argv) {
 
 		// TODO rethink short option characters
 		{"list-procs", no_argument, 0, 'x'},
-		{"check-userspace", required_argument, 0, 'u'},
 		{"pid", required_argument, 0, 'p'},
 		{"root-path", required_argument, 0, 'r'},
 		{"library-path", required_argument, 0, 'b'},
 		{0, 0, 0, 0}
 	};
 
-	while ((c = getopt_long(argc, argv, ":hg:lk:acet:xu:p:b:r:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, ":hg:lk:acet:xp:b:r:", long_options, &option_index)) != -1) {
 		switch (c) {
 		case 0: break;
 
@@ -202,10 +196,6 @@ int main(int argc, char **argv) {
 				std::cout << "No digit found in specified pid." << std::endl;
 				return 1;
 			}
-			break;
-
-		case 'u':
-			binaryName.assign(optarg);
 			break;
 
 		case 'r':
@@ -261,16 +251,6 @@ int main(int argc, char **argv) {
 		exit(0);
 	}
 
-	if (!binaryName.empty() && pid != 0) {
-		if (!fexists(binaryName)) {
-			std::cout << COLOR_RED << COLOR_BOLD
-			          << "Binary does not exist: " << binaryName << COLOR_RESET
-			          << std::endl;
-			exit(0);
-		}
-		binaryName = fs::canonical(binaryName).string();
-	}
-
 	std::cout << COLOR_GREEN << "Loading Kernel" << COLOR_NORM << std::endl;
 
 	ElfKernelLoader *kl = KernelValidator::loadKernel(kerndir);
@@ -313,10 +293,13 @@ int main(int argc, char **argv) {
 		validateKernel(&val);
 	}
 
-	if (!binaryName.empty() && pid != 0) {
+	auto tm = kl->getTaskManager();
 
+	if (pid != 0) {
+
+		std::string exe = tm->getTaskExeName(pid);
 		std::cout << "Creating process image to verify..." << std::endl;
-		Process proc{binaryName, kl, pid};
+		Process proc{exe, kl, pid};
 		std::cout << "Starting process validation..." << std::endl;
 		ProcessValidator val{kl, &proc, &vmi};
 		validateUserspace(&val);
@@ -341,7 +324,6 @@ int main(int argc, char **argv) {
 			pid_t pid = curTask.first;
 			auto task = curTask.second;
 
-			static auto tm = kl->getTaskManager();
 
 			if (tm->terminated(pid)) {
 				continue;
