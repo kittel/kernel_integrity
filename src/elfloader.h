@@ -79,6 +79,7 @@ protected:
 	 */
 	virtual void initText() = 0;
 	virtual void initData() = 0;
+
 };
 
 } // namespace kernint

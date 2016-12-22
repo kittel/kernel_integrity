@@ -29,6 +29,8 @@ public:
 
 	const SectionInfo &findSectionWithName(const std::string &sectionName) const override;
 	const SectionInfo &findSectionByID(uint32_t sectionID) const override;
+	const SectionInfo *findSectionByOffset(size_t offset) const override;
+	
 	bool isCodeAddress(uint64_t address) override;
 	bool isDataAddress(uint64_t address) override;
 

@@ -14,8 +14,10 @@ class ElfUserspaceLoader;
 class ElfKernelLoader;
 class Process;
 class ProcessValidator;
+class PagePtrInfo;
 
 class ElfUserspaceLoader : public ElfLoader {
+	friend class PagePtrInfo;
 	friend class ProcessValidator;
 	friend class Process;
 

@@ -66,9 +66,7 @@ void ElfUserspaceLoader::initData() {
 		// if this section is within the data segment
 		// the section size is subtracted so the start offset check
 		// is enough to verify it's in the segment.
-		if (CONTAINS(this->dataSegmentInfo.offset,
-		             this->dataSegmentInfo.filesz - section.size,
-		             section.offset)) {
+		if (section.isWritable() and section.isAlloc()) {
 
 			//std::cout << " adding section: " << section.name << std::endl;
 
@@ -81,6 +79,8 @@ void ElfUserspaceLoader::initData() {
 			} else {
 				uint8_t *data = (this->elffile->getFileContent() +
 			                     section.offset);
+
+				section.print();
 
 				this->dataSegmentContent.insert(
 					position,
@@ -148,24 +148,19 @@ void ElfUserspaceLoader::initImage() {
 /* Return the SectionInfo, in which the given addr is contained. */
 SectionInfo *ElfUserspaceLoader::getSegmentForAddress(uint64_t addr) {
 	// check textSegment
-	if (addr >= (uint64_t) this->textSegment.memindex && addr < ((uint64_t) this->textSegment.memindex) + this->textSegment.size) {
+	if (CONTAINS((uint64_t) this->textSegment.memindex, this->textSegment.size, addr)) {
 		return &this->textSegment;
 	}
 	// check dataSection
-	else if (addr >= (uint64_t) this->dataSection.memindex && addr < ((uint64_t)(this->dataSection.memindex) + this->dataSection.size)) {
+	else if (CONTAINS((uint64_t) this->dataSection.memindex, this->dataSection.size, addr)) {
 		return &this->dataSection;
 	}
 	// check heapSection
-	else if (addr >= (uint64_t) this->heapSection.memindex &&
-	         addr <= (uint64_t)(this->heapSection.memindex + this->heapSection.size)) {
+	else if (CONTAINS((uint64_t) this->heapSection.memindex, this->heapSection.size, addr)) {
 		return &this->heapSection;
 	}
 
-	/*
-	// check all dependencies TODO
-	uint64_t curDepMemindex = dependency.getCurMemindex();
-	else if(
-	*/
+	// maybe do a recursive search here.
 	else {
 		return nullptr;
 	}

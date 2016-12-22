@@ -60,7 +60,8 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 				this->elf64Shdr[i].sh_offset,
 				this->fileContent + this->elf64Shdr[i].sh_offset,
 				this->elf64Shdr[i].sh_addr,
-				this->elf64Shdr[i].sh_size
+				this->elf64Shdr[i].sh_size,
+				this->elf64Shdr[i].sh_flags
 			}
 		);
 
@@ -227,6 +228,14 @@ const SectionInfo &ElfFile64::findSectionByID(uint32_t sectionID) const {
 	throw Error{"could not find section by id"};
 }
 
+const SectionInfo *ElfFile64::findSectionByOffset(size_t offset) const {
+	for(auto && sI : this->sections) {
+		if (CONTAINS((uint64_t) sI.offset, sI.size, offset)) {
+			return &sI;
+		}
+	}
+	return nullptr;
+}
 
 bool ElfFile64::isCodeAddress(uint64_t address) {
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {

@@ -44,21 +44,24 @@ SectionInfo::SectionInfo()
 	secID{0xffffffff},
 	index{0},
 	memindex{0},
-	size{0} {}
+	size{0},
+	flags{0} {}
 
 SectionInfo::SectionInfo(const std::string &name,
                          uint32_t secID,
                          uint64_t offset,
                          uint8_t *index,
                          uint64_t memindex,
-                         uint64_t size)
+                         uint64_t size,
+                         uint64_t flags)
 	:
 	name{name},
 	secID{secID},
 	offset{offset},
 	index{index},
 	memindex{memindex},
-	size{size} {}
+	size{size},
+	flags{flags} {}
 
 SectionInfo::~SectionInfo() {}
 
@@ -70,6 +73,15 @@ bool SectionInfo::containsElfAddress(uint64_t address){
 bool SectionInfo::containsMemAddress(uint64_t address){
 	uint64_t addr = this->memindex;
 	return (address >= addr && address <= addr + this->size);
+}
+
+void SectionInfo::print(){
+	std::cout << "Section: " << name << std::endl <<
+	    "\tid:\t" << secID << std::endl <<
+	    "\toffset:\t" << offset << std::endl <<
+	    "\tindex:\t" << (uint64_t) index << std::endl <<
+	    "\tmemindex:\t" << memindex << std::endl <<
+	    "\tsize:\t" << size << std::endl << std::endl;
 }
 
 SegmentInfo::SegmentInfo()

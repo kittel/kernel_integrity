@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 #include <unordered_map>
 #include <vector>
+#include "helpers.h"
 
 class SymbolManager;
 
@@ -33,7 +34,8 @@ public:
 	            uint64_t offset,
 	            uint8_t *index,
 	            uint64_t memindex,
-	            uint64_t size);
+	            uint64_t size,
+	            uint64_t flags);
 	virtual ~SectionInfo();
 
 	std::string name;     ///< name of the section, init with first sec name
@@ -43,9 +45,23 @@ public:
 	                      ///< equals &elffilecontent[offset]
 	uint64_t memindex;    ///< target virtual address within the VM
 	uint64_t size;        ///< size of the section content
+	uint64_t flags;       ///< section flags
 
 	bool containsElfAddress(uint64_t address);
 	bool containsMemAddress(uint64_t address);
+	void print();
+
+	inline bool isWritable() {
+		return CHECKFLAGS(this->flags, SHF_WRITE);
+	}
+	
+	inline bool isExec() {
+		return CHECKFLAGS(this->flags, SHF_ALLOC);
+	}
+	
+	inline bool isAlloc() {
+		return CHECKFLAGS(this->flags, SHF_EXECINSTR);
+	}
 };
 
 
@@ -113,6 +129,8 @@ public:
 
 	virtual const SectionInfo &findSectionWithName(const std::string &sectionName) const = 0;
 	virtual const SectionInfo &findSectionByID(uint32_t sectionID) const = 0;
+	virtual const SectionInfo *findSectionByOffset(size_t offset) const = 0;
+
 	virtual bool isCodeAddress(uint64_t address) = 0;
 	virtual bool isDataAddress(uint64_t address) = 0;
 	virtual std::string sectionName(int sectionID) const = 0;

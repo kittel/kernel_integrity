@@ -156,18 +156,27 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 
 class PagePtrInfo {
 public:
-	PagePtrInfo(Process* process, VMAInfo mapping)
+	PagePtrInfo(Process* process, const VMAInfo *fromVMA, const VMAInfo &toVMA)
 		:
 		count{0},
 		ptrs{},
 		process{process},
 		data{nullptr},
-		mapping{mapping} {
+		fromVMA{fromVMA},
+		toVMA{toVMA} {
 
-		this->loader = this->process->findLoaderByFileName(mapping.name);
+		if (fromVMA->name[0] == '[') {
+			this->fromLoader = this->process->getExecLoader();
+		} else if (fromVMA->name.compare(fromVMA->name.size()-5,5,".heap") == 0) {
+			this->fromLoader = this->process->findLoaderByFileName(
+			                   fromVMA->name.substr(0,fromVMA->name.size()-5));
+		} else {
+			this->fromLoader = this->process->findLoaderByFileName(fromVMA->name);
+		}
+		this->toLoader = this->process->findLoaderByFileName(toVMA.name);
 
-		if (this->loader != nullptr) {
-			this->data = this->loader->getTextSegment().data();
+		if (this->toLoader != nullptr) {
+			this->data = this->toLoader->getTextSegment().data();
 		}
 	}
 
@@ -179,30 +188,24 @@ public:
 
 	void addPtr(uint64_t where, uint64_t addr) {
 		this->count += 1;
-		this->ptrs[addr][where] += 1;
+		this->ptrs[addr].insert(where);
 	}
 
 	void showPtrs(VMIInstance *vmi, uint32_t pid) {
 		std::cout << "Found " << count << " pointers:" << std::endl;
 		uint64_t callAddr = 0;
 		for (auto &ptr : ptrs) {
-			for (auto &where : ptr.second) {
-				std::cout << "From: 0x" << std::setfill('0') << std::setw(8)
-				          << std::hex << where.first
-				          << "\tto 0x" << std::setfill('0') << std::setw(8)
-				          << ptr.first - mapping.start << std::dec
-				          << "\t" << where.second;
-				break;
-			}
+			std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+			          << std::hex << ptr.first - toVMA.start << std::dec;
 
-			auto symname = this->process->symbols.getElfSymbolName(ptr.first - mapping.start);
+			auto symname = this->process->symbols.getElfSymbolName(ptr.first - toVMA.start);
 
 			if (symname != "") {
 				std::cout << "\t" << symname;
 			}
 			else if (this->data &&
 			         (callAddr = isReturnAddress(this->data,
-			                                     ptr.first - mapping.start,
+			                                     ptr.first - toVMA.start,
 			                                     0, vmi, pid))) {
 
 				std::cout << "\t" << "Return Address";
@@ -210,19 +213,13 @@ public:
 				std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
 				std::cout << "\t" << retFuncName;
 			}
-			else if (this->loader) {
-				for (uint32_t i = 0;
-				     i < this->loader->elffile->getNrOfSections();
-				     i++) {
-
-					auto sI = this->loader->elffile->findSectionByID(i);
-					if (CONTAINS((uint64_t) sI.memindex, sI.size, ptr.first - mapping.start)) {
-						std::cout << "\tSection: " << sI.name;
-						if (sI.name.compare(".dynstr") == 0) {
-							std::string str = std::string((char*) sI.index + (ptr.first - mapping.start) - sI.memindex);
-							std::cout << "\tString: " << str;
-						}
-						break;
+			else if (this->toLoader) {
+				auto sec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
+				if(sec) {
+					std::cout << "\tSection: " << sec->name;
+					if (sec->name.compare(".dynstr") == 0) {
+						std::string str = std::string((char*) sec->index + (ptr.first - toVMA.start) - sec->memindex);
+						std::cout << "\tString: " << str;
 					}
 				}
 			}
@@ -230,18 +227,29 @@ public:
 				std::cout << "\tplain file";
 			}
 			std::cout << std::endl;
+
+			for (auto &where : ptr.second) {
+				std::cout << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
+				          << std::hex << where << std::dec;
+				auto sec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
+				if(fromVMA->off && sec) {
+					std::cout << "\tSection: " << sec->name;
+				}
+				std::cout << std::endl;
+			}
 		}
-		std::cout << std::endl;
 	}
 
 
 protected:
 	uint32_t count;
-	std::unordered_map<uint64_t, std::unordered_map<uint64_t, uint32_t>> ptrs;
+	std::map<uint64_t, std::set<uint64_t>> ptrs;
 	Process *process;
-	ElfLoader *loader;
+	ElfLoader *fromLoader;
+	ElfLoader *toLoader;
 	const uint8_t *data;
-	VMAInfo mapping;
+	const VMAInfo *fromVMA;
+	const VMAInfo toVMA;
 };
 
 
@@ -252,12 +260,12 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 
 	std::vector<std::pair<VMAInfo, PagePtrInfo>> range;
 
-	for (auto &mapping : this->process->getMappedVMAs()) {
-		if (CHECKFLAGS(mapping.flags, VMAInfo::VM_EXEC)) {
+	for (auto &toVMA : this->process->getMappedVMAs()) {
+		if (CHECKFLAGS(toVMA.flags, VMAInfo::VM_EXEC)) {
 			range.push_back(
 				std::make_pair(
-					mapping,
-					PagePtrInfo(process, mapping)
+					toVMA,
+					PagePtrInfo(process, vma, toVMA)
 				)
 			);
 		}
@@ -288,13 +296,13 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 			if (CHECKFLAGS(section.first.flags, VMAInfo::VM_EXEC)) {
 				if (vma->name == section.first.name) {
 					// points to the same section
-					continue;
+					break;
 				}
 
 				if (IN_RANGE(*value, section.first.start + 1, section.first.end)) {
 					if (*value == section.first.start + 0x40) {
 						// Pointer to PHDR
-						continue;
+						break;
 					}
 
 					counter++;
