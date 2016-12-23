@@ -746,26 +746,20 @@ std::vector<ElfSymbol> ElfFile64::getSymbols() const {
 
 	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
 	Elf64_Sym *symtab = (Elf64_Sym *)symtabSection.index;
-
 	char *strtab = (char *)strtabSection.index;
 
-	uint32_t elements = symtabSection.size / sizeof(Elf64_Sym);
-
 	// initialize own symbols
-	for (unsigned int i = 0; i < elements; i++) {
+	for (unsigned int i = 0; i < symtabSection.size / sizeof(Elf64_Sym); i++) {
 
 		// if symbol is GLOBAL and _not_ UNDEFINED save it for announcement
-		if ((ELF64_ST_BIND(symtab[i].st_info) == STB_GLOBAL ||
-		     ELF64_ST_BIND(symtab[i].st_info) == STB_WEAK) &&
-		    symtab[i].st_shndx != SHN_UNDEF &&
+		if (symtab[i].st_shndx != SHN_UNDEF &&
 		    symtab[i].st_shndx != SHN_ABS &&
 		    symtab[i].st_shndx != SHN_COMMON) {
 
 			// this is final memory address after loading
 			uint64_t targetAddr = symtab[i].st_value;
-
+			if (!targetAddr) continue;
 			const SectionInfo *section = &(this->findSectionByID(symtab[i].st_shndx));
-
 			const SegmentInfo *segment = &(this->findSegmentByVaddr(targetAddr));
 
 			ElfSymbol sym{
@@ -780,6 +774,46 @@ std::vector<ElfSymbol> ElfFile64::getSymbols() const {
 			ret.push_back(sym);
 		}
 	}
+
+	try {
+		for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
+			// find sections SHT_SYMTAB, SHT_STRTAB
+			if (elf64Shdr[i].sh_type == SHT_SYMTAB) {
+				symtabSection = this->findSectionByID(i);
+				strtabSection = this->findSectionByID(elf64Shdr[i].sh_link);
+			}
+		}
+		symtab = (Elf64_Sym *)symtabSection.index;
+		strtab = (char *)strtabSection.index;
+
+		// initialize own symbols
+		for (unsigned int i = 0; i < symtabSection.size / sizeof(Elf64_Sym); i++) {
+
+			// if symbol is GLOBAL and _not_ UNDEFINED save it for announcement
+			if (symtab[i].st_shndx != SHN_UNDEF &&
+			    symtab[i].st_shndx != SHN_ABS &&
+			    symtab[i].st_shndx != SHN_COMMON) {
+
+				// this is final memory address after loading
+				uint64_t targetAddr = symtab[i].st_value;
+				if (!targetAddr) continue;
+				const SectionInfo *section = &(this->findSectionByID(symtab[i].st_shndx));
+				const SegmentInfo *segment = &(this->findSegmentByVaddr(targetAddr));
+
+				ElfSymbol sym{
+					std::string{&strtab[symtab[i].st_name]},
+					targetAddr,
+					symtab[i].st_info,
+					symtab[i].st_shndx,
+					section,
+					segment
+				};
+
+				ret.push_back(sym);
+			}
+		}
+	} catch(Error &e) {}
+
 	return ret;
 }
 
