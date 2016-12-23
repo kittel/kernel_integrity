@@ -78,7 +78,6 @@ int ProcessValidator::validateProcess() {
 	}
 
 	// TODO count errors or change return value
-	std::cout << "Validated: " << size << std::endl;
 	std::cout << "Validated " << pageCount << " executable pages" << std::endl;
 	return 0;
 }
@@ -196,13 +195,14 @@ public:
 		//std::cout << "Found " << count << " pointers:" << std::endl;
 		uint64_t callAddr = 0;
 		for (auto &ptr : ptrs) {
-			auto symname = this->process->symbols.getElfSymbolName(ptr.first - toVMA.start);
+			auto symname = this->process->symbols.getElfSymbolName(ptr.first);
 			auto toSec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
 
 
 			if (symname != "") {
 				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-				//          << std::hex << ptr.first - toVMA.start << std::dec;
+				//          << std::hex << ptr.first - toVMA.start << std::dec
+				//          << "\t" << "Symbol:"
 				//          << "\t" << symname << std::endl;
 				continue;
 			}
@@ -212,60 +212,77 @@ public:
 			                               ptr.first - toVMA.start,
 			                               0, vmi, pid))) {
 
-				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-				//          << std::hex << ptr.first - toVMA.start << std::dec;
-				//std::cout << "\t" << "Return Address";
 				//uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
 				//std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
-				//std::cout << "\t" << retFuncName << std::endl;
+				//
+				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+				//          << std::hex << ptr.first - toVMA.start << std::dec
+				//          << "\t" << "Return Address:"<< "\t" << retFuncName << std::endl;
 				continue;
 			}
 
 			if(!this->toLoader){
 				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-				//          << std::hex << ptr.first - toVMA.start << std::dec;
-				//std::cout << "\tplain file" << std::endl;
+				//          << std::hex << ptr.first - toVMA.start << std::dec
+				//          << "\tplain file" << std::endl;
 				continue;
 			}
 
 			if(toSec) {
 				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-				//          << std::hex << ptr.first - toVMA.start << std::dec;
+				//          << std::hex << ptr.first - toVMA.start << std::dec
+				//          << "\tSection: " << toSec->name;
 				if (toSec->name == ".dynstr") {
-					//std::string str = std::string((char*) sec->index + (ptr.first - toVMA.start) - sec->memindex);
-					//std::cout << "\tString: " << str;
+					//std::string str = std::string((char*) toSec->index + (ptr.first - toVMA.start) -toSec->memindex);
+					//std::cout << "\tString: " << str << std::endl;
 					continue;
 				}
 				if (toSec->name == ".dynsym") {
+					//std::cout << std::endl;
 					continue;
 				}
 				if (toSec->name == ".rodata") {
+					//std::cout << std::endl;
 					continue;
 				}
-
-				bool found = false;
-				for (auto &where : ptr.second) {
-					auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
-					if(fromVMA->off and fromSec and
-					   fromSec->name == ".got.plt") {
-						found = true;
-					}
-				}
-				if (found) { continue; }
+				//std::cout << std::endl;
 			}
 
-			std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+			bool found = false;
+			for (auto &where : ptr.second) {
+				auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
+				if(fromVMA->off and fromSec and
+				   fromSec->name == ".got.plt") {
+					//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+					//          << std::hex << ptr.first - toVMA.start << std::dec
+					//          << "\tSection: " << toSec->name << std::endl
+					//          << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
+					//          << std::hex << where << std::dec
+					//          << "\tSection: " << fromSec->name
+					//          << std::endl;
+					found = true;
+				}
+			}
+			if (found) { continue; }
+
+			std::cout << COLOR_RED
+			          << "Pointer to 0x" << std::setfill('0') << std::setw(8)
 			          << std::hex << ptr.first - toVMA.start << std::dec;
+			if (toSec) {
+				std::cout << "\tSection: " << toSec->name;
+			}
+			std::cout << std::endl;
 
 			for (auto &where : ptr.second) {
 				std::cout << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
 				          << std::hex << where << std::dec;
-				auto sec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
-				if(fromVMA->off && sec) {
-					std::cout << "\tSection: " << sec->name;
+				auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
+				if(fromVMA->off && fromSec) {
+					std::cout << "\tSection: " << fromSec->name;
 				}
 				std::cout << std::endl;
 			}
+			std::cout << COLOR_NORM;
 			unknown_count++;
 		}
 		return unknown_count;
