@@ -210,7 +210,7 @@ public:
 			if (this->data &&
 			   (callAddr = isReturnAddress(this->data,
 			                               ptr.first - toVMA.start,
-			                               0, vmi, pid))) {
+			                               toVMA.start, vmi, pid))) {
 
 				//uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
 				//std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
@@ -229,23 +229,38 @@ public:
 			}
 
 			if(toSec) {
+				bool known = false;
 				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
 				//          << std::hex << ptr.first - toVMA.start << std::dec
 				//          << "\tSection: " << toSec->name;
 				if (toSec->name == ".dynstr") {
 					//std::string str = std::string((char*) toSec->index + (ptr.first - toVMA.start) -toSec->memindex);
-					//std::cout << "\tString: " << str << std::endl;
-					continue;
+					//std::cout << "\tString: " << str;
+					known = true;
 				}
-				if (toSec->name == ".dynsym") {
-					//std::cout << std::endl;
-					continue;
+				else if (toSec->name == ".text" and
+				         toSec->offset == (ptr.first - toVMA.start)){
+					known = true;
 				}
-				if (toSec->name == ".rodata") {
-					//std::cout << std::endl;
-					continue;
+				else if (toSec->name == ".dynsym" or
+				         toSec->name == ".rodata" or
+				         toSec->name == ".dynamic" or
+				         toSec->name == ".interp" or
+				         toSec->name == ".hash" or
+				         toSec->name == ".gnu.hash" or
+				         toSec->name == ".gnu.version" or
+				         toSec->name == ".gnu.version_d" or
+				         toSec->name == ".gcc_except_table" or
+				         toSec->name == "__libc_IO_vtables" or
+				         toSec->name == ".data.rel.ro" or
+				         toSec->name == ".plt" or
+				         toSec->name == ".plt.got" or
+				         toSec->name == ".got.plt" or
+				         toSec->name == ".got") {
+					known = true;
 				}
 				//std::cout << std::endl;
+				if(known) continue;
 			}
 
 			bool found = false;
