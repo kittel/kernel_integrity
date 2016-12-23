@@ -198,9 +198,6 @@ public:
 	virtual std::vector<std::string> getDependencies() = 0;
 	virtual std::vector<ElfSymbol> getSymbols() const = 0;
 
-	virtual std::vector<Elf64_Rel> getRelEntries() const = 0;
-	virtual std::vector<Elf64_Rela> getRelaEntries() const = 0;
-
 	uint32_t shstrindex;
 
 	/**

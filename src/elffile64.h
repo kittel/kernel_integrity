@@ -71,12 +71,6 @@ public:
 	Elf64_Shdr *elf64Shdr;
 	Elf64_Phdr *elf64Phdr;
 
-	template<typename T>
-	std::vector<T> getRelocationEntries(uint32_t type) const;
-
-	std::vector<Elf64_Rel> getRelEntries() const override;
-	std::vector<Elf64_Rela> getRelaEntries() const override;
-
 private:
 	void applyRelaOnSection(uint32_t relSectionID,
 	                        ElfLoader *loader,

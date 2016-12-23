@@ -734,38 +734,6 @@ const SegmentInfo &ElfFile64::findSegmentByVaddr(const Elf64_Addr addr) const {
 	throw Error{"could not find segment by vaddr"};
 }
 
-template <typename T>
-std::vector<T> ElfFile64::getRelocationEntries(uint32_t type) const {
-	std::vector<T> ret;
-
-	// find .rel sections
-	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		// check the relocation type
-		if (this->elf64Shdr[i].sh_type == type) {
-			int nrRel = (int)(this->elf64Shdr[i].sh_size / sizeof(T));
-			auto index = this->fileContent + elf64Shdr[i].sh_offset;
-
-			// add .rel entries to vector
-			for (int j = 0; j < nrRel; j++) {
-				ret.push_back((reinterpret_cast<T *>(index))[j]);
-			}
-		}
-	}
-
-	return ret;
-}
-
-// Return all relocation entries from all .rel sections
-std::vector<Elf64_Rel> ElfFile64::getRelEntries() const {
-	return this->getRelocationEntries<Elf64_Rel>(SHT_REL);
-}
-
-// Return all relocation entries from all .rela sections
-std::vector<Elf64_Rela> ElfFile64::getRelaEntries() const {
-	return this->getRelocationEntries<Elf64_Rela>(SHT_RELA);
-}
-
-
 std::vector<ElfSymbol> ElfFile64::getSymbols() const {
 	std::vector<ElfSymbol> ret;
 
