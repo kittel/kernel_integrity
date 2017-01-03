@@ -42,11 +42,13 @@ public:
 	const SegmentInfo &findDataSegment() const override;
 	const SegmentInfo &findSegmentByVaddr(const Elf64_Addr addr) const;
 
+	std::string dynSymbolName(uint64_t offset) const override;
 	std::string symbolName(uint32_t index, uint32_t strindex) const override;
 
 	void addSymbolsToStore(SymbolManager *store, uint64_t memindex) const override;
 
 	uint64_t findAddressOfVariable(const std::string &symbolName) override;
+	uint64_t entryPoint() const override;
 
 	ElfKernelLoader *parseKernel() override;
 	ElfModuleLoader *parseKernelModule(const std::string &name,

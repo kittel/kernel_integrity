@@ -155,168 +155,229 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 
 class PagePtrInfo {
 public:
-	PagePtrInfo(Process* process, const VMAInfo *fromVMA, const VMAInfo &toVMA)
-		:
-		count{0},
-		ptrs{},
-		process{process},
-		data{nullptr},
-		fromVMA{fromVMA},
-		toVMA{toVMA} {
 
-		if (fromVMA->name[0] != '[') {
-			this->fromLoader = this->process->findLoaderByFileName(fromVMA->name);
-		} else {
-			this->fromLoader = this->process->getExecLoader();
+PagePtrInfo(Process* process, const VMAInfo *fromVMA, const VMAInfo &toVMA)
+	:
+	count{0},
+	ptrs{},
+	process{process},
+	data{nullptr},
+	fromVMA{fromVMA},
+	toVMA{toVMA} {
+
+	if (fromVMA->name[0] != '[') {
+		this->fromLoader = this->process->findLoaderByFileName(fromVMA->name);
+	} else {
+		this->fromLoader = this->process->getExecLoader();
+	}
+	this->toLoader = this->process->findLoaderByFileName(toVMA.name);
+
+	if (this->toLoader != nullptr) {
+		this->data = this->toLoader->getTextSegment().data();
+	}
+}
+
+~PagePtrInfo() = default;
+
+uint32_t getCount() {
+	return count;
+}
+
+void addPtr(uint64_t where, uint64_t addr) {
+	this->count += 1;
+	this->ptrs[addr].insert(where);
+}
+
+uint64_t showPtrs(VMIInstance *vmi, uint32_t pid) {
+	uint64_t unknown_count = 0;
+	//std::cout << "Found " << count << " pointers:" << std::endl;
+	uint64_t callAddr = 0;
+	bool printKnown = true;
+	for (auto &ptr : ptrs) {
+
+		auto toSec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
+		auto symname = this->process->symbols.getElfSymbolName(ptr.first);
+
+
+		if (symname != "") {
+			if (printKnown) {
+				std::cout << COLOR_GREEN << "Pointer to Symbol:"
+				          << "\t" << symname << std::endl << COLOR_NORM;
+			}
+			continue;
 		}
-		this->toLoader = this->process->findLoaderByFileName(toVMA.name);
 
-		if (this->toLoader != nullptr) {
-			this->data = this->toLoader->getTextSegment().data();
+		if(!this->toLoader && !toVMA.name.empty()){
+			if (printKnown) {
+				std::cout << COLOR_GREEN << "Pointer to Plain File:"
+				          << "\t" << toVMA.name << std::endl << COLOR_NORM;
+			}
+			continue;
 		}
-	}
 
-	~PagePtrInfo() = default;
-
-	uint32_t getCount() {
-		return count;
-	}
-
-	void addPtr(uint64_t where, uint64_t addr) {
-		this->count += 1;
-		this->ptrs[addr].insert(where);
-	}
-
-	uint64_t showPtrs(VMIInstance *vmi, uint32_t pid) {
-		uint64_t unknown_count = 0;
-		//std::cout << "Found " << count << " pointers:" << std::endl;
-		uint64_t callAddr = 0;
-		for (auto &ptr : ptrs) {
-
-			// TODO redo this entire section...
-			// I am confused ...
-			auto symname = this->process->symbols.getElfSymbolName(ptr.first);
-			auto toSec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
-
-
-			if (symname != "") {
-				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-				//          << std::hex << ptr.first - toVMA.start << std::dec
-				//          << "\t" << "Symbol:"
-				//          << "\t" << symname << std::endl;
+		if(toSec){
+			if ((ptr.first - toVMA.start - toSec->offset) == 0) {
+				if (printKnown) {
+					std::cout << COLOR_GREEN << "Pointer to start of Section:"
+					          << "\t" << toSec->name << std::endl << COLOR_NORM;
+				}
 				continue;
 			}
 
-			if (this->data &&
-			   (callAddr = isReturnAddress(this->data,
-			                               ptr.first - toVMA.start,
-			                               toVMA.start, vmi, pid))) {
+			if (printKnown) {
+				if (toSec->name == ".dynstr"){
+					std::string str = std::string((char*) toSec->index + (ptr.first - toVMA.start) - toSec->memindex);
+					std::cout << COLOR_GREEN << "Pointer to String:"
+					          << "\t" << str << std::endl << COLOR_NORM;
+					continue;
+				}
+			
+				if(toSec->name == ".dynsym"){
+					std::string str = this->toLoader->elffile->dynSymbolName(ptr.first - toVMA.start - toSec->offset);
+					std::cout << COLOR_GREEN << "Pointer to Symbol:"
+					          << "\t" << str << std::endl << COLOR_NORM;
+					continue;
+				}
+			}
 
-				//uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
-				//std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
-				//
-				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-				//          << std::hex << ptr.first - toVMA.start << std::dec
-				//          << "\t" << "Return Address:"<< "\t" << retFuncName << std::endl;
+			std::unordered_set<std::string> allowedSections = {
+				".gnu.hash",
+				".gnu.version",
+				".data.rel.ro",
+				".dynsym",
+				".dynstr",
+				".got.plt",
+				".rodata",
+				"__libc_IO_vtables"
+			};
+
+			if(allowedSections.find(toSec->name) != allowedSections.end()) {
+				if (printKnown) {
+					std::cout << COLOR_GREEN << "Pointer to Section:"
+					          << "\t" << toSec->name << std::endl << COLOR_NORM;
+				}
 				continue;
 			}
 
-			if(!this->toLoader){
-				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-				//          << std::hex << ptr.first - toVMA.start << std::dec
-				//          << "\tplain file" << std::endl;
-				continue;
-			}
-
-			if(toSec) {
-				bool known = false;
-				//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-				//          << std::hex << ptr.first - toVMA.start << std::dec
-				//          << "\tSection: " << toSec->name;
-				if (toSec->name == ".dynstr") {
-					//std::string str = std::string((char*) toSec->index + (ptr.first - toVMA.start) -toSec->memindex);
-					//std::cout << "\tString: " << str;
-					known = true;
-				}
-				else if (toSec->name == ".text" and
-				         toSec->offset == (ptr.first - toVMA.start)){
-					known = true;
-				}
-				else if (toSec->name == ".dynsym" or
-				         toSec->name == ".rodata" or
-				         toSec->name == ".dynamic" or
-				         toSec->name == ".interp" or
-				         toSec->name == ".eh_frame" or
-				         toSec->name == ".eh_frame_hdr" or
-				         toSec->name == ".hash" or
-				         toSec->name == ".note.ABI-tag" or
-				         toSec->name == ".note.gnu.build-id" or
-				         toSec->name == ".gnu.hash" or
-				         toSec->name == ".gnu.version" or
-				         toSec->name == ".gnu.version_d" or
-				         toSec->name == ".gnu.version_r" or
-				         toSec->name == ".gcc_except_table" or
-				         toSec->name == "__libc_IO_vtables" or
-				         toSec->name == ".data.rel.ro" or
-				         toSec->name == ".data.rel.ro.local" or
-				         toSec->name == ".rela.dyn" or
-				         toSec->name == ".rela.plt" or
-				         toSec->name == ".plt" or
-				         toSec->name == ".plt.got" or
-				         toSec->name == ".got.plt" or
-				         toSec->name == ".got") {
-					known = true;
-				}
-				//std::cout << std::endl;
-				if(known) continue;
-			}
-
-			if(this->fromLoader){
-				bool found = false;
-				for (auto &where : ptr.second) {
-					auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
-					if(fromVMA->off and fromSec and
-					   fromSec->name == ".got.plt") {
-						//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-						//          << std::hex << ptr.first - toVMA.start << std::dec
-						//          << "\tSection: " << toSec->name << std::endl
-						//          << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
-						//          << std::hex << where << std::dec
-						//          << "\tSection: " << fromSec->name
-						//          << std::endl;
-						found = true;
+			if (toSec->name == ".text") {
+				if (toLoader->elffile->entryPoint() == (ptr.first - toVMA.start)){
+					if (printKnown) {
+						std::cout << COLOR_GREEN << "Pointer to Entry Point:"
+						          << std::endl << COLOR_NORM;
 					}
+					continue;
 				}
-				if (found) { continue; }
+				if (this->data &&
+				   (callAddr = isReturnAddress(this->data,
+				                               ptr.first - toVMA.start,
+				                               toVMA.start, vmi, pid))) {
+					if (printKnown) {
+						uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
+						std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
+						
+						std::cout << COLOR_GREEN << "Return Address:"
+						          << "\t" << retFuncName << std::endl << COLOR_NORM;
+					}
+					continue;
+				}
 			}
+		}
 
-			std::cout << COLOR_RED
-			          << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-			          << std::hex << ptr.first - toVMA.start << std::dec;
-			if (toSec) {
-				std::cout << "\tSection: " << toSec->name;
+
+		// if(toSec) {
+		// 	bool known = false;
+		// 	//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+		// 	//          << std::hex << ptr.first - toVMA.start << std::dec
+		// 	//          << "\tSection: " << toSec->name;
+		// 	if (toSec->name == ".dynstr") {
+		// 		//std::string str = std::string((char*) toSec->index + (ptr.first - toVMA.start) -toSec->memindex);
+		// 		//std::cout << "\tString: " << str;
+		// 		known = true;
+		// 	}
+		// 	else if (toSec->name == ".text" and
+		// 	         toSec->offset == (ptr.first - toVMA.start)){
+		// 		known = true;
+		// 	}
+		// 	else if (toSec->name == ".dynsym" or
+		// 	         toSec->name == ".rodata" or
+		// 	         toSec->name == ".dynamic" or
+		// 	         toSec->name == ".interp" or
+		// 	         toSec->name == ".eh_frame" or
+		// 	         toSec->name == ".eh_frame_hdr" or
+		// 	         toSec->name == ".hash" or
+		// 	         toSec->name == ".note.ABI-tag" or
+		// 	         toSec->name == ".note.gnu.build-id" or
+		// 	         toSec->name == ".gnu.hash" or
+		// 	         toSec->name == ".gnu.version" or
+		// 	         toSec->name == ".gnu.version_d" or
+		// 	         toSec->name == ".gnu.version_r" or
+		// 	         toSec->name == ".gcc_except_table" or
+		// 	         toSec->name == "__libc_IO_vtables" or
+		// 	         toSec->name == ".data.rel.ro" or
+		// 	         toSec->name == ".data.rel.ro.local" or
+		// 	         toSec->name == ".rela.dyn" or
+		// 	         toSec->name == ".rela.plt" or
+		// 	         toSec->name == ".plt" or
+		// 	         toSec->name == ".plt.got" or
+		// 	         toSec->name == ".got.plt" or
+		// 	         toSec->name == ".got") {
+		// 		known = true;
+		// 	}
+		// 	//std::cout << std::endl;
+		// 	if(known) continue;
+		// }
+
+		// if(this->fromLoader){
+		// 	bool found = false;
+		// 	for (auto &where : ptr.second) {
+		// 		auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
+		// 		if(fromVMA->off and fromSec and
+		// 		   fromSec->name == ".got.plt") {
+		// 			//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+		// 			//          << std::hex << ptr.first - toVMA.start << std::dec
+		// 			//          << "\tSection: " << toSec->name << std::endl
+		// 			//          << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
+		// 			//          << std::hex << where << std::dec
+		// 			//          << "\tSection: " << fromSec->name
+		// 			//          << std::endl;
+		// 			found = true;
+		// 		}
+		// 	}
+		// 	if (found) { continue; }
+		// }
+
+		std::cout << COLOR_RED
+		          << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+		          << std::hex << ptr.first - toVMA.start << " ( 0x"
+		          << ptr.first << " ) " << std::dec;
+		if (toSec) {
+			std::cout << "\tSection: " << toSec->name;
+		}
+		std::cout << std::endl;
+		
+		for (auto &where : ptr.second) {
+			std::cout << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
+			          << std::hex << where << " ( 0x"
+			          << fromVMA->start + ptr.first << " ) " << std::dec;
+			const SectionInfo* fromSec = 0;
+			if(this->fromLoader && fromVMA->ino != 0) {
+				fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
+			}
+			if(fromSec) {
+				std::cout << "\tSection: " << fromSec->name;
+			}else if (fromVMA->ino == 0) {
+				std::cout << "\tSection: .bss (dynamic)";
+			} else {
+				std::cout << "\tPlain File: " << fromVMA->name << " : ";
+				fromVMA->print();
 			}
 			std::cout << std::endl;
-			
-			for (auto &where : ptr.second) {
-				std::cout << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
-				          << std::hex << where << std::dec;
-				const SectionInfo* fromSec = 0;
-				if(this->fromLoader){
-					fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
-				}
-				if(fromSec) {
-					std::cout << "\tSection: " << fromSec->name;
-				}else{
-					std::cout << "\tPlain File ";
-				}
-				std::cout << std::endl;
-			}
-			std::cout << COLOR_NORM;
-			unknown_count++;
 		}
-		return unknown_count;
+		std::cout << COLOR_NORM;
+		unknown_count++;
 	}
+	return unknown_count;
+}
 
 
 protected:

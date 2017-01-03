@@ -43,7 +43,7 @@ namespace fs = boost::filesystem;
 #define DELETE(expr) do { if(expr){ delete expr; expr = 0; }; } while (0)
 
 #define CHECKFLAGS(byte, flags)    !!((byte & flags) == flags)
-#define CONTAINS(min, size, what)  (what >= min && what <= min + size)
+#define CONTAINS(min, size, what)  (what >= min && what < min + size)
 #define IN_RANGE(value, left, right) (value >= left && value <= right)
 
 

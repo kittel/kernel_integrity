@@ -139,10 +139,12 @@ public:
 	virtual const SegmentInfo &findDataSegment() const = 0;
 
 	virtual uint64_t findAddressOfVariable(const std::string &symbolName) = 0;
+	virtual uint64_t entryPoint() const = 0;
 
 	virtual uint8_t *sectionAddress(int sectionID) = 0;
 	virtual uint64_t sectionAlign(int sectionID) = 0;
 
+	virtual std::string dynSymbolName(uint64_t offset) const = 0;
 	virtual std::string symbolName(uint32_t index, uint32_t strindex) const = 0;
 	virtual void addSymbolsToStore(SymbolManager *store, uint64_t memindex) const = 0;
 

@@ -206,9 +206,9 @@ const SectionInfo &ElfFile64::findSectionWithName(const std::string &sectionName
 	auto it = this->section_names.find(sectionName);
 
 	if (it != std::end(this->section_names)) {
-		if (it->second->name != sectionName) {
-			throw Error{"wrong result in section name map"};
-		}
+		// if (it->second->name != sectionName) {
+		// 	throw Error{"wrong result in section name map"};
+		// }
 
 		return *(it->second);
 	}
@@ -281,12 +281,32 @@ uint64_t ElfFile64::sectionAlign(int sectionID) {
 	return this->elf64Shdr[sectionID].sh_addralign;
 }
 
+std::string ElfFile64::dynSymbolName(uint64_t offset) const {
+	
+	SectionInfo symtabSection = this->findSectionWithName(".dynsym");
+	if((offset) % sizeof(Elf64_Sym) != 0) {
+		std::cout << COLOR_RED << "Warning: Unaligned Symbol pointer."<< COLOR_NORM << std::endl;
+		offset -= (offset) % sizeof(Elf64_Sym);
+	}
+	assert(offset < symtabSection.size);
+	Elf64_Sym *sym = (Elf64_Sym *)(symtabSection.index + offset);
+	
+	SectionInfo strtabSection = this->findSectionWithName(".dynstr");
+	char *strtab = (char *)strtabSection.index;
+
+	return std::string{&strtab[sym->st_name]};
+}
+
 std::string ElfFile64::symbolName(Elf64_Word index, uint32_t strindex) const {
 	return toString(&((this->fileContent + this->elf64Shdr[strindex].sh_offset)[index]));
 }
 
 uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
 	return this->symbolNameMap[symbolName];
+}
+
+uint64_t ElfFile64::entryPoint() const {
+	return (uint64_t) this->elf64Ehdr->e_entry;
 }
 
 bool ElfFile64::isRelocatable() const {
@@ -781,6 +801,7 @@ std::vector<ElfSymbol> ElfFile64::getSymbols() const {
 			if (elf64Shdr[i].sh_type == SHT_SYMTAB) {
 				symtabSection = this->findSectionByID(i);
 				strtabSection = this->findSectionByID(elf64Shdr[i].sh_link);
+				break;
 			}
 		}
 		symtab = (Elf64_Sym *)symtabSection.index;
