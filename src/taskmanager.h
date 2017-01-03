@@ -185,6 +185,7 @@ protected:
 	std::string rootPath;
 
 	std::vector<uint8_t> vdsoData;
+	uint64_t vdsoVvarPageOffset;
 
 	Kernel *kernel;
 

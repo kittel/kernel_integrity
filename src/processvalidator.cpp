@@ -164,13 +164,10 @@ public:
 		fromVMA{fromVMA},
 		toVMA{toVMA} {
 
-		if (fromVMA->name[0] == '[') {
-			this->fromLoader = this->process->getExecLoader();
-		} else if (fromVMA->name.compare(fromVMA->name.size()-5,5,".heap") == 0) {
-			this->fromLoader = this->process->findLoaderByFileName(
-			                   fromVMA->name.substr(0,fromVMA->name.size()-5));
-		} else {
+		if (fromVMA->name[0] != '[') {
 			this->fromLoader = this->process->findLoaderByFileName(fromVMA->name);
+		} else {
+			this->fromLoader = this->process->getExecLoader();
 		}
 		this->toLoader = this->process->findLoaderByFileName(toVMA.name);
 
@@ -195,6 +192,9 @@ public:
 		//std::cout << "Found " << count << " pointers:" << std::endl;
 		uint64_t callAddr = 0;
 		for (auto &ptr : ptrs) {
+
+			// TODO redo this entire section...
+			// I am confused ...
 			auto symname = this->process->symbols.getElfSymbolName(ptr.first);
 			auto toSec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
 
@@ -246,13 +246,21 @@ public:
 				         toSec->name == ".rodata" or
 				         toSec->name == ".dynamic" or
 				         toSec->name == ".interp" or
+				         toSec->name == ".eh_frame" or
+				         toSec->name == ".eh_frame_hdr" or
 				         toSec->name == ".hash" or
+				         toSec->name == ".note.ABI-tag" or
+				         toSec->name == ".note.gnu.build-id" or
 				         toSec->name == ".gnu.hash" or
 				         toSec->name == ".gnu.version" or
 				         toSec->name == ".gnu.version_d" or
+				         toSec->name == ".gnu.version_r" or
 				         toSec->name == ".gcc_except_table" or
 				         toSec->name == "__libc_IO_vtables" or
 				         toSec->name == ".data.rel.ro" or
+				         toSec->name == ".data.rel.ro.local" or
+				         toSec->name == ".rela.dyn" or
+				         toSec->name == ".rela.plt" or
 				         toSec->name == ".plt" or
 				         toSec->name == ".plt.got" or
 				         toSec->name == ".got.plt" or
@@ -263,22 +271,24 @@ public:
 				if(known) continue;
 			}
 
-			bool found = false;
-			for (auto &where : ptr.second) {
-				auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
-				if(fromVMA->off and fromSec and
-				   fromSec->name == ".got.plt") {
-					//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-					//          << std::hex << ptr.first - toVMA.start << std::dec
-					//          << "\tSection: " << toSec->name << std::endl
-					//          << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
-					//          << std::hex << where << std::dec
-					//          << "\tSection: " << fromSec->name
-					//          << std::endl;
-					found = true;
+			if(this->fromLoader){
+				bool found = false;
+				for (auto &where : ptr.second) {
+					auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
+					if(fromVMA->off and fromSec and
+					   fromSec->name == ".got.plt") {
+						//std::cout << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+						//          << std::hex << ptr.first - toVMA.start << std::dec
+						//          << "\tSection: " << toSec->name << std::endl
+						//          << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
+						//          << std::hex << where << std::dec
+						//          << "\tSection: " << fromSec->name
+						//          << std::endl;
+						found = true;
+					}
 				}
+				if (found) { continue; }
 			}
-			if (found) { continue; }
 
 			std::cout << COLOR_RED
 			          << "Pointer to 0x" << std::setfill('0') << std::setw(8)
@@ -287,13 +297,18 @@ public:
 				std::cout << "\tSection: " << toSec->name;
 			}
 			std::cout << std::endl;
-
+			
 			for (auto &where : ptr.second) {
 				std::cout << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
 				          << std::hex << where << std::dec;
-				auto fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
-				if(fromVMA->off && fromSec) {
+				const SectionInfo* fromSec = 0;
+				if(this->fromLoader){
+					fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
+				}
+				if(fromSec) {
 					std::cout << "\tSection: " << fromSec->name;
+				}else{
+					std::cout << "\tPlain File ";
 				}
 				std::cout << std::endl;
 			}
@@ -355,21 +370,21 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 			continue;
 		}
 
-		for (auto &section : range) {
-			if (CHECKFLAGS(section.first.flags, VMAInfo::VM_EXEC)) {
-				if (vma->name == section.first.name) {
-					// points to the same section
+		for (auto &mapping : range) {
+			if (CHECKFLAGS(mapping.first.flags, VMAInfo::VM_EXEC)) {
+				if (vma->name == mapping.first.name) {
+					// points to the same mapping
 					break;
 				}
 
-				if (IN_RANGE(*value, section.first.start + 1, section.first.end)) {
-					if (*value == section.first.start + 0x40) {
+				if (IN_RANGE(*value, mapping.first.start + 1, mapping.first.end)) {
+					if (*value == mapping.first.start + 0x40) {
 						// Pointer to PHDR
 						break;
 					}
 
 					counter++;
-					section.second.addPtr(i, *value);
+					mapping.second.addPtr(i, *value);
 				}
 			}
 		}
@@ -385,27 +400,25 @@ void ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 
 	uint64_t unknown = 0;
 
-	for (auto &section : range) {
-		if (section.second.getCount() == 0) continue;
-		const ElfUserspaceLoader* loader = nullptr;
-		if (vma->name[0] == '[') {
-			loader = this->process->getExecLoader();
-		} else if (vma->name.compare(vma->name.size()-5,5,".heap") == 0) {
-			loader = this->process->findLoaderByFileName(
-			            vma->name.substr(0,vma->name.size()-5));
-		} else {
-			loader = this->process->findLoaderByFileName(vma->name);
-		}
-		if (!loader) {
-			std::cout << "Could not find loader for VMA: " << vma->name << std::endl;
-		} else {
-			//std::cout << "Dependency in layer: " << loader->isDependency(section.first.name) << std::endl;
-		}
-		uint64_t unknown_now = section.second.showPtrs(this->vmi, this->pid);
+	for (auto &mapping : range) {
+		if (mapping.second.getCount() == 0) continue;
+		// const ElfUserspaceLoader* loader = nullptr;
+		// if (vma->name[0] != '[') {
+		// 	loader = this->process->findLoaderByFileName(vma->name);
+		// } else {
+		// 	loader = this->process->getExecLoader();
+		// }
+		// if (!loader) {
+		// 	std::cout << "Could not find loader for VMA: " << vma->name << ": ";
+		// 	vma->print();
+		// } else {
+		// 	//std::cout << "Dependency in layer: " << loader->isDependency(mapping.first.name) << std::endl;
+		// }
+		uint64_t unknown_now = mapping.second.showPtrs(this->vmi, this->pid);
 		unknown += unknown_now;
 		if(unknown_now) {
-			std::cout << "Pointers from " << ((vma->name[0] == '[') ?loader->getName() + " " + vma->name :vma->name)
-			          << " to " << section.first.name << std::endl;
+			std::cout << "Pointers from " << ((vma->name[0] == '[') ? process->getName() + " " + vma->name :vma->name)
+			          << " to " << mapping.first.name << std::endl;
 		}
 	}
 	if(unknown) {

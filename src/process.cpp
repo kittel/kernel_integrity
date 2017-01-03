@@ -26,10 +26,18 @@ Process::Process(const std::string &binaryName, Kernel *kernel, pid_t pid)
 	vdsoLoader{nullptr},
 	binaryName{binaryName} {
 
+	auto tm = this->kernel->getTaskManager();
+
 	std::cout << COLOR_GREEN << "Loading process " << binaryName
 	          << COLOR_NORM << std::endl;
-	this->mappedVMAs = this->kernel->getTaskManager()->getVMAInfo(pid);
-	this->execLoader = this->kernel->getTaskManager()->loadExec(this);
+	if (tm->terminated(pid)) {
+		std::cout << COLOR_RED << COLOR_BOLD
+		          << "No such task with pid: " << pid
+		          << COLOR_RESET << std::endl;
+		return;
+	}
+	this->mappedVMAs = tm->getVMAInfo(pid);
+	this->execLoader = tm->loadExec(this);
 
 	// process load-time relocations
 	std::cout << "Processing load-time relocations..." << std::endl;
@@ -198,10 +206,7 @@ void Process::processLoadRel() {
 		ElfUserspaceLoader *loader = this->findLoaderByFileName(vma.name);
 
 		// not stack, heap, vdso, vvar and so on
-		if (not loader &&
-		    vma.name[0] != '[' &&
-		    not util::hasEnding(vma.name, ".heap")) {
-
+		if (not loader && vma.ino != 0) {
 			// std::cout << "vma '" << vma.name
 			//           << "' not found as loaded library, loading..."
 			//           << std::endl;
@@ -302,7 +307,7 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 
 	for (auto &sym : syms) {
 		const std::string &name     = sym.name;
-		uint64_t           location = sym.value;
+		uint64_t location           = sym.value;
 		const SegmentInfo *segment  = sym.segment;
 
 		// test if the symbol actually has target location 0,
@@ -335,8 +340,11 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 			// is the same as
 			// loader.name = mapping.name
 			// because findloaderbyfilename just looks at that name.
-			if (mapping->name == loader->getName()) {
+			if (mapping->name != loader->getName()){
+				continue;
+			}
 
+			if (mapping->name[0] == '[' || mapping->ino != 0) {
 				// test if the flags of the mapping match the flags of the
 				// found segment
 

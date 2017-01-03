@@ -295,14 +295,17 @@ int main(int argc, char **argv) {
 
 	auto tm = kl->getTaskManager();
 
-	if (pid != 0) {
-
+	if (pid != 0 && !tm->terminated(pid)) {
 		std::string exe = tm->getTaskExeName(pid);
 		std::cout << "Creating process image to verify..." << std::endl;
 		Process proc{exe, kl, pid};
 		std::cout << "Starting process validation..." << std::endl;
 		ProcessValidator val{kl, &proc, &vmi};
 		validateUserspace(&val);
+	} else {
+		std::cout << COLOR_RED << COLOR_BOLD
+		          << "No task with pid: " << pid
+		          << COLOR_RESET << std::endl;
 	}
 
 	if (listprocs) {

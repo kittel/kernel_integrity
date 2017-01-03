@@ -119,14 +119,50 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 	std::string name;
 	uint64_t fileOff = 0;
 
-	std::string prevName;
-
 	// Get address of VDSO page
-	uint64_t vdsoPtr = mm.memberByName("context", true).memberByName("vdso").getAddress();
+	Instance context = mm.memberByName("context", true);
+	uint64_t vdsoPtr = context.memberByName("vdso").getAddress();
+	// Required to dereference void pointer
 	uint64_t vdsoPage = this->kernel->vmi->read64FromVA(vdsoPtr);
 
+	// Not available in kernel 3.16
+	// uint64_t vvar_start = context.memberByName("vdso_image", true).memberByName("sym_vvar_start").getAddress();
+	// std::cout << "VDSO_image: " << std::endl;
+	// Instance vdso_image = context.memberByName("vdso_image", true);
+	// std::cout << "vvar_page: " << std::endl;
+	// uint64_t vvar_page = vdso_image.memberByName("sym_vvar_page").getValue<int64_t>();
+
+	Instance vm_mm = cur.memberByName("vm_mm", true, true);
+	uint64_t vm_mm_brk = vm_mm.memberByName("brk").getValue<uint64_t>();
+	uint64_t vm_mm_start_brk = vm_mm.memberByName("start_brk").getValue<uint64_t>();
+	uint64_t vm_mm_start_stack = vm_mm.memberByName("start_stack").getValue<uint64_t>();
+	//uint64_t vm_mm_start_code = vm_mm.memberByName("start_code").getValue<uint64_t>();
+	//uint64_t vm_mm_end_code = vm_mm.memberByName("end_code").getValue<uint64_t>();
+	//uint64_t vm_mm_start_data = vm_mm.memberByName("start_data").getValue<uint64_t>();
+	//uint64_t vm_mm_end_data = vm_mm.memberByName("end_data").getValue<uint64_t>();
+
 	for (int i = 0; i < map_count; i++) {
-		// TODO change to memberByName("", false).getRawValue<std::string>(true)
+		// uint64_t this_vm_mm_brk = vm_mm.memberByName("brk").getValue<uint64_t>();
+		// uint64_t this_vm_mm_start_brk = vm_mm.memberByName("start_brk").getValue<uint64_t>();
+		// uint64_t this_vm_mm_start_stack = vm_mm.memberByName("start_stack").getValue<uint64_t>();
+		// uint64_t this_vm_mm_start_code = vm_mm.memberByName("start_code").getValue<uint64_t>();
+		// uint64_t this_vm_mm_end_code = vm_mm.memberByName("end_code").getValue<uint64_t>();
+		// uint64_t this_vm_mm_start_data = vm_mm.memberByName("start_data").getValue<uint64_t>();
+		// uint64_t this_vm_mm_end_data = vm_mm.memberByName("end_data").getValue<uint64_t>();
+		// 
+		// if(vm_mm_brk != this_vm_mm_brk ||
+		//    vm_mm_start_brk != this_vm_mm_start_brk ||
+		//    vm_mm_start_stack != this_vm_mm_start_stack ||
+		//    vm_mm_start_code != this_vm_mm_start_code ||
+		//    vm_mm_end_code != this_vm_mm_end_code ||
+		//    vm_mm_start_data != this_vm_mm_start_data ||
+		//    vm_mm_end_data != this_vm_mm_end_data) {
+		// 	std::cout << COLOR_RED << COLOR_BOLD
+		// 	          << "Warning mm_vm inconsistent for process"
+		// 	          << COLOR_RESET << std::endl;
+		// 	exit(0);
+		// }
+
 		curStart = cur.memberByName("vm_start").getValue<uint64_t>();
 		curEnd   = cur.memberByName("vm_end").getValue<uint64_t>();
 		flags    = cur.memberByName("vm_flags").getValue<uint64_t>();
@@ -150,40 +186,21 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 		}
 
 		if (name.empty()) {
-			////////////////////////////////////////////////////
-			// TODO XXX TODO XXX TODO                         //
-			// This is a dirty hack!                          //
-			// Find out where the kernel stores               //
-			// the addresses of vvar                          //
-			// I feel ashame for not fixing this right now!   //
-			////////////////////////////////////////////////////
-
-			Instance vm_mm = cur.memberByName("vm_mm", true, true);
 			if (curStart == vdsoPage) {
 				name = "[vdso]";
-			} else if (curStart <=
-			           vm_mm.memberByName("brk").getValue<uint64_t>() &&
-			           curEnd >= vm_mm.memberByName("start_brk")
-			           .getValue<uint64_t>()) {
-				name = "[heap]";
-			} else if (curStart <= vm_mm.memberByName("start_stack")
-			           .getValue<uint64_t>() &&
-			           curEnd >= vm_mm.memberByName("start_stack")
-			           .getValue<uint64_t>()) {
-				name = "[stack]";
-			} else if (i == map_count - 1) {
+			} else if (curStart == vdsoPage + this->vdsoVvarPageOffset) {
 				name = "[vvar]";
+			} else if (curStart <= vm_mm_brk && curEnd >= vm_mm_start_brk) {
+				name = "[heap]";
+			} else if (curStart <= vm_mm_start_stack && curEnd >= vm_mm_start_stack) {
+				name = "[stack]";
+			} else if (ino == 0 && curStart == vec.back().end) {
+				name = vec.back().name;
 			} else {
-				if (prevName.find(".heap") != std::string::npos) {
-					name = prevName;
-				}
-				else {
-					name = prevName + ".heap";
-				}
+				name = "<unknown>";
 			}
 		}
 
-		prevName = name;
 		vec.push_back(
 			VMAInfo{
 				curStart,
@@ -483,6 +500,8 @@ ElfUserspaceLoader *TaskManager::loadVDSO(Process *process) {
 	this->vdsoData = this->kernel->vmi->readVectorFromVA(
 		vdsoImage.memberByName("data").getRawValue<uint64_t>(false),
 		vdsoImage.memberByName("size").getValue<uint64_t>());
+
+	this->vdsoVvarPageOffset = vdsoImage.memberByName("sym_vvar_page").getValue<uint64_t>();
 
 	// Load VDSO page
 	ElfFile *vdsoFile = ElfFile::loadElfFileFromBuffer(
