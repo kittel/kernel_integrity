@@ -348,7 +348,7 @@ int main(int argc, char **argv) {
 			// process environment, and they have to be loaded again!
 			// otherwise, the wrong offsets will be reused!
 			
-			kl->getTaskManager()->cleanupLibraries();
+			// kl->getTaskManager()->cleanupLibraries();
 			const auto time2_start = std::chrono::system_clock::now();
 			Process proc{exe, kl, pid};
 			ProcessValidator val{kl, &proc, &vmi};

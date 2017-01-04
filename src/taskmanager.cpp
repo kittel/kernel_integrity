@@ -194,7 +194,7 @@ std::vector<VMAInfo> TaskManager::getVMAInfo(pid_t pid) {
 				name = "[heap]";
 			} else if (curStart <= vm_mm_start_stack && curEnd >= vm_mm_start_stack) {
 				name = "[stack]";
-			} else if (ino == 0 && curStart == vec.back().end) {
+			} else if (ino == 0 && vec.size() && curStart == vec.back().end) {
 				name = vec.back().name;
 			} else {
 				name = "<unknown>";
