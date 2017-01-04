@@ -321,6 +321,12 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 		//          << std::hex << ", location: 0x" << location
 		//          << std::dec << std::endl;
 
+		// segment flags from program header table
+		bool sflag_r, sflag_w, sflag_x;
+		sflag_r = segment->flags & PF_R;
+		sflag_w = segment->flags & PF_W;
+		sflag_x = segment->flags & PF_X;
+
 
 		// TODO: check the last mapping?
 		const VMAInfo *sym_proc_mapping = nullptr;
@@ -354,12 +360,6 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 				mflag_w = mapping->flags & VMAInfo::VM_WRITE;
 				mflag_x = mapping->flags & VMAInfo::VM_EXEC;
 
-				// segment flags from program header table
-				bool sflag_r, sflag_w, sflag_x;
-				sflag_r = segment->flags & PF_R;
-				sflag_w = segment->flags & PF_W;
-				sflag_x = segment->flags & PF_X;
-
 				if (mflag_r == sflag_r and
 				    mflag_w == sflag_w and
 				    mflag_x == sflag_x) {
@@ -376,8 +376,8 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 
 		if (sym_proc_mapping == nullptr) {
 			std::stringstream ss;
-			ss << "could not find any mapping for the symbol '"
-			   << name << "'";
+			ss << std::endl << "could not find any mapping for the symbol '"
+			   << name << "'" << std::endl;
 			throw Error{ss.str()};
 		}
 

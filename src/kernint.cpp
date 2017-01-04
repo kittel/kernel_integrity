@@ -347,7 +347,7 @@ int main(int argc, char **argv) {
 			// this is because the loaded libraries depend on the
 			// process environment, and they have to be loaded again!
 			// otherwise, the wrong offsets will be reused!
-			
+
 			// kl->getTaskManager()->cleanupLibraries();
 			const auto time2_start = std::chrono::system_clock::now();
 			Process proc{exe, kl, pid};

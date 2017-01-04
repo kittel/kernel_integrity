@@ -27,8 +27,9 @@ void ElfKernelLoader::initText() {
 	this->textSegment = elffile->findSectionWithName(".text"s);
 	this->updateSectionInfoMemAddress(this->textSegment);
 
-	this->fentryAddress = this->elffile->findAddressOfVariable("__fentry__");
-	this->genericUnrolledAddress = this->elffile->findAddressOfVariable("copy_user_generic_unrolled");
+	this->fentryAddress = this->symbols.getSystemMapAddress("__fentry__", true);
+	this->genericUnrolledAddress = this->symbols.getSystemMapAddress("copy_user_generic_unrolled", true);
+	assert(this->genericUnrolledAddress);
 
 	// patch kernel stuff.
 	this->applyAltinstr(&this->pvpatcher);
@@ -59,9 +60,9 @@ void ElfKernelLoader::initText() {
 	info                    = elffile->findSectionWithName(".init.text");
 	uint64_t initTextOffset = -info.memindex + (uint64_t)info.index;
 
-	info.index = (uint8_t*)elffile->findAddressOfVariable("__start_mcount_loc") +
+	info.index = (uint8_t*)this->symbols.getSystemMapAddress("__start_mcount_loc", true) +
 	initTextOffset;
-	info.size = (uint8_t*)elffile->findAddressOfVariable("__stop_mcount_loc") +
+	info.size = (uint8_t*)this->symbols.getSystemMapAddress("__stop_mcount_loc", true) +
 	            initTextOffset - info.index;
 	this->applyMcount(info, &this->pvpatcher);
 
@@ -78,8 +79,8 @@ void ElfKernelLoader::initText() {
 
 	info               = elffile->findSectionWithName(".data");
 	int64_t dataOffset = -(uint64_t)info.memindex + (uint64_t)info.index;
-	uint64_t jumpStart = elffile->findAddressOfVariable("__start___jump_table");
-	uint64_t jumpStop  = elffile->findAddressOfVariable("__stop___jump_table");
+	uint64_t jumpStart = this->symbols.getSystemMapAddress("__start___jump_table", true);
+	uint64_t jumpStop  = this->symbols.getSystemMapAddress("__stop___jump_table", true);
 
 	info.index = (uint8_t*)jumpStart + dataOffset;
 	info.size  = (uint8_t*)jumpStop + dataOffset - info.index;

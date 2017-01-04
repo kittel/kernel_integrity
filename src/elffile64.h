@@ -30,7 +30,7 @@ public:
 	const SectionInfo &findSectionWithName(const std::string &sectionName) const override;
 	const SectionInfo &findSectionByID(uint32_t sectionID) const override;
 	const SectionInfo *findSectionByOffset(size_t offset) const override;
-	
+
 	bool isCodeAddress(uint64_t address) override;
 	bool isDataAddress(uint64_t address) override;
 
@@ -47,7 +47,6 @@ public:
 
 	void addSymbolsToStore(SymbolManager *store, uint64_t memindex) const override;
 
-	uint64_t findAddressOfVariable(const std::string &symbolName) override;
 	uint64_t entryPoint() const override;
 
 	ElfKernelLoader *parseKernel() override;
@@ -65,7 +64,7 @@ public:
 	bool isDynamicLibrary() const override;
 	bool isExecutable() const override;
 
-	std::vector<ElfSymbol> getSymbols() const override;
+	std::vector<ElfSymbol> getSymbols(bool loadDbg) const override;
 
 	std::vector<std::string> getDependencies() override;
 

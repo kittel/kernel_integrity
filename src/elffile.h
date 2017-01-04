@@ -54,11 +54,11 @@ public:
 	inline bool isWritable() {
 		return CHECKFLAGS(this->flags, SHF_WRITE);
 	}
-	
+
 	inline bool isExec() {
 		return CHECKFLAGS(this->flags, SHF_ALLOC);
 	}
-	
+
 	inline bool isAlloc() {
 		return CHECKFLAGS(this->flags, SHF_EXECINSTR);
 	}
@@ -138,7 +138,6 @@ public:
 	virtual const SegmentInfo &findCodeSegment() const = 0;
 	virtual const SegmentInfo &findDataSegment() const = 0;
 
-	virtual uint64_t findAddressOfVariable(const std::string &symbolName) = 0;
 	virtual uint64_t entryPoint() const = 0;
 
 	virtual uint8_t *sectionAddress(int sectionID) = 0;
@@ -198,7 +197,7 @@ public:
 	virtual bool isExecutable() const = 0;
 
 	virtual std::vector<std::string> getDependencies() = 0;
-	virtual std::vector<ElfSymbol> getSymbols() const = 0;
+	virtual std::vector<ElfSymbol> getSymbols(bool loadDbg = true) const = 0;
 
 	uint32_t shstrindex;
 
@@ -228,9 +227,6 @@ protected:
 
 	std::string filename;
 
-	typedef std::map<std::string, uint64_t> SymbolNameMap;
-	SymbolNameMap symbolNameMap;
-
 	std::vector<SectionInfo> sections;
 	std::vector<SegmentInfo> segments;
 
@@ -238,6 +234,8 @@ protected:
 	std::unordered_map<std::string, SectionInfo *> section_names;
 
 	bool doLazyBind;
+
+	ElfFile* loadDebugVersion() const;
 };
 
 } // namespace kernint

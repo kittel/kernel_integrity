@@ -33,9 +33,6 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 
 	this->shstrindex = elf64Ehdr->e_shstrndx;
 
-	uint32_t symindex = 0;
-	uint32_t strindex = 0;
-
 	this->sections.clear();
 
 	// allocate the memory for the section vector
@@ -44,12 +41,6 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 	this->sections.reserve(this->getNrOfSections());
 
 	for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
-		// find sections SHT_SYMTAB, SHT_STRTAB
-		if (elf64Shdr[i].sh_type == SHT_SYMTAB) {
-			symindex = i;
-			strindex = elf64Shdr[i].sh_link;
-		}
-
 		std::string section_name = this->sectionName(i);
 
 		// save section infos
@@ -89,29 +80,6 @@ ElfFile64::ElfFile64(FILE *fd, size_t fileSize, uint8_t *fileContent)
 				}
 			);
 		}
-	}
-
-	if (!symindex) {
-		return;
-	}
-
-	uint32_t symSize = elf64Shdr[symindex].sh_size;
-	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
-	Elf64_Sym *symBase = (Elf64_Sym *)(this->fileContent + elf64Shdr[symindex].sh_offset);
-
-	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
-	for (Elf64_Sym *sym = symBase;
-	     sym < (Elf64_Sym *)(((uint8_t *)symBase) + symSize);
-	     sym++) {
-
-		if (!sym->st_name) {
-			continue;
-		}
-
-		std::string symbolName = this->symbolName(sym->st_name, strindex);
-		uint64_t symbolAddress = sym->st_value;
-
-		this->symbolNameMap[symbolName] = symbolAddress;
 	}
 }
 
@@ -282,7 +250,7 @@ uint64_t ElfFile64::sectionAlign(int sectionID) {
 }
 
 std::string ElfFile64::dynSymbolName(uint64_t offset) const {
-	
+
 	SectionInfo symtabSection = this->findSectionWithName(".dynsym");
 	if((offset) % sizeof(Elf64_Sym) != 0) {
 		std::cout << COLOR_RED << "Warning: Unaligned Symbol pointer."<< COLOR_NORM << std::endl;
@@ -290,7 +258,7 @@ std::string ElfFile64::dynSymbolName(uint64_t offset) const {
 	}
 	assert(offset < symtabSection.size);
 	Elf64_Sym *sym = (Elf64_Sym *)(symtabSection.index + offset);
-	
+
 	SectionInfo strtabSection = this->findSectionWithName(".dynstr");
 	char *strtab = (char *)strtabSection.index;
 
@@ -299,10 +267,6 @@ std::string ElfFile64::dynSymbolName(uint64_t offset) const {
 
 std::string ElfFile64::symbolName(Elf64_Word index, uint32_t strindex) const {
 	return toString(&((this->fileContent + this->elf64Shdr[strindex].sh_offset)[index]));
-}
-
-uint64_t ElfFile64::findAddressOfVariable(const std::string &symbolName) {
-	return this->symbolNameMap[symbolName];
 }
 
 uint64_t ElfFile64::entryPoint() const {
@@ -754,46 +718,18 @@ const SegmentInfo &ElfFile64::findSegmentByVaddr(const Elf64_Addr addr) const {
 	throw Error{"could not find segment by vaddr"};
 }
 
-std::vector<ElfSymbol> ElfFile64::getSymbols() const {
+std::vector<ElfSymbol> ElfFile64::getSymbols(bool loadDbg) const {
+
 	std::vector<ElfSymbol> ret;
 
 	if (not (this->isDynamic() or this->isExecutable())) {
 		return ret;
 	}
 
-	SectionInfo symtabSection = this->findSectionWithName(".dynsym");
-	SectionInfo strtabSection = this->findSectionWithName(".dynstr");
-
-	// TODO: warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'Elf64_Sym *' increases required alignment from 1 to 8
-	Elf64_Sym *symtab = (Elf64_Sym *)symtabSection.index;
-	char *strtab = (char *)strtabSection.index;
-
-	// initialize own symbols
-	for (unsigned int i = 0; i < symtabSection.size / sizeof(Elf64_Sym); i++) {
-
-		// if symbol is GLOBAL and _not_ UNDEFINED save it for announcement
-		if (symtab[i].st_shndx != SHN_UNDEF &&
-		    symtab[i].st_shndx != SHN_ABS &&
-		    symtab[i].st_shndx != SHN_COMMON) {
-
-			// this is final memory address after loading
-			uint64_t targetAddr = symtab[i].st_value;
-			if (!targetAddr) continue;
-			const SectionInfo *section = &(this->findSectionByID(symtab[i].st_shndx));
-			const SegmentInfo *segment = &(this->findSegmentByVaddr(targetAddr));
-
-			ElfSymbol sym{
-				std::string{&strtab[symtab[i].st_name]},
-				targetAddr,
-				symtab[i].st_info,
-				symtab[i].st_shndx,
-				section,
-				segment
-			};
-
-			ret.push_back(sym);
-		}
-	}
+	SectionInfo symtabSection;
+	SectionInfo strtabSection;
+	Elf64_Sym *symtab;
+	char *strtab;
 
 	try {
 		for (unsigned int i = 0; i < this->getNrOfSections(); i++) {
@@ -816,13 +752,21 @@ std::vector<ElfSymbol> ElfFile64::getSymbols() const {
 			    symtab[i].st_shndx != SHN_COMMON) {
 
 				// this is final memory address after loading
+				std::string name = std::string(&strtab[symtab[i].st_name]);
+				if(name.empty()) continue;
 				uint64_t targetAddr = symtab[i].st_value;
 				if (!targetAddr) continue;
-				const SectionInfo *section = &(this->findSectionByID(symtab[i].st_shndx));
-				const SegmentInfo *segment = &(this->findSegmentByVaddr(targetAddr));
+
+				const SectionInfo *section = nullptr;
+				const SegmentInfo *segment = nullptr;
+
+				if(loadDbg) {
+					section = &(this->findSectionByID(symtab[i].st_shndx));
+					segment = &(this->findSegmentByVaddr(targetAddr));
+				}
 
 				ElfSymbol sym{
-					std::string{&strtab[symtab[i].st_name]},
+					name,
 					targetAddr,
 					symtab[i].st_info,
 					symtab[i].st_shndx,
@@ -835,6 +779,61 @@ std::vector<ElfSymbol> ElfFile64::getSymbols() const {
 		}
 	} catch(Error &e) {}
 
+	if(ret.size() == 0 && loadDbg){
+		// std::cout << "No symbols found trying to load debug symbols" << std::endl;
+		ElfFile* dbgVersion = this->loadDebugVersion();
+		if(dbgVersion) {
+			ret = dbgVersion->getSymbols(false);
+			for (auto && sym : ret) {
+				sym.section = &(this->findSectionByID(sym.shndx));
+				sym.segment = &(this->findSegmentByVaddr(sym.value));
+			}
+			delete(dbgVersion);
+		}
+	}
+
+	if(!loadDbg) {
+		return ret;
+	}
+
+	symtabSection = this->findSectionWithName(".dynsym");
+	strtabSection = this->findSectionWithName(".dynstr");
+
+	symtab = (Elf64_Sym *)symtabSection.index;
+	strtab = (char *)strtabSection.index;
+
+	// initialize own symbols
+	for (unsigned int i = 0; i < symtabSection.size / sizeof(Elf64_Sym); i++) {
+
+		// if symbol is GLOBAL and _not_ UNDEFINED save it for announcement
+		if (symtab[i].st_shndx != SHN_UNDEF &&
+		    symtab[i].st_shndx != SHN_ABS &&
+		    symtab[i].st_shndx != SHN_COMMON) {
+
+			// this is final memory address after loading
+			std::string name = std::string(&strtab[symtab[i].st_name]);
+			if(name.empty()) continue;
+			uint64_t targetAddr = symtab[i].st_value;
+			if (!targetAddr) continue;
+			const SectionInfo *section = &(this->findSectionByID(symtab[i].st_shndx));
+			const SegmentInfo *segment = &(this->findSegmentByVaddr(targetAddr));
+
+			ElfSymbol sym{
+				name,
+				targetAddr,
+				symtab[i].st_info,
+				symtab[i].st_shndx,
+				section,
+				segment
+			};
+
+			ret.push_back(sym);
+		}
+	}
+
+	//for (auto && sym : ret) {
+	//	std::cout << sym.name << " -> " << std::hex << sym.value << std::dec << std::endl;
+	//}
 	return ret;
 }
 

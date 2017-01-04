@@ -149,29 +149,26 @@ ElfFile *ElfFile::loadElfFile(const std::string &filename) {
 	fd       = fopen(filename.c_str(), "rb");
 
 	if (fd == nullptr) {
-		std::cout << COLOR_RED << COLOR_BOLD
-		          << "File not found: " << filename
-		          << COLOR_NORM << std::endl;
+		// std::cout << COLOR_RED << COLOR_BOLD
+		//           << "File not found: " << filename
+		//           << COLOR_RESET << std::endl;
 		return nullptr;
 	}
 
-	{
-		char e_ident[SELFMAG];
-		size_t nread = fread(e_ident, 1, sizeof(e_ident), fd);
+	char e_ident[SELFMAG];
+	size_t nread = fread(e_ident, 1, sizeof(e_ident), fd);
 
-		if (nread != SELFMAG or
-		    e_ident[EI_MAG0] != ELFMAG0 or
-		    e_ident[EI_MAG1] != ELFMAG1 or
-		    e_ident[EI_MAG2] != ELFMAG2 or
-		    e_ident[EI_MAG3] != ELFMAG3) {
+	if (nread != SELFMAG or
+	    e_ident[EI_MAG0] != ELFMAG0 or
+	    e_ident[EI_MAG1] != ELFMAG1 or
+	    e_ident[EI_MAG2] != ELFMAG2 or
+	    e_ident[EI_MAG3] != ELFMAG3) {
 
-			std::cout << "non-elf file: " << filename << std::endl;
+		std::cout << "non-elf file: " << filename << std::endl;
 
-			fclose(fd);
-			return nullptr;
-		}
+		fclose(fd);
+		return nullptr;
 	}
-
 
 	ElfFile *elfFile     = nullptr;
 	size_t fileSize      = 0;
@@ -236,6 +233,21 @@ ElfFile* ElfFile::loadElfFileFromBuffer(const std::string &filename,
 
 	return elfFile;
 }
+
+ElfFile* ElfFile::loadDebugVersion() const {
+	ElfFile* dbg = nullptr;
+	auto it = this->section_names.find(".note.gnu.build-id");
+	if (it != this->section_names.end()) {
+		auto buildIdSection = *(it->second);
+		std::string buildID = hexStr(buildIdSection.index+16, buildIdSection.size-16);
+		std::stringstream s;
+		s << "/home/kittel/guest" << "/usr/lib/debug/.build-id/"
+		  << buildID.substr(0,2) << "/" << buildID.substr(2) << ".debug";
+		dbg = this->loadElfFile(s.str());
+	}
+	return dbg;
+}
+
 
 ElfFile::ElfType ElfFile::getType() { return this->type; }
 

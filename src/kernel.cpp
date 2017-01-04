@@ -122,7 +122,7 @@ void Kernel::loadAllModules() {
 		if(!module.second) {
 			std::cout << "missing module for " << module.first << std::endl;
 		}
-		
+
 		assert(module.second);
 	}
 

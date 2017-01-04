@@ -80,6 +80,18 @@ inline std::string toString(const uint8_t *string) {
 /** print a hexdump of some memory */
 void printHexDump(const std::vector<uint8_t> *bytes);
 
+constexpr char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+                           '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+inline std::string hexStr(unsigned char *data, int len){
+	std::string s(len * 2, ' ');
+	for (int i = 0; i < len; ++i) {
+		s[2 * i]     = hexmap[(data[i] & 0xF0) >> 4];
+		s[2 * i + 1] = hexmap[data[i] & 0x0F];
+	}
+	return s;
+}
+
 /** print memory mismatches */
 void displayChange(const uint8_t *memory,
                    const uint8_t *reference,
@@ -101,10 +113,20 @@ uint64_t isReturnAddress(const uint8_t *ptr, uint32_t offset, uint64_t index,
 		// This is a jmp instruction!
 		return 0;
 	}
+	if (offset > 5 && ptr[offset - 5] == (uint8_t)0x41 &&
+		ptr[offset - 4] == (uint8_t)0xff) {
+		// callq *0x??(%r??)
+		return 1;
+	}
 	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
 	    ptr[offset - 5] == (uint8_t)0x90) {
 		// call qword [rax+0x0]
 		// return 1 as we do not know rax
+		return 1;
+	}
+	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
+	    ptr[offset - 5] == (uint8_t)0x95) {
+		// ff 95 88 00 00 00       callq  *0x88(%rbp)
 		return 1;
 	}
 	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
@@ -116,7 +138,7 @@ uint64_t isReturnAddress(const uint8_t *ptr, uint32_t offset, uint64_t index,
 	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
 	    ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0x25) {
 		// call qword [0x0]
-		std::cout << "INVESTIGATE!" << std::endl;
+		// std::cout << "INVESTIGATE!" << std::endl;
 		return 1;
 	}
 	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
