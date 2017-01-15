@@ -119,6 +119,12 @@ AC_CHECK_LIB([dwarf], [dwarf_init], [],
 AC_CHECK_HEADERS([libdwarf/libdwarf.h], [],
 				 [AC_MSG_ERROR(["Error! You need to have libdwarf headers around."])]
 )
+AC_CHECK_LIB([capstone], [cs_open], [],
+			 [AC_MSG_ERROR(["Error! You need to have libcapstone around."])]
+)
+AC_CHECK_HEADERS([capstone/capstone.h], [],
+				 [AC_MSG_ERROR(["Error! You need to have libcapstone headers around."])]
+)
 
 LIBS=$OLDLIBS
 

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstring>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -12,6 +13,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
@@ -57,6 +59,27 @@ namespace fs = boost::filesystem;
 
 namespace kernint {
 
+/** print a hexdump of some memory */
+void printHexDump(const std::vector<uint8_t> *bytes);
+
+/** print memory mismatches */
+void displayChange(const uint8_t *memory,
+                   const uint8_t *reference,
+                   int32_t offset,
+                   int32_t size);
+
+std::string findFileInDir(std::string dirName,
+                          std::string fileName,
+                          std::string extension,
+                          std::vector<std::string> exclude=std::vector<std::string>());
+
+std::tuple<size_t, bool, std::string>
+printInstructions(const uint8_t *ptr, uint32_t offset, uint64_t index);
+bool isIntendedInstruction(const uint8_t *ptr, uint32_t offset, uint64_t index);
+bool isValidInstruction(const uint8_t *ptr, uint32_t offset, uint64_t index);
+uint64_t isReturnAddress(const uint8_t *ptr, uint32_t offset, uint64_t index,
+                         VMIInstance *vmi=nullptr, uint32_t pid=0);
+
 inline std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
 	std::stringstream ss(s);
 	std::string item;
@@ -65,7 +88,6 @@ inline std::vector<std::string> &split(const std::string &s, char delim, std::ve
 	}
 	return elems;
 }
-
 
 inline std::vector<std::string> split(const std::string &s, char delim) {
 	std::vector<std::string> elems;
@@ -76,9 +98,6 @@ inline std::vector<std::string> split(const std::string &s, char delim) {
 inline std::string toString(const uint8_t *string) {
 	return std::string(reinterpret_cast<const char *>(string));
 }
-
-/** print a hexdump of some memory */
-void printHexDump(const std::vector<uint8_t> *bytes);
 
 constexpr char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
                            '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
@@ -91,73 +110,6 @@ inline std::string hexStr(unsigned char *data, int len){
 	}
 	return s;
 }
-
-/** print memory mismatches */
-void displayChange(const uint8_t *memory,
-                   const uint8_t *reference,
-                   int32_t offset,
-                   int32_t size);
-
-inline
-uint64_t isReturnAddress(const uint8_t *ptr, uint32_t offset, uint64_t index,
-                         VMIInstance *vmi=nullptr, uint32_t pid=0) {
-
-	// TODO:  warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'int32_t *' (aka 'int *') increases required alignment from 1 to 4
-	int32_t *callOffset = (int32_t*) (ptr + offset - 4);
-	if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe8) {
-		// call qword 0x5
-		return index + offset + *callOffset;
-	}
-	if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe9) {
-		// jmp qword
-		// This is a jmp instruction!
-		return 0;
-	}
-	if (offset > 5 && ptr[offset - 5] == (uint8_t)0x41 &&
-		ptr[offset - 4] == (uint8_t)0xff) {
-		// callq *0x??(%r??)
-		return 1;
-	}
-	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
-	    ptr[offset - 5] == (uint8_t)0x90) {
-		// call qword [rax+0x0]
-		// return 1 as we do not know rax
-		return 1;
-	}
-	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
-	    ptr[offset - 5] == (uint8_t)0x95) {
-		// ff 95 88 00 00 00       callq  *0x88(%rbp)
-		return 1;
-	}
-	if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
-	    ptr[offset - 5] == (uint8_t)0x15) {
-		// call qword [rel 0x6]
-		uint64_t callAddr = index + offset + *callOffset;
-		return vmi->read64FromVA(callAddr, pid);
-	}
-	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
-	    ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0x25) {
-		// call qword [0x0]
-		// std::cout << "INVESTIGATE!" << std::endl;
-		return 1;
-	}
-	if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
-	    ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0xc5) {
-		// call   QWORD PTR [rax*8-0x0]
-		return 1;
-	}
-	if (offset > 2 && ptr[offset - 2] == (uint8_t)0xff) {
-		return 1;
-	}
-	if (offset > 3 && ptr[offset - 3] == (uint8_t)0xff) {
-		// call qword [rbx+0x0]
-		return 1;
-	}
-
-	return 0;
-}
-
-
 /* Convert a C-String into a std::string for gdb use (don't use elsewhere) */
 [[deprecated("don't use this gdb helper")]]
 inline std::string& toSTDstring(const char *input) {
@@ -192,12 +144,6 @@ inline bool fexists(const std::string &filename) {
 	return ifile.good();
 }
 
-std::string findFileInDir(std::string dirName,
-                          std::string fileName,
-                          std::string extension,
-                          std::vector<std::string> exclude=std::vector<std::string>());
-
-
 template<typename T>
 inline bool betweenRange(T value, const std::vector<std::pair<T, T>> &r){
 	for (auto &elem : r) {
@@ -214,6 +160,18 @@ size_t offset(const char* buf, size_t len, const char* str) {
 	return std::search(buf, buf + len, str, str + strlen(str)) - buf;
 }
 
+template <typename T>
+inline std::vector<T> operator+(const std::vector<T>& a, const std::vector<T>& b)
+{
+	assert(a.size() == b.size());
+
+	std::vector<T> result;
+	result.reserve(a.size());
+
+	std::transform(a.begin(), a.end(), b.begin(),
+	               std::back_inserter(result), std::plus<T>());
+	return result;
+}
 
 namespace util {
 

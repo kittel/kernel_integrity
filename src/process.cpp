@@ -317,9 +317,9 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 			//throw InternalError{"symbol with location 0 registered"};
 		}
 
-		// std::cout << " * symbol: " << name
-		//          << std::hex << ", location: 0x" << location
-		//          << std::dec << std::endl;
+		//std::cout << " * symbol: " << name
+		//         << std::hex << ", location: 0x" << location
+		//         << std::dec << std::endl;
 
 		// segment flags from program header table
 		bool sflag_r, sflag_w, sflag_x;
@@ -385,7 +385,7 @@ void Process::registerSyms(ElfUserspaceLoader *loader,
 		location += sym_proc_mapping->start;
 
 		// actually register it!
-		this->symbols.addSymbolAddress(name, location, true);
+		this->symbols.addSymbolAddress(name, location, false);
 		// bool replaced = this->symbols.addSymbolAddress(name, location, true);
 		// if (replaced) {
 		// 	std::cout << " * reregistered symbol: " << name << std::endl;

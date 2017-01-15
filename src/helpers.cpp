@@ -3,6 +3,8 @@
 #include <cxxabi.h>
 #include <dlfcn.h>
 
+#include <capstone/capstone.h>
+
 
 namespace kernint {
 
@@ -129,6 +131,175 @@ std::string findFileInDir(std::string dirName,
 		}
 	}
 	return "";
+}
+
+class Capstone {
+public:
+	static csh getHandle(){
+		if(!instance) {
+			instance = new Capstone();
+		}
+		return instance->handle;
+	}
+
+private:
+	static Capstone *instance;
+
+	csh handle;
+
+	Capstone(){
+		if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+			assert(false);
+	}
+	~Capstone(){
+		cs_close(&handle);
+	}
+
+};
+
+Capstone* Capstone::instance = nullptr;
+
+std::tuple<size_t, bool, std::string>
+printInstructions(const uint8_t *ptr, uint32_t offset, uint64_t index){
+	csh handle = Capstone::getHandle();
+	cs_insn *insn = cs_malloc(handle);
+	size_t nr_inst = 0;
+	std::stringstream ss;
+
+	// Check if current instruction may be disassembled
+	const uint8_t* code = ptr;
+	uint64_t cs_ptr = index;
+	size_t size = offset;
+	while(cs_disasm_iter(handle, &code, &size, &cs_ptr, insn)){
+		nr_inst++;
+		ss << insn->mnemonic << "\t" << insn->op_str << std::endl;
+		if(strcmp(insn->mnemonic, "ret") == 0) break;
+	}
+	cs_free(insn, 1);
+	return std::make_tuple(nr_inst, (size == 0), ss.str());
+}
+
+bool isIntendedInstruction(const uint8_t *ptr, uint32_t offset, uint64_t index) {
+	csh handle = Capstone::getHandle();
+	cs_insn *insn = cs_malloc(handle);
+
+	// Check if current instruction may be disassembled
+	const uint8_t* code = ptr + offset;
+	uint64_t cs_ptr = index + offset;
+	size_t size = offset + 10;
+	while(cs_disasm_iter(handle, &code, &size, &cs_ptr, insn) and code < ptr + offset);
+	cs_free(insn, 1);
+	return (code == ptr + offset);
+}
+
+bool isValidInstruction(const uint8_t *ptr, uint32_t offset, uint64_t index) {
+	bool ret = false;
+	csh handle = Capstone::getHandle();
+	cs_insn *insn = cs_malloc(handle);
+
+	// Check if current instruction may be disassembled
+	const uint8_t* code = ptr + offset;
+	uint64_t cs_ptr = index + offset;
+	size_t size = 10;
+	if (cs_disasm_iter(handle, &code, &size, &cs_ptr, insn)) {
+		ret = true;
+	}
+	cs_free(insn, 1);
+	return ret;
+}
+
+
+uint64_t isReturnAddress(const uint8_t *ptr, uint32_t offset, uint64_t index,
+                         VMIInstance * /*vmi*/, uint32_t /*pid*/) {
+	// List of return values:
+	//
+	// NOT_AN_INSTRUCTON
+	// NOT_AFTER_CALL
+
+	uint64_t address = 0;
+
+	csh handle = Capstone::getHandle();
+	cs_insn *insn = cs_malloc(handle);
+
+	if(!isValidInstruction(ptr, offset, index))
+		return 0;
+
+	// TODO maybe a relative jump is expected
+	int i = 0;
+	for(i = 2; i < 8; i++){
+		//Check if previous instruction is a call
+		const uint8_t *code = ptr + offset - i;
+		uint64_t cs_ptr = index + offset - i;
+		size_t size = 20;
+
+		if (cs_disasm_iter(handle, &code, &size, &cs_ptr, insn) and
+		    insn->size == i and
+		    (strcmp(insn->mnemonic, "call")  == 0 ||
+		     strcmp(insn->mnemonic, "lcall") == 0)) {
+			if (insn->op_str[0] == '0' and insn->op_str[1] == 'x'){
+				address = (uint64_t)strtol(insn->op_str + 2, NULL, 16);;
+			} else {
+				address = 1;
+			}
+			break;
+		}
+	}
+	cs_free(insn, 1);
+	return address;
+
+	// // TODO:  warning: cast from 'uint8_t *' (aka 'unsigned char *') to 'int32_t *' (aka 'int *') increases required alignment from 1 to 4
+	// int32_t *callOffset = (int32_t*) (ptr + offset - 4);
+	// if (offset > 2 && ptr[offset - 2] == (uint8_t)0xff) {
+	// 	return 1;
+	// }
+	// if (offset > 3 && ptr[offset - 3] == (uint8_t)0xff) {
+	// 	// call qword [rbx+0x0]
+	// 	return 1;
+	// }
+	// if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe8) {
+	// 	// call qword 0x5
+	// 	return index + offset + *callOffset;
+	// }
+	// if (offset > 5 && ptr[offset - 5] == (uint8_t)0xe9) {
+	// 	// jmp qword
+	// 	// This is a jmp instruction!
+	// 	return 0;
+	// }
+	// if (offset > 5 && ptr[offset - 5] == (uint8_t)0x41 &&
+	// 	ptr[offset - 4] == (uint8_t)0xff) {
+	// 	// callq *0x??(%r??)
+	// 	return 1;
+	// }
+	// if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
+	//     ptr[offset - 5] == (uint8_t)0x90) {
+	// 	// call qword [rax+0x0]
+	// 	// return 1 as we do not know rax
+	// 	return 1;
+	// }
+	// if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
+	//     ptr[offset - 5] == (uint8_t)0x95) {
+	// 	// ff 95 88 00 00 00       callq  *0x88(%rbp)
+	// 	return 1;
+	// }
+	// if (offset > 6 && ptr[offset - 6] == (uint8_t)0xff &&
+	//     ptr[offset - 5] == (uint8_t)0x15) {
+	// 	// call qword [rel 0x6]
+	// 	uint64_t callAddr = index + offset + *callOffset;
+	// 	return vmi->read64FromVA(callAddr, pid);
+	// }
+	// if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
+	//     ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0x25) {
+	// 	// call qword [0x0]
+	// 	// std::cout << "INVESTIGATE!" << std::endl;
+	// 	return 1;
+	// }
+	// if (offset > 7 && ptr[offset - 7] == (uint8_t)0xff &&
+	//     ptr[offset - 6] == (uint8_t)0x14 && ptr[offset - 5] == (uint8_t)0xc5) {
+	// 	// call   QWORD PTR [rax*8-0x0]
+	// 	return 1;
+	// }
+
+	// return 0;
 }
 
 namespace util {

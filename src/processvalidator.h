@@ -47,7 +47,7 @@ protected:
 	constexpr static uint16_t stdPageSize  = 0x1000;
 
 	void validateCodePage(const VMAInfo *vma) const;
-	void validateDataPage(const VMAInfo *vma) const;
+	std::vector<size_t> validateDataPage(const VMAInfo *vma) const;
 };
 
 } // namespace kernint
