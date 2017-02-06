@@ -195,9 +195,10 @@ public:
 	virtual bool isDynamic() const = 0;
 	virtual bool isDynamicLibrary() const = 0;
 	virtual bool isExecutable() const = 0;
+	size_t getSymbolCount() const;
 
 	virtual std::vector<std::string> getDependencies() = 0;
-	virtual std::vector<ElfSymbol> getSymbols(bool loadDbg = true) const = 0;
+	virtual std::vector<ElfSymbol> getSymbols(bool loadDbg = true) = 0;
 
 	uint32_t shstrindex;
 
@@ -234,6 +235,7 @@ protected:
 	std::unordered_map<std::string, SectionInfo *> section_names;
 
 	bool doLazyBind;
+	size_t symbolCount;
 
 	ElfFile* loadDebugVersion() const;
 };

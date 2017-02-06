@@ -64,7 +64,7 @@ public:
 	bool isDynamicLibrary() const override;
 	bool isExecutable() const override;
 
-	std::vector<ElfSymbol> getSymbols(bool loadDbg) const override;
+	std::vector<ElfSymbol> getSymbols(bool loadDbg) override;
 
 	std::vector<std::string> getDependencies() override;
 

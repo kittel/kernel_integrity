@@ -125,7 +125,8 @@ ElfFile::ElfFile(FILE *fd, size_t fileSize, uint8_t *fileContent,
 	type{type},
 	programType{programType},
 	filename{""},
-	doLazyBind{false} // < TODO set to true once the "this elf doesn't lazybind" detection works
+	doLazyBind{false}, // < TODO set to true once the "this elf doesn't lazybind" detection works
+	symbolCount{0}
 {}
 
 ElfFile::~ElfFile(){
@@ -252,6 +253,10 @@ ElfFile* ElfFile::loadDebugVersion() const {
 ElfFile::ElfType ElfFile::getType() { return this->type; }
 
 ElfFile::ElfProgramType ElfFile::getProgramType() { return this->programType;}
+
+size_t ElfFile::getSymbolCount() const{
+	return this->symbolCount;
+}
 
 int ElfFile::getFD() { return fileno(this->fd); }
 

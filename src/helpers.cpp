@@ -184,8 +184,8 @@ bool isIntendedInstruction(const uint8_t *ptr, uint32_t offset, uint64_t index) 
 	cs_insn *insn = cs_malloc(handle);
 
 	// Check if current instruction may be disassembled
-	const uint8_t* code = ptr + offset;
-	uint64_t cs_ptr = index + offset;
+	const uint8_t* code = ptr;
+	uint64_t cs_ptr = index;
 	size_t size = offset + 10;
 	while(cs_disasm_iter(handle, &code, &size, &cs_ptr, insn) and code < ptr + offset);
 	cs_free(insn, 1);

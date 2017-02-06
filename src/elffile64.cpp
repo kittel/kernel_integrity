@@ -718,7 +718,7 @@ const SegmentInfo &ElfFile64::findSegmentByVaddr(const Elf64_Addr addr) const {
 	throw Error{"could not find segment by vaddr"};
 }
 
-std::vector<ElfSymbol> ElfFile64::getSymbols(bool loadDbg) const {
+std::vector<ElfSymbol> ElfFile64::getSymbols(bool loadDbg) {
 
 	std::vector<ElfSymbol> ret;
 
@@ -795,6 +795,9 @@ std::vector<ElfSymbol> ElfFile64::getSymbols(bool loadDbg) const {
 	if(!loadDbg) {
 		return ret;
 	}
+
+	// Store the number of internal symbols for later reference.
+	this->symbolCount = ret.size();
 
 	symtabSection = this->findSectionWithName(".dynsym");
 	strtabSection = this->findSectionWithName(".dynstr");

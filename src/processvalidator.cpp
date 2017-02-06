@@ -21,6 +21,534 @@ namespace fs = boost::filesystem;
 
 namespace kernint {
 
+class PagePtrInfo {
+public:
+
+PagePtrInfo(Process* process, const VMAInfo *fromVMA, const VMAInfo &toVMA)
+	:
+	count{0},
+	ptrs{},
+	process{process},
+	data{nullptr},
+	fromVMA{fromVMA},
+	toVMA{toVMA} {
+
+	if (fromVMA->name[0] != '[') {
+		this->fromLoader = this->process->findLoaderByFileName(fromVMA->name);
+	} else {
+		this->fromLoader = this->process->getExecLoader();
+	}
+	this->toLoader = this->process->findLoaderByFileName(toVMA.name);
+
+	if (this->toLoader != nullptr) {
+		this->data = this->toLoader->getTextSegment().data();
+	}
+}
+
+~PagePtrInfo() = default;
+
+uint32_t getCount() {
+	return count;
+}
+
+void addPtr(uint64_t where, uint64_t addr) {
+	this->count += 1;
+	this->ptrs[addr].insert(where);
+}
+
+typedef enum {
+	PTR_NO_SECTION      = 1 << 0,
+	PTR_PLAIN_FILE      = 1 << 1,
+	PTR_SECTION_START   = 1 << 2,
+	PTR_DYNSTR          = 1 << 3,
+	PTR_DYNSYM          = 1 << 4,
+	PTR_SEC_NOT_TEXT    = 1 << 5,
+	PTR_SYMBOL          = 1 << 6,
+	PTR_ENTRY           = 1 << 7,
+	PTR_INVALID_INSTR   = 1 << 8,
+	PTR_UNINT_INSTR     = 1 << 9,
+	PTR_RETURN          = 1 << 10,
+	PTR_UNKNOWN         = 1 << 12,
+	PTR_GADGET          = 1 << 13,
+	PTR_NOT_7f          = 1 << 14,
+	PTR_UNINT_INSTR_NC  = 1 << 15,
+	PTR_END_PRINTABLE   = 1 << 16
+} ptr_class_e;
+
+static std::string printStat2(std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> ptr_class) {
+	size_t overall              = 0;
+	size_t overall_not_7f       = 0;
+	size_t overall_7f           = 0;
+	size_t ptr_unique            = 0;
+	size_t ptr_unique_not_7f     = 0;
+	size_t ptr_unique_7f         = 0;
+	size_t ptr_text             = 0;
+	size_t ptr_text_not_7f      = 0;
+	size_t ptr_text_7f          = 0;
+	size_t ptr_unk              = 0;
+	size_t ptr_unk_not_7f       = 0;
+	size_t ptr_unk_7f           = 0;
+	size_t ptr_inv_inst         = 0;
+	size_t ptr_inv_inst_not_7f  = 0;
+	size_t ptr_inv_inst_7f      = 0;
+	size_t ptr_unin_inst        = 0;
+	size_t ptr_unin_inst_not_7f = 0;
+	size_t ptr_unin_inst_7f     = 0;
+	size_t ptr_unin_ret         = 0;
+	size_t ptr_unin_ret_not_7f  = 0;
+	size_t ptr_unin_ret_7f      = 0;
+	size_t ptr_unin_gad        = 0;
+	size_t ptr_unin_gad_not_7f = 0;
+	size_t ptr_unin_gad_7f     = 0;
+	size_t ptr_unk_print        = 0;
+	size_t ptr_unk_print_not_7f = 0;
+	size_t ptr_unk_print_7f     = 0;
+
+	for (auto && ptr : ptr_class) {
+		auto flags = ptr.second.second;
+		
+		overall += ptr.second.first;
+		ptr_unique++;
+		if(!(CHECKFLAGS(flags, PTR_SEC_NOT_TEXT))) ptr_text++;
+		if(CHECKFLAGS(flags, PTR_UNKNOWN)) ptr_unk++;
+		if(CHECKFLAGS(flags, PTR_INVALID_INSTR)) ptr_inv_inst++;
+		if(CHECKFLAGS(flags, PTR_UNINT_INSTR)) ptr_unin_inst++;
+		if(CHECKFLAGS(flags, (PTR_UNINT_INSTR | PTR_RETURN))) ptr_unin_ret++;
+		if(CHECKFLAGS(flags, (PTR_UNINT_INSTR | PTR_GADGET))) ptr_unin_gad++;
+		if(CHECKFLAGS(flags, (PTR_UNKNOWN | PTR_END_PRINTABLE))) ptr_unk_print++;
+
+
+		if(CHECKFLAGS(flags, PTR_NOT_7f)){
+			overall_not_7f += ptr.second.first;
+			ptr_unique_not_7f++;
+			if(!(CHECKFLAGS(flags, PTR_SEC_NOT_TEXT))) ptr_text_not_7f++;
+			if(CHECKFLAGS(flags, PTR_UNKNOWN)) ptr_unk_not_7f++;
+			if(CHECKFLAGS(flags, PTR_INVALID_INSTR)) ptr_inv_inst_not_7f++;
+			if(CHECKFLAGS(flags, PTR_UNINT_INSTR)) ptr_unin_inst_not_7f++;
+			if(CHECKFLAGS(flags, (PTR_UNINT_INSTR | PTR_RETURN))) ptr_unin_ret_not_7f++;
+			if(CHECKFLAGS(flags, (PTR_UNINT_INSTR | PTR_GADGET))) ptr_unin_gad_not_7f++;
+			if(CHECKFLAGS(flags, (PTR_UNKNOWN | PTR_END_PRINTABLE))) ptr_unk_print_not_7f++;
+		}else{
+			overall_7f += ptr.second.first;
+			ptr_unique_7f++;
+			if(!(CHECKFLAGS(flags, PTR_SEC_NOT_TEXT))) ptr_text_7f++;
+			if(CHECKFLAGS(flags, PTR_UNKNOWN)) ptr_unk_7f++;
+			if(CHECKFLAGS(flags, PTR_INVALID_INSTR)) ptr_inv_inst_7f++;
+			if(CHECKFLAGS(flags, PTR_UNINT_INSTR)) ptr_unin_inst_7f++;
+			if(CHECKFLAGS(flags, (PTR_UNINT_INSTR | PTR_RETURN))) ptr_unin_ret_7f++;
+			if(CHECKFLAGS(flags, (PTR_UNINT_INSTR | PTR_GADGET))) ptr_unin_gad_7f++;
+			if(CHECKFLAGS(flags, (PTR_UNKNOWN | PTR_END_PRINTABLE))) ptr_unk_print_7f++;
+		}
+	}
+
+	//   << "Overall ptrs;"
+	//   << "Unique ptrs;"
+	//   << "Not PIE;"
+	//   << "Ptr Known;"
+	//   << "No corresponding section;"
+	//   << "Ptr to plain file;"
+	//   << "Ptr to start of section;"
+	//   << "Pointer to Section != .text;"
+	//   << "Ptr to String (.dynstr);"
+	//   << "Ptr to Symbol (.dynsym)";
+	//   << "Pointer to Symbol;"
+	//   << "Pointer to EntryPoint;"
+	//   << "Return Address;"
+	//   << "Unknown Ptr;"
+	//   << "Unknown Ptr Pie;"
+	//   << "Unknown Pie End Printable"
+	//   << "Invalid Instruction;"
+	//   << "Unintended Instruction;"
+	//   << "Unintended Instruction not checked;"
+	//   << "Unintended Return instruction;"
+	//   << "Unintended Usable Gadget;"
+
+	std::stringstream ss;
+	ss << ";" << overall       << " (" << overall_7f << " / " << overall_not_7f << ")"
+	   << ";" << ptr_unique    << " (" << ptr_unique_7f << " / " << ptr_unique_not_7f << ")"
+	   << ";" << ptr_text      << " (" << ptr_text_7f << " / " << ptr_text_not_7f << ")"
+	   << ";" << ptr_unk       << " (" << ptr_unk_7f << " / " << ptr_unk_not_7f << ")"
+	   << ";" << ptr_unk_print << " (" << ptr_unk_print_7f << " / " << ptr_unk_print_not_7f << ")"
+	   << ";" << ptr_inv_inst  << " (" << ptr_inv_inst_7f << " / " << ptr_inv_inst_not_7f << ")"
+	   << ";" << ptr_unin_inst << " (" << ptr_unin_inst_7f << " / " << ptr_unin_inst_not_7f << ")"
+	   << ";" << ptr_unin_ret  << " (" << ptr_unin_ret_7f << " / " << ptr_unin_ret_not_7f << ")"
+	   << ";" << ptr_unin_gad  << " (" << ptr_unin_gad_7f << " / " << ptr_unin_gad_not_7f << ")"
+	;
+
+	return ss.str();
+}
+
+static std::string printStat(std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> ptr_class, bool count_not_7f = true) {
+	size_t overall              = 0;
+	size_t ptr_not_7f           = 0;
+	size_t ptr_unk_7f           = 0;
+	size_t ptr_no_section       = 0;
+	size_t ptr_plain_file       = 0;
+	size_t ptr_section_start    = 0;
+	size_t ptr_dynstr           = 0;
+	size_t ptr_dynsym           = 0;
+	size_t ptr_sec_not_text     = 0;
+	size_t ptr_symbol           = 0;
+	size_t ptr_entry            = 0;
+	size_t ptr_invalid_instr    = 0;
+	size_t ptr_unint_instr      = 0;
+	size_t ptr_unint_instr_nc   = 0;
+	size_t ptr_return           = 0;
+	size_t ptr_unint_return     = 0;
+	size_t ptr_unknown          = 0;
+	size_t ptr_unint_gadget     = 0;
+	size_t ptr_unk_7f_end_print = 0;
+
+	for (auto && ptr : ptr_class) {
+		if(!count_not_7f && !(ptr.first >> 24)) continue;
+		overall += ptr.second.first;
+		auto flags = ptr.second.second;
+		if(CHECKFLAGS(flags, PTR_NO_SECTION)) ptr_no_section++;
+		if(CHECKFLAGS(flags, PTR_PLAIN_FILE)) ptr_plain_file++;
+		if(CHECKFLAGS(flags, PTR_SECTION_START)) ptr_section_start++;
+		if(CHECKFLAGS(flags, PTR_DYNSTR)) ptr_dynstr++;
+		if(CHECKFLAGS(flags, PTR_DYNSYM)) ptr_dynsym++;
+		if(CHECKFLAGS(flags, PTR_SEC_NOT_TEXT)) ptr_sec_not_text++;
+		if(CHECKFLAGS(flags, PTR_SYMBOL)) ptr_symbol++;
+		if(CHECKFLAGS(flags, PTR_ENTRY)) ptr_entry++;
+		if(CHECKFLAGS(flags, PTR_INVALID_INSTR)) ptr_invalid_instr++;
+		if(CHECKFLAGS(flags, PTR_UNINT_INSTR)) ptr_unint_instr++;
+		if(CHECKFLAGS(flags, PTR_UNINT_INSTR_NC)) ptr_unint_instr_nc++;
+		if(CHECKFLAGS(flags, PTR_RETURN)) ptr_return++;
+		if(CHECKFLAGS(flags, (PTR_UNINT_INSTR | PTR_RETURN))) ptr_unint_return++;
+		if(CHECKFLAGS(flags, PTR_UNKNOWN)) ptr_unknown++;
+		if(CHECKFLAGS(flags, (PTR_UNINT_INSTR | PTR_GADGET))) ptr_unint_gadget++;
+		if(CHECKFLAGS(flags, PTR_NOT_7f)) ptr_not_7f++;
+		if(CHECKFLAGS(flags, (PTR_UNKNOWN)) &&
+		   !CHECKFLAGS(flags, (PTR_NOT_7f))){
+			ptr_unk_7f++;
+		}
+		if(CHECKFLAGS(flags, (PTR_UNKNOWN)) &&
+		   !CHECKFLAGS(flags, (PTR_NOT_7f)) &&
+		   CHECKFLAGS(flags, (PTR_END_PRINTABLE))){
+			ptr_unk_7f_end_print++;
+		}
+	}
+
+	//   << "Overall ptrs;"
+	//   << "Unique ptrs;"
+	//   << "Not PIE;"
+	//   << "Ptr Known;"
+	//   << "No corresponding section;"
+	//   << "Ptr to plain file;"
+	//   << "Ptr to start of section;"
+	//   << "Pointer to Section != .text;"
+	//   << "Ptr to String (.dynstr);"
+	//   << "Ptr to Symbol (.dynsym)";
+	//   << "Pointer to Symbol;"
+	//   << "Pointer to EntryPoint;"
+	//   << "Return Address;"
+	//   << "Unknown Ptr;"
+	//   << "Unknown Ptr Pie;"
+	//   << "Unknown Pie End Printable"
+	//   << "Invalid Instruction;"
+	//   << "Unintended Instruction;"
+	//   << "Unintended Instruction not checked;"
+	//   << "Unintended Return instruction;"
+	//   << "Unintended Usable Gadget;"
+
+	std::stringstream ss;
+	ss << ";" << overall
+	   << ";" << ptr_class.size()
+	   << ";" << ptr_not_7f
+	   << ";" << ptr_class.size() - ptr_unknown
+	   << ";" << ptr_no_section
+//	   << ";" << ptr_plain_file
+	   << ";" << ptr_section_start
+	   << ";" << ptr_sec_not_text
+	   << ";" << ptr_dynstr
+	   << ";" << ptr_dynsym
+	   << ";" << ptr_symbol
+	   << ";" << ptr_entry
+	   << ";" << ptr_return
+	   << ";" << ptr_unknown
+	   << ";" << ptr_unk_7f
+	   << ";" << ptr_unk_7f_end_print
+	   << ";" << ptr_invalid_instr
+	   << ";" << ptr_unint_instr
+	   << ";" << ptr_unint_instr_nc
+	   << ";" << ptr_unint_return
+	   << ";" << ptr_unint_gadget;
+
+	return ss.str();
+}
+
+std::string printMappingInfo() {
+	std::stringstream ss;
+	ss << "Mapping summary"
+	   << ";" << this->process->getPID()
+	   << ";" << this->process->getName()
+	   << ";" << this->fromVMA->name
+	   << ";" << this->toVMA.name
+	   << ";" << ((this->toLoader) ?0 :this->toLoader->elffile->getSymbolCount());
+	return ss.str();
+}
+
+std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> showPtrs() {
+	//std::cout << "Found " << count << " pointers:" << std::endl;
+	uint64_t callAddr = 0;
+	bool printKnown = false;
+	std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> ptr_class;
+	for (auto &ptr : ptrs) {
+		ptr_class[ptr.first].first = ptr.second.size();
+
+		uint64_t flags = 0;
+		if (!(ptr.first >> 24)) SETFLAGS(flags, PTR_NOT_7f);
+
+		auto toSec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
+
+		if(!toSec) {
+			SETFLAGS(flags, PTR_NO_SECTION);
+			if (printKnown) {
+				std::cout << COLOR_MARGENTA << "Pointer to no section"
+				          << std::endl << COLOR_NORM;
+			}
+			ptr_class[ptr.first].second = flags;
+			continue;
+		}
+
+		if(!this->toLoader && !toVMA.name.empty()){
+			SETFLAGS(flags, PTR_PLAIN_FILE);
+			if (printKnown) {
+				std::cout << COLOR_GREEN << "Pointer to Plain File:"
+				          << "\t" << toVMA.name << std::endl << COLOR_NORM;
+			}
+			ptr_class[ptr.first].second = flags;
+			continue;
+		}
+
+		if ((ptr.first - toVMA.start - toSec->offset) == 0) {
+			SETFLAGS(flags, PTR_SECTION_START);
+			if (printKnown) {
+				std::cout << COLOR_GREEN << "Pointer to start of Section:"
+				          << "\t" << toSec->name << std::endl << COLOR_NORM;
+			}
+			ptr_class[ptr.first].second = flags;
+			continue;
+		}
+
+
+		if (toSec->name == ".dynstr"){
+			SETFLAGS(flags, PTR_DYNSTR);
+			if (printKnown) {
+				std::string str = std::string((char*) toSec->index + (ptr.first - toVMA.start) - toSec->memindex);
+				std::cout << COLOR_GREEN << "Pointer to String:"
+				          << "\t" << str << std::endl << COLOR_NORM;
+			}
+		}
+
+		if(toSec->name == ".dynsym"){
+			SETFLAGS(flags, PTR_DYNSYM);
+			if (printKnown) {
+				std::string str = this->toLoader->elffile->dynSymbolName(ptr.first - toVMA.start - toSec->offset);
+				std::cout << COLOR_GREEN << "Pointer to Symbol:"
+				          << "\t" << str << std::endl << COLOR_NORM;
+			}
+		}
+
+		std::unordered_set<std::string> allowedSections = {
+			".data.rel.ro",
+			".data.rel.ro.local",
+			".dynamic",
+			".dynstr",
+			".dynsym",
+			".eh_frame",
+			".eh_frame_hdr",
+			".gcc_except_table",
+			".gnu.hash",
+			".gnu.version",
+			".gnu.version_d",
+			".gnu.version_r",
+			".got",
+			".got.plt",
+			".hash",
+			".interp",
+			".note.ABI-tag",
+			".note.gnu.build-id",
+			".plt",
+			".plt.got",
+			".rela.dyn",
+			".rela.plt",
+			".rodata",
+			"__libc_IO_vtables",
+			"__libc_thread_freeres_fn"
+		};
+
+		if(allowedSections.find(toSec->name) != allowedSections.end()) {
+			SETFLAGS(flags, PTR_SEC_NOT_TEXT);
+			if (printKnown) {
+				std::cout << COLOR_MARGENTA << "Pointer to Section:"
+				          << "\t" << toSec->name << std::endl << COLOR_NORM;
+			}
+			ptr_class[ptr.first].second = flags;
+			continue;
+		}
+
+		auto symname = this->process->symbols.getElfSymbolName(ptr.first);
+		if (symname != "") {
+			SETFLAGS(flags, PTR_SYMBOL);
+			if (printKnown) {
+				std::cout << COLOR_GREEN << "Pointer to Symbol:"
+				          << "\t" << symname << std::endl << COLOR_NORM;
+			}
+			ptr_class[ptr.first].second = flags;
+			continue;
+		}
+
+		if (toLoader->elffile->entryPoint() == (ptr.first - toVMA.start)){
+			SETFLAGS(flags, PTR_ENTRY);
+			if (printKnown) {
+				std::cout << COLOR_GREEN << "Pointer to Entry Point:"
+				          << std::endl << COLOR_NORM;
+			}
+			ptr_class[ptr.first].second = flags;
+			continue;
+		}
+
+		if (toSec->name == ".text") {
+			assert(this->data);
+		}
+
+		uint64_t func = this->process->symbols.getContainingSymbol(ptr.first);
+		std::string funcName = this->process->symbols.getElfSymbolName(func);
+
+		if(!isValidInstruction(this->data,
+		                       ptr.first - toVMA.start,
+		                       toVMA.start)) {
+			SETFLAGS(flags, PTR_UNKNOWN);
+			SETFLAGS(flags, PTR_INVALID_INSTR);
+			std::cout << COLOR_RED << COLOR_BOLD
+			          << "Pointer to invalid instruction! "
+			          << COLOR_BOLD_OFF
+			          << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+			          << std::hex << ptr.first - toVMA.start << " ( 0x"
+			          << ptr.first << " ) " << std::dec << COLOR_RESET << std::endl;
+			ptr_class[ptr.first].second = flags;
+			continue;
+		}
+
+		//if(this->toLoader->elffile->getSymbolCount() &&
+		if((ptr.first - func) > 0x4000) {
+			SETFLAGS(flags, PTR_UNINT_INSTR_NC);
+		} else if (!isIntendedInstruction(this->data + (func - toVMA.start),
+		                                  ptr.first - func,
+		                                  func)) {
+			SETFLAGS(flags, PTR_UNKNOWN);
+			SETFLAGS(flags, PTR_UNINT_INSTR);
+			std::cout << COLOR_RED << COLOR_BOLD
+			          << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+			          << std::hex << ptr.first - toVMA.start << " ( 0x"
+			          << ptr.first << " ) " << std::dec
+			          << "\tPointer to unintended instruction!"
+			          << COLOR_RESET << std::endl;
+		}
+
+		if((callAddr = isReturnAddress(this->data,
+		                               ptr.first - toVMA.start,
+		                               toVMA.start))) {
+			SETFLAGS(flags, PTR_RETURN);
+
+			if (printKnown | CHECKFLAGS(flags, (PTR_UNINT_INSTR))) {
+				if (CHECKFLAGS(flags, PTR_UNINT_INSTR)) {
+					std::cout << COLOR_RED << COLOR_BOLD
+				          << "\tPointer to unintended return addres!"
+					          << COLOR_RESET << std::endl;
+				}
+				uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
+				std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
+
+				std::cout << COLOR_GREEN << "Return Address to: "
+				          << "\t" << retFuncName << std::endl << COLOR_NORM;
+				if((callAddr) > 1) {
+					std::string callFuncName = this->process->symbols.getElfSymbolName(callAddr);
+					std::cout << COLOR_GREEN << "\tPreceeding call: "
+					          << "\t" << callFuncName << std::endl << COLOR_NORM;
+				}
+			}
+
+			if (!CHECKFLAGS(flags, (PTR_UNINT_INSTR))){
+				ptr_class[ptr.first].second = flags;
+				continue;
+			}
+
+		}
+
+		SETFLAGS(flags, PTR_UNKNOWN);
+		{
+			// Check if pointer contains NULL byte followed by printable
+			uint64_t ptr_cpy = ptr.first;
+			unsigned char* ptr_char = (unsigned char*) &(ptr_cpy);
+			bool foundNULL = false;
+			bool endsPrintable = false;
+			for(int i = 7; i >= 0 ; i--){
+				if(!foundNULL and ptr_char[i] == '\0'){
+					foundNULL = true;
+					endsPrintable = true;
+					continue;
+				}
+				if(foundNULL and (ptr_char[i] & 0x80)){
+					foundNULL = false;
+					endsPrintable = false;
+				}
+			}
+			if(endsPrintable) {
+				SETFLAGS(flags, PTR_END_PRINTABLE);
+				std::cout << "Printable pointer: 0x" << std::hex << ptr.first << std::dec << std:: endl;
+			}else{
+				std::cout << "Not printable pointer: 0x" << std::hex << ptr.first << std::dec << std:: endl;
+			}
+		}
+
+		std::cout << COLOR_RED
+		          << "Pointer to 0x" << std::setfill('0') << std::setw(8)
+		          << std::hex << ptr.first - toVMA.start << " ( 0x"
+		          << ptr.first << " ) " << std::dec;
+		if (toSec) {
+			std::cout << "\tSection: " << toSec->name;
+		}
+		std::cout << std::endl;
+		std::cout << "\tinto function: " << funcName << std::hex
+		          << " (" << "offset: " << ptr.first - func << ")"
+		          << std::dec << " From " << ptr.second.size() << " Locations"
+		          << std::endl << COLOR_NORM;
+
+		size_t offset = ptr.first - toVMA.start;
+		uint64_t len = this->toLoader->getTextSegment().size() - offset;
+		auto ret = printInstructions(this->data + offset, len, ptr.first);
+		size_t nr_instr = std::get<0>(ret);
+		bool end_valid = std::get<1>(ret);
+		std::string instr = std::get<2>(ret);
+		std::cout << COLOR_RED << COLOR_BOLD
+		          << "\tPointing to gadget of " << nr_instr
+		          << " instructions" << std::endl;
+		if(end_valid) {
+			std:: cout << "\tEnding in an invalid instruction!" << std::endl;
+		}else{
+			SETFLAGS(flags, PTR_GADGET);
+		}
+		std::cout << COLOR_RESET;
+		ptr_class[ptr.first].second = flags;
+
+	}
+	return ptr_class;
+}
+
+
+protected:
+	uint32_t count;
+	std::map<uint64_t, std::set<uint64_t>> ptrs;
+	Process *process;
+	ElfLoader *fromLoader;
+	ElfLoader *toLoader;
+	const uint8_t *data;
+	const VMAInfo *fromVMA;
+	const VMAInfo toVMA;
+};
 // TODO: retrieve paths from command line parameters
 ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
                                    Process *process,
@@ -38,6 +566,48 @@ ProcessValidator::ProcessValidator(ElfKernelLoader *kl,
 
 ProcessValidator::~ProcessValidator() {}
 
+void printHeaders(){
+
+	static bool done = false;
+	if(done) return;
+	done = true;
+
+	std::stringstream ss1;
+	std::stringstream ss2;
+
+	ss1 << "Overall ptrs;"
+	    << "Unique ptrs;"
+	    << "Not PIE;"
+	    << "Ptr Known;"
+	    << "No corresponding section;"
+//	    << "Ptr to plain file;"
+	    << "Ptr to start of section;"
+	    << "Pointer to Section != .text;"
+	    << "Ptr to String (.dynstr);"
+	    << "Ptr to Symbol (.dynsym);"
+	    << "Pointer to Symbol;"
+	    << "Pointer to EntryPoint;"
+	    << "Return Address;"
+	    << "Unknown Ptr;"
+	    << "Unknown Ptr Pie;"
+	    << "Unknown Pie End Printable;"
+	    << "Invalid Instruction;"
+	    << "Unintended Instruction;"
+	    << "Unintended Instruction not checked;"
+	    << "Unintended Return instruction;"
+	    << "Unintended Usable Gadget";
+
+
+	ss2 << "C1;C2;C3;C4;C5;C6;C7;C8;C9;C10;C11;C12;C13;C14;C15;C16;C17;C18;C19;C20";
+
+	std::cout << "Process summary;PID;Name;" << ss1.str() << std::endl;
+	std::cout << "Process summary;PID;Name;" << ss2.str() << std::endl;
+	std::cout << "Section summary;PID;Name;SectionName;Symcount" << ss1.str() << std::endl;
+	std::cout << "Section summary;PID;Name;SectionName;Symcount" << ss2.str() << std::endl;
+	std::cout << "Mapping summary;PID;Name;FromMapping;ToMapping;Symcount" << ss1.str() << std::endl;
+	std::cout << "Mapping summary;PID;Name;FromMapping;ToMapping;Symcount" << ss2.str() << std::endl;
+}
+
 int ProcessValidator::validateProcess() {
 	static uint64_t execSize = 0;
 	static uint64_t execPageCount = 0;
@@ -48,6 +618,8 @@ int ProcessValidator::validateProcess() {
 	std::cout << COLOR_GREEN
 	          << "Starting page validation ..."
 	          << COLOR_RESET << std::endl;
+
+	printHeaders();
 
 	PageMap executablePageMap = this->vmi->getPages(this->pid);
 	for (auto &page : executablePageMap) {
@@ -62,14 +634,14 @@ int ProcessValidator::validateProcess() {
 	}
 	this->vmi->destroyMap(executablePageMap);
 
-	std::vector<size_t> summary_counter(20, 0);
-
+	std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> glob_stats;
 	// Check if all mapped VMAs are valid
 	for (auto &section : this->process->getMappedVMAs()) {
+		std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> stats;
 		if(section.name == "[stack]" || section.name == "[heap]") {
 			dataSize += section.end - section.start;
 			dataPageCount++;
-			summary_counter = summary_counter + this->validateDataPage(&section);
+			stats = this->validateDataPage(&section);
 		} else if (section.name[0] == '[') {
 			continue;
 		} else if ((section.flags & VMAInfo::VM_EXEC)) {
@@ -79,30 +651,24 @@ int ProcessValidator::validateProcess() {
 		} else if ((section.flags & VMAInfo::VM_WRITE)) {
 			dataSize += section.end - section.start;
 			dataPageCount++;
-			summary_counter = summary_counter + this->validateDataPage(&section);
+			stats = this->validateDataPage(&section);
 		}
-		// No need to validate pages that are only readable,
-		// we trust the kernel.
+		for (auto ptr : stats){
+			auto tmp = glob_stats[ptr.first];
+			if(tmp.first != 0 and tmp.second != ptr.second.second){
+				assert(false);
+			}
+			glob_stats[ptr.first].first += ptr.second.first;
+			glob_stats[ptr.first].second = ptr.second.second;
+		}
 	}
 
-	if(summary_counter[0]) {
-		std::cout << "Prozess summary" << ";"
+	if(glob_stats.size()) {
+		std::cout << "Process summary"
 		          << ";" << this->process->getPID()
-		          << ";" << this->process->getName()
-		          << ";" << summary_counter[ 0]
-		          << ";" << summary_counter[ 1]
-		          << ";" << summary_counter[ 2]
-		          << ";" << summary_counter[ 3]
-		          << ";" << summary_counter[ 4]
-		          << ";" << summary_counter[ 5]
-		          << ";" << summary_counter[ 6]
-		          << ";" << summary_counter[ 7]
-		          << ";" << summary_counter[ 8]
-		          << ";" << summary_counter[ 9]
-		          << ";" << summary_counter[10]
-		          << ";" << summary_counter[11]
-		          << ";" << summary_counter[12]
-		          << std::endl;
+		          << ";" << this->process->getName();
+		std::cout << PagePtrInfo::printStat2(glob_stats);
+		std::cout << std::endl;
 	}
 
 	// TODO count errors or change return value
@@ -184,299 +750,14 @@ void ProcessValidator::validateCodePage(const VMAInfo *vma) const {
 }
 
 
-class PagePtrInfo {
-public:
 
-PagePtrInfo(Process* process, const VMAInfo *fromVMA, const VMAInfo &toVMA)
-	:
-	count{0},
-	counter(20, 0),
-	ptrs{},
-	process{process},
-	data{nullptr},
-	fromVMA{fromVMA},
-	toVMA{toVMA} {
-
-	if (fromVMA->name[0] != '[') {
-		this->fromLoader = this->process->findLoaderByFileName(fromVMA->name);
-	} else {
-		this->fromLoader = this->process->getExecLoader();
-	}
-	this->toLoader = this->process->findLoaderByFileName(toVMA.name);
-
-	if (this->toLoader != nullptr) {
-		this->data = this->toLoader->getTextSegment().data();
-	}
-}
-
-~PagePtrInfo() = default;
-
-uint32_t getCount() {
-	return count;
-}
-
-void addPtr(uint64_t where, uint64_t addr) {
-	this->count += 1;
-	this->ptrs[addr].insert(where);
-}
-
-void printSummary() {
-	if(counter[0]) {
-		std::cout << "Mapping summary" << ";"
-		          << ";" << this->process->getPID()
-		          << ";" << this->process->getName()
-		          << ";" << this->fromVMA->name
-		          << ";" << this->toVMA.name
-		          << ";" << counter[ 0]
-		          << ";" << counter[ 1]
-		          << ";" << counter[ 2]
-		          << ";" << counter[ 3]
-		          << ";" << counter[ 4]
-		          << ";" << counter[ 5]
-		          << ";" << counter[ 6]
-		          << ";" << counter[ 7]
-		          << ";" << counter[ 8]
-		          << ";" << counter[ 9]
-		          << ";" << counter[10]
-		          << ";" << counter[11]
-		          << ";" << counter[12]
-		          << std::endl;
-	}
-}
-
-std::vector<size_t> showPtrs(VMIInstance *vmi, uint32_t pid) {
-	//std::cout << "Found " << count << " pointers:" << std::endl;
-	uint64_t callAddr = 0;
-	bool printKnown = false;
-	for (auto &ptr : ptrs) {
-		this->counter[0]++;
-		this->counter[1] += ptr.second.size();
-		bool valid = false;
-
-		auto toSec = this->toLoader->elffile->findSectionByOffset(ptr.first - toVMA.start);
-		auto symname = this->process->symbols.getElfSymbolName(ptr.first);
-
-
-		if (symname != "") {
-			this->counter[2]++;
-			if (printKnown) {
-				std::cout << COLOR_GREEN << "Pointer to Symbol:"
-				          << "\t" << symname << std::endl << COLOR_NORM;
-			}
-			continue;
-		}
-
-		if(!this->toLoader && !toVMA.name.empty()){
-			this->counter[3]++;
-			if (printKnown) {
-				std::cout << COLOR_GREEN << "Pointer to Plain File:"
-				          << "\t" << toVMA.name << std::endl << COLOR_NORM;
-			}
-			continue;
-		}
-
-		if(!toSec) {
-			this->counter[4]++;
-			if (printKnown) {
-				std::cout << COLOR_MARGENTA << "Pointer to no section"
-				          << std::endl << COLOR_NORM;
-			}
-			continue;
-		}
-
-		if ((ptr.first - toVMA.start - toSec->offset) == 0) {
-			this->counter[5]++;
-			if (printKnown) {
-				std::cout << COLOR_GREEN << "Pointer to start of Section:"
-				          << "\t" << toSec->name << std::endl << COLOR_NORM;
-			}
-			continue;
-		}
-
-		if (printKnown) {
-			if (toSec->name == ".dynstr"){
-				std::string str = std::string((char*) toSec->index + (ptr.first - toVMA.start) - toSec->memindex);
-				std::cout << COLOR_GREEN << "Pointer to String:"
-				          << "\t" << str << std::endl << COLOR_NORM;
-				continue;
-			}
-
-			if(toSec->name == ".dynsym"){
-				std::string str = this->toLoader->elffile->dynSymbolName(ptr.first - toVMA.start - toSec->offset);
-				std::cout << COLOR_GREEN << "Pointer to Symbol:"
-				          << "\t" << str << std::endl << COLOR_NORM;
-				continue;
-			}
-		}
-
-		std::unordered_set<std::string> allowedSections = {
-			".data.rel.ro",
-			".data.rel.ro.local",
-			".dynamic",
-			".dynstr",
-			".dynsym",
-			".eh_frame",
-			".eh_frame_hdr",
-			".gcc_except_table",
-			".gnu.hash",
-			".gnu.version",
-			".gnu.version_d",
-			".gnu.version_r",
-			".got",
-			".got.plt",
-			".hash",
-			".interp",
-			".note.ABI-tag",
-			".note.gnu.build-id",
-			".plt",
-			".plt.got",
-			".rela.dyn",
-			".rela.plt",
-			".rodata",
-			"__libc_IO_vtables",
-			"__libc_thread_freeres_fn"
-		};
-
-		if(allowedSections.find(toSec->name) != allowedSections.end()) {
-			this->counter[6]++;
-			if (printKnown) {
-				std::cout << COLOR_MARGENTA << "Pointer to Section:"
-				          << "\t" << toSec->name << std::endl << COLOR_NORM;
-			}
-			continue;
-		}
-
-		if (toSec->name == ".text") {
-			if (toLoader->elffile->entryPoint() == (ptr.first - toVMA.start)){
-				this->counter[7]++;
-				if (printKnown) {
-					std::cout << COLOR_GREEN << "Pointer to Entry Point:"
-					          << std::endl << COLOR_NORM;
-				}
-				continue;
-			}
-			if (this->data) {
-				if(!isValidInstruction(this->data,
-				                       ptr.first - toVMA.start,
-				                       toVMA.start)) {
-					this->counter[8]++;
-					std::cout << COLOR_RED << COLOR_BOLD
-					          << "Pointer to invalid instruction!"
-					          << COLOR_RESET << std::endl;
-				}else{
-					valid = true;
-				}
-				if(valid &&
-				   (callAddr = isReturnAddress(this->data,
-				                               ptr.first - toVMA.start,
-				                               toVMA.start, vmi, pid))) {
-					this->counter[9]++;
-					if (printKnown) {
-						uint64_t retFunc = this->process->symbols.getContainingSymbol(ptr.first);
-						std::string retFuncName = this->process->symbols.getElfSymbolName(retFunc);
-
-						std::cout << COLOR_GREEN << "Return Address to: "
-						          << "\t" << retFuncName << std::endl << COLOR_NORM;
-						if((callAddr) > 1) {
-							std::string callFuncName = this->process->symbols.getElfSymbolName(callAddr);
-							std::cout << COLOR_GREEN << "\tPreceeding call: "
-							          << "\t" << callFuncName << std::endl << COLOR_NORM;
-						}
-					}
-					continue;
-				}
-			}
-
-			uint64_t func = this->process->symbols.getContainingSymbol(ptr.first);
-			std::string funcName = this->process->symbols.getElfSymbolName(func);
-
-			this->counter[10]++;
-			std::cout << COLOR_MARGENTA << "Unknown Pointer:"
-			          << "\t" << funcName << std::hex
-			          << " (" << "offset: " << ptr.first - func << ")"
-			          << std::dec << std::endl << COLOR_NORM;
-
-			if(this->data && valid){
-				uint64_t start = func - toVMA.start;
-				if(!isIntendedInstruction(this->data + start,
-				                          ptr.first - func,
-				                          toVMA.start + start)) {
-					this->counter[11]++;
-					std::cout << COLOR_RED << COLOR_BOLD
-					          << "\tPointer to unintended instruction!"
-					          << COLOR_RESET << std::endl;
-				}
-				start = ptr.first - toVMA.start;
-				uint64_t len = this->toLoader->getTextSegment().size() - start;
-				auto ret = printInstructions(this->data + start, len, toVMA.start + start);
-				size_t nr_instr = std::get<0>(ret);
-				bool end_valid = std::get<1>(ret);
-				std::string instr = std::get<2>(ret);
-				std::cout << COLOR_RED << COLOR_BOLD
-				          << "\tPointing to gadget of " << nr_instr
-				          << " instructions" << std::endl;
-				if(end_valid) {
-					std:: cout << "\tEnding in an invalid instruction!" << std::endl;
-				}
-				for(auto && str : split(instr, '\n')){
-					std::cout << "\t\t" << str << std::endl;
-				}
-				std::cout << COLOR_RESET;
-			}
-
-
-		}
-
-		std::cout << COLOR_RED
-		          << "Pointer to 0x" << std::setfill('0') << std::setw(8)
-		          << std::hex << ptr.first - toVMA.start << " ( 0x"
-		          << ptr.first << " ) " << std::dec;
-		if (toSec) {
-			std::cout << "\tSection: " << toSec->name;
-		}
-		std::cout << std::endl;
-
-		for (auto &where : ptr.second) {
-			std::cout << "\tFrom: 0x" << std::setfill('0') << std::setw(8)
-			          << std::hex << where << " ( 0x"
-			          << fromVMA->start + ptr.first << " ) " << std::dec;
-			const SectionInfo* fromSec = 0;
-			if(this->fromLoader && fromVMA->ino != 0) {
-				fromSec = this->fromLoader->elffile->findSectionByOffset(fromVMA->off * 0x1000 + where);
-			}
-			if(fromSec) {
-				std::cout << "\tSection: " << fromSec->name;
-			}else if (fromVMA->ino == 0) {
-				std::cout << "\tSection: .bss (dynamic)";
-			} else {
-				std::cout << "\tPlain File: " << fromVMA->name << " : ";
-				fromVMA->print();
-			}
-			std::cout << std::endl;
-		}
-		std::cout << COLOR_NORM;
-		this->counter[12]++;
-	}
-	return this->counter;
-}
-
-
-protected:
-	uint32_t count;
-	std::vector<size_t> counter;
-	std::map<uint64_t, std::set<uint64_t>> ptrs;
-	Process *process;
-	ElfLoader *fromLoader;
-	ElfLoader *toLoader;
-	const uint8_t *data;
-	const VMAInfo *fromVMA;
-	const VMAInfo toVMA;
-};
-
-std::vector<size_t> ProcessValidator::validateDataPage(const VMAInfo *vma) const {
+std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>>
+ProcessValidator::validateDataPage(const VMAInfo *vma) const {
 	// TODO: see if the start address of the mapping
 	// is the address of GOT, then validate if symbols and
 	// references are correct. elffile64 does the patching.
+
+	std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> glob_stats;
 
 	std::vector<std::pair<VMAInfo, PagePtrInfo>> range;
 
@@ -496,7 +777,7 @@ std::vector<size_t> ProcessValidator::validateDataPage(const VMAInfo *vma) const
 	                                     this->pid, true);
 	if (content.size() <= sizeof(uint64_t)) {
 		// This page is currently not mapped
-		return std::vector<size_t>(20, 0);
+		return glob_stats;
 	}
 
 	uint8_t *data = content.data();
@@ -523,7 +804,6 @@ std::vector<size_t> ProcessValidator::validateDataPage(const VMAInfo *vma) const
 						// Pointer to PHDR
 						break;
 					}
-
 					mapping.second.addPtr(i, *value);
 				}
 			}
@@ -534,49 +814,66 @@ std::vector<size_t> ProcessValidator::validateDataPage(const VMAInfo *vma) const
 	// sysdeps/x86_64/dl-trampoline.S:64
 	// LD_BIND_NOW forces load-time relocations.
 
-	std::vector<size_t> summary_counter(20, 0);
 
 	for (auto &mapping : range) {
-		std::vector<size_t> counter = mapping.second.showPtrs(this->vmi, this->pid);
+		auto && stats = mapping.second.showPtrs();
 
-		summary_counter = summary_counter + counter;
-		if(counter[12]) {
+		if(stats.size() == 0) continue;
+
+		std::cout << mapping.second.printMappingInfo();
+		std::cout << PagePtrInfo::printStat(stats);
+		std::cout << std::endl;
+
+		size_t unknown = 0;
+		for (auto ptr : stats){
+			if (CHECKFLAGS(ptr.second.second, PagePtrInfo::PTR_UNKNOWN)) unknown++;
+			auto tmp = glob_stats[ptr.first];
+			if(tmp.first != 0 and tmp.second != ptr.second.second){
+				assert(false);
+			}
+			glob_stats[ptr.first].first += ptr.second.first;
+			glob_stats[ptr.first].second = ptr.second.second;
+		}
+
+		if(unknown) {
 			std::cout << "Pointers from " << ((vma->name[0] == '[') ? process->getName() + " " + vma->name :vma->name)
 			          << " to " << mapping.first.name << std::endl;
 		}
-		mapping.second.printSummary();
+
+		// TODO mapping.second.printSummary();
 	}
-	if(summary_counter[1]) {
+	size_t unknown = 0;
+	for (auto ptr : glob_stats){
+		if (CHECKFLAGS(ptr.second.second, PagePtrInfo::PTR_UNKNOWN)) unknown++;
+	}
+
+	if(unknown) {
 		std::cout << "Found " << COLOR_RED << COLOR_BOLD
 		      << std::setfill(' ') << std::setw(5)
-		      << summary_counter[12] << COLOR_RESET << " unknown ("
-		      << COLOR_GREEN << std::setw(5) << summary_counter[1] << COLOR_RESET << ")"
+		      << unknown << COLOR_RESET << " unknown ("
+		      << COLOR_GREEN << std::setw(5) << glob_stats.size() << COLOR_RESET << ")"
 		      << " pointers: ";
 		vma->print();
 	}
+	
+	if(glob_stats.size()){
+		ElfUserspaceLoader * fromLoader;
+		if (vma->name[0] != '[') {
+			fromLoader = this->process->findLoaderByFileName(vma->name);
+		} else {
+			fromLoader = this->process->getExecLoader();
+		}
 
-	if(summary_counter[0]) {
-		std::cout << "Section summary" << ";"
+		std::cout << "Segment summary"
 		          << ";" << this->process->getPID()
 		          << ";" << this->process->getName()
 		          << ";" << vma->name
-		          << ";" << summary_counter[ 0]
-		          << ";" << summary_counter[ 1]
-		          << ";" << summary_counter[ 2]
-		          << ";" << summary_counter[ 3]
-		          << ";" << summary_counter[ 4]
-		          << ";" << summary_counter[ 5]
-		          << ";" << summary_counter[ 6]
-		          << ";" << summary_counter[ 7]
-		          << ";" << summary_counter[ 8]
-		          << ";" << summary_counter[ 9]
-		          << ";" << summary_counter[10]
-		          << ";" << summary_counter[11]
-		          << ";" << summary_counter[12]
-		          << std::endl;
+		          << ";" << ((fromLoader)? fromLoader->elffile->getSymbolCount() :0);
+		std::cout << PagePtrInfo::printStat(glob_stats);
+		std::cout << std::endl;
 	}
 
-	return summary_counter;
+	return glob_stats;
 
 }
 
